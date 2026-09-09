@@ -1,4 +1,11 @@
-import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  type RefreshControlProps,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@/constants/theme';
@@ -8,13 +15,15 @@ interface ScreenProps {
   /** Disable when the screen manages its own scrolling. Defaults to true. */
   scrollable?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Optional pull-to-refresh control for data screens. */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 /**
  * Send2U screen shell: light background, safe areas, consistent padding.
  * Scrollable by default so content survives small screens.
  */
-export function Screen({ children, scrollable = true, contentStyle }: ScreenProps) {
+export function Screen({ children, scrollable = true, contentStyle, refreshControl }: ScreenProps) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       {scrollable ? (
@@ -22,7 +31,8 @@ export function Screen({ children, scrollable = true, contentStyle }: ScreenProp
           style={styles.flex}
           contentContainerStyle={[styles.content, contentStyle]}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}>
           {children}
         </ScrollView>
       ) : (

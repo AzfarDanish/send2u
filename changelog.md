@@ -117,3 +117,183 @@ here conflicts with the actual implementation.
 - Known limitations: native-device rendering not checked (no simulator run in
   this environment); web screenshots are representative of layout but not a
   substitute for on-device review.
+
+## 2026-09-10 — Menu: real Supabase menu + requester browsing + local cart
+
+- Change: first data-backed feature. New minimal 2-level schema (one active
+  menu per vendor; no menus table): `send2u_vendors` and `send2u_menu_items`
+  (id, vendor, name, description, price_cents, nullable image_url for future
+  Storage, availability, ordering, timestamps) via migration
+  `create_send2u_menu`, plus fictional demo seed (`seed_send2u_menu_demo`):
+  6 placeholder stalls, 26 items with MYR prices, 2 unavailable items.
+  Read-only RLS: one SELECT policy per table (`TO authenticated`; vendors
+  gated on `is_active`, items on vendor-active via EXISTS); zero write
+  policies; ambient grants revoked, `GRANT SELECT … TO authenticated` only —
+  requesters provably cannot modify menu data. App: `services/menu.ts`
+  (SELECT-only, explicit errors, no `any`), `hooks/useMenu.ts` (mount fetch +
+  pull-to-refresh, no cache lib), `lib/money.ts` (`formatMYR`), extended
+  `Vendor`/`MenuItem` types, in-memory `CartContext` (add/setQty/remove/
+  clear, subtotal = price × qty, resets per session, never persisted).
+  UI: Home "Today's menu" (vendor sections, price-forward rows, unavailable
+  badges, loading/error/empty/refresh states), new `/(requester)/menu/[id]`
+  detail (vendor, price, availability, qty stepper, Add-to-cart → local cart
+  only, honest confirmation), Create tab as cart home (lines, steppers,
+  subtotal, no-fees note, "checkout next task" + clear). Shared
+  `MenuItemRow`/`QuantityStepper`; `Screen` gained optional pull-to-refresh.
+- Reason: make the menu real while bounding scope — no cart persistence, no
+  checkout/order/fees/vendor-mixing rules (explicitly deferred).
+- Decisions:
+  - No payment infrastructure of any kind (no Stripe/FPX/wallets). QR-payment
+    direction preserved with zero implementation: no schema change; reserved
+    future home documented as a helper-profile extension holding a Storage
+    image reference (binary never in DB), to be built with the payment task.
+  - Unavailable items stay readable (grayed + badged) rather than hidden.
+- Validation: `tsc`, `eslint`, `expo-doctor` 18/18, `expo export -p web`
+  (incl. new `menu/[id]` route) — pass. SQL-verified: columns, both policy
+  predicates, SELECT-only grants, 6/26/2 seed counts; advisors clean on new
+  tables. Screens contain no raw Supabase calls and menu service has no
+  writes (grep-verified).
+- Known limitations:
+  - Anonymous sign-ins were re-disabled on the app project after earlier
+    verification passed, so the live authenticated RLS matrix (read OK /
+    write-denied probes) and authenticated menu screenshots could not run
+    this session. Re-enable the toggle on this project and re-run them
+    before relying on end-to-end menu behavior; SQL-level policy/grant
+    verification above stands on its own.
+  - Native-device review not done.
+
+## 2026-09-10 — Incident: menu migrations applied to wrong project, reverted
+
+- What happened: the menu migrations (`create_send2u_menu`,
+  `seed_send2u_menu_demo`) were applied through Supabase MCP to project
+  `xhyhezk…`, but the app (per its updated `.env`) and the original MCP
+  project instruction both point at project `sqspqwj…`. The MCP session
+  serves `xhyhezk…`, so all MCP database work landed there.
+- Reverted on `xhyhezk…` via recorded migration
+  `revert_send2u_menu_wrong_project` (DROP of the two task-created tables;
+  policies, index, grants, and seed rows went with them). Pre-drop evidence:
+  tables absent pre-task, no external dependents, no triggers/functions, no
+  local migration files, no hardcoded refs in source.
+- Verified post-rollback: menu tables/policies/grants fully gone;
+  `send2u_profiles` intact (12 rows, same 3 policies, RLS on); all unrelated
+  tables byte-identical to baseline counts; migration history preserves the
+  full trail (profiles → menu → seed → revert). No app code was changed.
+- Disposition: app-side menu implementation (service, hook, cart, UI) is
+  database-agnostic and REMAINS; migration SQL is preserved for reapplication.
+  Nothing was applied to `sqspqwj…` — it cannot be inspected or modified with
+  current tooling, so menu migrations are intentionally HELD, not reapplied.
+- Target verdict: app → `sqspqwj…`, MCP → `xhyhezk…` — DO NOT MATCH. Canonical
+  project is `sqspqwj…` by converging user evidence, but app/MCP alignment is
+  still unresolved.
+- Validation: `tsc`, `eslint` — pass (no app changes in this task).
+- Remaining blocker: establish a single reachable target (MCP session serving
+  `sqspqwj…`, or explicit instruction otherwise) before any menu migration
+  runs again.
+
+## 2026-09-10 — Incident follow-up: wrong-DB cleanup script + service key slot
+
+- Change: added one-time `cleanup-send2u-wrong-database.sql` (repo root, to be
+  deleted after use) that drops the leftover `send2u_profiles` table on the
+  wrong project ONLY — pre-flight guard aborts if menu tables reappear, and
+  post-flight queries verify zero `send2u` objects remain while unrelated
+  tables stay intact. Pre-verified safe: no FKs, policies, views, or functions
+  depend on the table. Added an empty `SUPABASE_SERVICE_ROLE_KEY` slot to
+  `.env`/`.env.example` (deliberately NOT `EXPO_PUBLIC_`-prefixed and never
+  referenced from app code, so it cannot leak into the client bundle).
+- Reason: fully clear the wrong database via a guarded paste-into-dashboard
+  script, and hold the server-only secret outside the codebase.
+- Validation: `tsc` — pass; dependency/secret scans clean; script read back
+  and reviewed statement-by-statement (guard + 3 `IF EXISTS` drops + 3
+  verification queries). Script NOT executed by the agent — user runs it.
+- Known limitations: the secret value itself must be pasted by the user from
+  the dashboard (secret keys are not retrievable via tooling, by design).
+
+## 2026-09-10 — Menu: clean implementation on canonical database
+
+- Target verification (before any mutation): app `.env`
+  `EXPO_PUBLIC_SUPABASE_URL` and Supabase MCP project URL both resolve to
+  `sqspqwj…` (canonical); wrong project `xhyhezk…` untouched. Pre-migration
+  state confirmed empty: 0 tables in `public`, 0 migrations, only system
+  schemas present.
+- Database: migration `create_send2u_menu` — 2-level schema, no menus table:
+  `send2u_vendors` (name, description, location_hint, nullable image_url,
+  is_active/is_open, sort_order, timestamps; non-empty-name and ordering
+  checks) and `send2u_menu_items` (vendor FK cascade, name, description,
+  price_cents with non-negative check, nullable image_url, is_available,
+  sort_order, timestamps); indexes on vendor display order and
+  (vendor_id, sort_order, name).
+- RLS: enabled on both tables, read-only. `send2u_vendors_select_active`
+  and `send2u_menu_items_select_active_vendor` (EXISTS on active vendor),
+  both `FOR SELECT TO authenticated`; zero write policies. Grants stripped
+  (`REVOKE ALL FROM PUBLIC, anon, authenticated`) then `GRANT SELECT …
+  TO authenticated` only. Unavailable items stay readable by design;
+  inactive vendors hidden.
+- Seed: migration `seed_send2u_menu_demo` — exactly 6 fictional demo vendors
+  (all active; 5 open + `Selera Barat Palsu` closed to demo the closed badge)
+  with 28 items total (5/5/5/4/5/4 per vendor), realistic MYR prices in cents,
+  3 unavailable items across vendors, all image references NULL. Names are
+  invented development data, not real businesses.
+- App: requester menu layer from the earlier (wrong-DB) task already matches
+  this schema and needed no rework — `services/menu.ts` (SELECT-only, no
+  `any`), `hooks/useMenu.ts`, `lib/money.ts`, `CartContext` (in-memory,
+  subtotal = price × quantity, no fees/checkout/persistence), Home vendor
+  sections, `menu/[id]` detail, Create tab as cart home. One hardening fix:
+  detail `handleAdd` now returns early for unavailable items, so they cannot
+  enter the cart even if the disabled button is activated programmatically.
+  No Supabase calls in presentation components; no hardcoded menu fallback;
+  no image URLs; light-only design system intact.
+- Decisions: no payment infrastructure (QR-payment direction preserved with
+  zero implementation, same as before); no vendor-mixing rules, no cart
+  persistence, no order creation — all deferred.
+- Validation (live on `sqspqwj…`): 6 vendors / 28 items / 3 unavailable;
+  relationships and prices row-verified; RLS on both tables; authenticated
+  reads 6 vendors + 28 items incl. 3 unavailable; anon SELECT denied
+  (permission denied); authenticated INSERT/UPDATE/DELETE all denied
+  (42501); counts unchanged after denied writes. Advisors: only pre-existing
+  `rls_auto_enable` SECURITY DEFINER warns, expected anon-sign-in
+  informational flags (dev uses anonymous auth → authenticated role), and one
+  INFO unused-index on the fresh seed. `tsc` clean, `eslint` 0 errors
+  (1 pre-existing generated-file warning), `expo-doctor` 18/18,
+  `expo export -p web` pass (incl. `menu/[id]`).
+- Known limitations:
+  - `send2u_profiles` does not exist on the canonical DB (it was empty
+    before this task and this task scopes to menu tables only), so dev
+    `continueAs`/`switchRole` profile persistence will fail until the
+    profiles migration is re-applied in a separate auth task. Menu RLS
+    itself needs only the `authenticated` role and is fully verified.
+  - No authenticated end-to-end screenshots this session (needs the missing
+    profiles table + anon toggle state); UI code is unchanged from the
+    previously screenshot-verified implementation apart from the guard above.
+  - Native-device review not done.
+
+## 2026-09-10 — Auth: dev-auth profiles on canonical database
+
+- Target verification (before mutation): app `.env`
+  `EXPO_PUBLIC_SUPABASE_URL` and Supabase MCP project URL both resolve to
+  `sqspqwj…` (canonical). Pre-migration `public` held only the two menu
+  tables; `send2u_profiles` confirmed absent.
+- Database: migration `create_send2u_profiles` — `send2u_profiles` keyed by
+  `auth.uid()` (`id` uuid PK with FK to `auth.users` cascade delete; `role`
+  text restricted to `requester|helper|vendor|admin` via CHECK; timestamps).
+  RLS on with three ownership-pinned `TO authenticated` policies
+  (select/insert/update own row, `auth.uid() = id`); no DELETE policy.
+  Grants stripped then `GRANT SELECT, INSERT, UPDATE … TO authenticated`
+  only — matches the original profile design and the existing
+  `services/auth.ts` contract (`fetchProfile` select, `setProfileRole`
+  upsert on `id`), so no app code changes were needed.
+- Validation (live on `sqspqwj…`): table present with RLS on; 3 policies and
+  SELECT/INSERT/UPDATE-only grants confirmed; PK/FK/role-CHECK constraints
+  present; authenticated SELECT with no JWT returns 0 rows (no leak); anon
+  SELECT denied (42501); authenticated INSERT with no JWT denied by RLS;
+  invalid role `'superuser'` rejected by CHECK with no row written; menu
+  tables byte-identical (6 vendors / 28 items); profiles at 0 rows (clean,
+  no seed — correct for an auth table). Advisors: no RLS-disabled findings;
+  only pre-existing `rls_auto_enable` warns plus expected anon-sign-in
+  informational flags (dev uses anonymous auth → authenticated role).
+  `tsc` clean, `eslint` 0 errors, `expo-doctor` 18/18,
+  `expo export -p web` pass.
+- Known limitations:
+  - No live anonymous sign-in round trip this session (toggle state not
+    re-checked); end-to-end `continueAs`/`switchRole` should be exercised on
+    device once anon sign-ins are confirmed enabled.
+  - Native-device review not done.

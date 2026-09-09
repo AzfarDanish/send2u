@@ -43,18 +43,51 @@ export interface Helper extends AppUser {
   isVerifiedStudent?: boolean;
 }
 
+/** Cafeteria stall. One active menu per vendor for the MVP (no menus table). */
 export interface Vendor {
   id: string;
   name: string;
-  locationDescription?: string;
-  isOpen?: boolean;
+  description: string | null;
+  locationHint: string | null;
+  /** Storage path/URL for a future vendor image. Unused in MVP. */
+  imageUrl: string | null;
+  isActive: boolean;
+  isOpen: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MenuItem {
   id: string;
   vendorId: string;
   name: string;
+  description: string | null;
+  /** Price in Malaysian Ringgit cents (e.g. 650 = RM 6.50). */
   priceCents: number;
+  /** Storage path/URL for a future item image. Unused in MVP. */
+  imageUrl: string | null;
+  isAvailable: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Menu item with its vendor joined — what the requester UI renders. */
+export interface MenuItemWithVendor extends MenuItem {
+  vendor: Pick<Vendor, 'id' | 'name' | 'locationHint' | 'isOpen'>;
+}
+
+/** One vendor section on the requester menu. */
+export interface VendorMenuSection {
+  vendor: Vendor;
+  items: MenuItemWithVendor[];
+}
+
+/** Local in-memory cart line. No checkout, no persistence (MVP). */
+export interface CartLine {
+  item: MenuItemWithVendor;
+  quantity: number;
 }
 
 export interface DeliveryLocation {

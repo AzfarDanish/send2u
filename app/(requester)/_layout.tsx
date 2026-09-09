@@ -55,6 +55,7 @@ export default function RequesterLayout() {
         name="profile"
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
       />
+      <Tabs.Screen name="menu/[id]" options={{ href: null, title: 'Item details' }} />
     </Tabs>
   );
 }

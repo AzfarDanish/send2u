@@ -1,0 +1,60 @@
+import { Redirect, Tabs } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
+import { colors, navigation, touchTargets, typography } from '@/constants/theme';
+import { useAuth } from '@/hooks/useAuth';
+
+function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
+  function TabIcon({ color, size }: { color: string; size: number }) {
+    return <MaterialIcons name={name} size={size} color={color} />;
+  }
+  return TabIcon;
+}
+
+export default function HelperLayout() {
+  const { user, role, isLoading } = useAuth();
+
+  if (isLoading) return null;
+  if (!user) return <Redirect href="/(auth)/sign-in" />;
+  if (role === 'requester') return <Redirect href="/(requester)" />;
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: true,
+        headerStyle: { backgroundColor: navigation.headerBackground },
+        headerTitleStyle: { ...typography.subtitle, color: navigation.headerText },
+        headerTintColor: navigation.headerText,
+        headerShadowVisible: false,
+        tabBarActiveTintColor: navigation.tabActive,
+        tabBarInactiveTintColor: navigation.tabInactive,
+        tabBarStyle: {
+          backgroundColor: navigation.tabBarBackground,
+          borderTopColor: navigation.tabBarBorder,
+          borderTopWidth: 1,
+          height: touchTargets.tabBar,
+          paddingTop: 8,
+          paddingBottom: 8,
+        },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        sceneStyle: { backgroundColor: colors.background },
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{ title: 'Jobs', tabBarIcon: tabIcon('work-outline') }}
+      />
+      <Tabs.Screen
+        name="deliveries"
+        options={{ title: 'My Deliveries', tabBarIcon: tabIcon('delivery-dining') }}
+      />
+      <Tabs.Screen
+        name="earnings"
+        options={{ title: 'Earnings', tabBarIcon: tabIcon('account-balance-wallet') }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
+      />
+    </Tabs>
+  );
+}

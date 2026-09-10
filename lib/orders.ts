@@ -17,13 +17,17 @@ export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warn
   switch (status) {
     case 'pending':
     case 'assigned':
+    case 'going_to_vendor':
     case 'at_vendor':
-    case 'purchased':
+    case 'food_available':
+    case 'food_purchased':
     case 'picked_up':
       return 'info';
+    case 'out_for_delivery':
     case 'delivering':
       return 'warning';
     case 'delivered':
+    case 'awaiting_requester_payment':
     case 'confirmed':
       return 'success';
     case 'completed':

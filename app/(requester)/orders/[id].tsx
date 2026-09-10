@@ -18,15 +18,48 @@ import { cancelOrder, getOrderDetail } from '@/services/orders';
 import type { OrderStatus, OrderWithDetails } from '@/types/domain';
 
 const PROGRESS_STEPS: { key: string; label: string; done: OrderStatus[] }[] = [
-  { key: 'placed', label: 'Placed', done: ['assigned', 'at_vendor', 'purchased', 'picked_up', 'delivering', 'delivered', 'completed'] },
-  { key: 'helper', label: 'Helper', done: ['at_vendor', 'purchased', 'picked_up', 'delivering', 'delivered', 'completed'] },
-  { key: 'food', label: 'Food ready', done: ['picked_up', 'delivering', 'delivered', 'completed'] },
-  { key: 'delivery', label: 'Delivered', done: ['delivered', 'completed'] },
+  { key: 'placed', label: 'Placed', done: ['assigned', 'going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'awaiting_requester_payment', 'completed'] },
+  { key: 'helper', label: 'Helper', done: ['going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'awaiting_requester_payment', 'completed'] },
+  { key: 'food', label: 'Food ready', done: ['picked_up', 'out_for_delivery', 'delivering', 'delivered', 'awaiting_requester_payment', 'completed'] },
+  { key: 'delivery', label: 'Delivered', done: ['delivered', 'awaiting_requester_payment', 'completed'] },
   { key: 'paid', label: 'Completed', done: ['completed'] },
 ];
 
 /** Requester order detail: progress, totals, cancel, and post-delivery payment. */
 export default function OrderDetailScreen() {
+  const getStatusMessage = (status: OrderStatus): string => {
+    switch (status) {
+      case 'pending':
+        return 'Finding a helper';
+      case 'assigned':
+        return 'Helper assigned';
+      case 'going_to_vendor':
+        return 'Helper is going to the cafe';
+      case 'at_vendor':
+        return 'Helper is at the cafe';
+      case 'food_available':
+        return 'Food confirmed available';
+      case 'food_purchased':
+        return 'Food purchased';
+      case 'picked_up':
+        return 'Food picked up';
+      case 'out_for_delivery':
+      case 'delivering':
+        return 'Out for delivery';
+      case 'delivered':
+        return 'Delivered';
+      case 'awaiting_requester_payment':
+        return 'Payment required';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'disputed':
+        return 'Needs settlement';
+      default:
+        return orderStatusLabel(status);
+    }
+  };
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
@@ -97,10 +130,10 @@ export default function OrderDetailScreen() {
 
   const cancellable =
     !cancelled &&
-    (order.status === 'pending' || order.status === 'assigned' || order.status === 'at_vendor');
+    (order.status === 'pending' || order.status === 'assigned' || order.status === 'going_to_vendor' || order.status === 'at_vendor');
   const lateCancellable =
     !cancelled &&
-    (order.status === 'purchased' || order.status === 'picked_up' || order.status === 'delivering');
+    (order.status === 'food_available' || order.status === 'food_purchased' || order.status === 'picked_up' || order.status === 'out_for_delivery' || order.status === 'delivering');
 
   return (
     <>
@@ -108,7 +141,7 @@ export default function OrderDetailScreen() {
       <Screen>
         <View style={styles.heading}>
           <Text variant="title">{order.vendor.name}</Text>
-          <Badge label={orderStatusLabel(order.status)} tone={orderStatusTone(order.status)} />
+          <Badge label={getStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
         </View>
         <Text variant="caption" color="secondary">
           Placed {formatOrderDate(order.createdAt)} · Pickup ref {order.pickupCode}

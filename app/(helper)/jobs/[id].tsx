@@ -226,43 +226,21 @@ export default function JobDetailScreen() {
           </Card>
         ) : null}
 
-        {job.status === 'assigned' || job.status === 'at_vendor' ? (
+        {job.status === 'assigned' ? (
           <Card>
-            <Badge
-              label={job.status === 'at_vendor' ? 'At vendor' : 'Accepted'}
-              tone="info"
-            />
-            <Text variant="subtitle">
-              {job.status === 'at_vendor' ? 'You are at the stall' : 'Head to the vendor'}
-            </Text>
+            <Badge label="Assigned" tone="info" />
+            <Text variant="subtitle">Go to the vendor</Text>
             <Text color="secondary">
-              {job.status === 'at_vendor'
-                ? 'Check the food is available, pay the stall with your own money, then record the purchase.'
-                : 'Go to the stall, then let the app know you arrived so you can record the purchase.'}
+              Head to {job.vendor.name} to check the food availability and make the purchase.
             </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
-            {job.status === 'assigned' ? (
-              <Button
-                title={acting === 'arrive' ? 'Recording…' : "I'm at the vendor"}
-                onPress={() => void handleAdvance('arrive')}
-                disabled={busy}
-                loading={acting === 'arrive'}
-              />
-            ) : (
-              <Button
-                title={acting === 'purchase' ? 'Recording…' : 'Food purchased with my money'}
-                onPress={() => void handleAdvance('purchase')}
-                disabled={busy}
-                loading={acting === 'purchase'}
-              />
-            )}
             <Button
-              title="Food unavailable"
-              variant="secondary"
-              onPress={() => void handleAdvance('report_unavailable')}
+              title={acting === 'go_to_vendor' ? 'Starting…' : 'Go to vendor'}
+              onPress={() => void handleAdvance('go_to_vendor')}
               disabled={busy}
+              loading={acting === 'go_to_vendor'}
             />
             <Button
               title="Release job"
@@ -271,11 +249,79 @@ export default function JobDetailScreen() {
               disabled={busy}
             />
             <Text variant="caption" color="muted">
-              Releasing returns the order to the open queue. Reporting unavailable cancels it
-              cleanly — the requester owes nothing.
+              Releasing returns the order to the open queue.
             </Text>
           </Card>
-        ) : job.status === 'purchased' ? (
+        ) : job.status === 'going_to_vendor' ? (
+          <Card>
+            <Badge label="Going to vendor" tone="info" />
+            <Text variant="subtitle">On the way to {job.vendor.name}</Text>
+            <Text color="secondary">
+              Let the app know when you arrive at the stall so you can check food availability.
+            </Text>
+            {actionError ? (
+              <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
+            ) : null}
+            <Button
+              title={acting === 'arrive' ? 'Recording…' : "I'm at the vendor"}
+              onPress={() => void handleAdvance('arrive')}
+              disabled={busy}
+              loading={acting === 'arrive'}
+            />
+            <Button
+              title="Release job"
+              variant="danger"
+              onPress={() => void handleAdvance('release')}
+              disabled={busy}
+            />
+          </Card>
+        ) : job.status === 'at_vendor' ? (
+          <Card>
+            <Badge label="At vendor" tone="info" />
+            <Text variant="subtitle">Check food availability</Text>
+            <Text color="secondary">
+              Ask the stall if the requested food is available. Report the status below.
+            </Text>
+            {actionError ? (
+              <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
+            ) : null}
+            <Button
+              title={acting === 'report_food_available' ? 'Recording…' : 'Food available'}
+              onPress={() => void handleAdvance('report_food_available')}
+              disabled={busy}
+              loading={acting === 'report_food_available'}
+            />
+            <Button
+              title="Food unavailable"
+              variant="danger"
+              onPress={() => void handleAdvance('report_food_unavailable')}
+              disabled={busy}
+            />
+            <Button
+              title="Release job"
+              variant="secondary"
+              onPress={() => void handleAdvance('release')}
+              disabled={busy}
+            />
+          </Card>
+        ) : job.status === 'food_available' ? (
+          <Card>
+            <Badge label="Food available" tone="info" />
+            <Text variant="subtitle">Purchase the food</Text>
+            <Text color="secondary">
+              Pay the stall with your own money, then record the purchase. You front the food cost.
+            </Text>
+            {actionError ? (
+              <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
+            ) : null}
+            <Button
+              title={acting === 'purchase' ? 'Recording…' : 'Food purchased with my money'}
+              onPress={() => void handleAdvance('purchase')}
+              disabled={busy}
+              loading={acting === 'purchase'}
+            />
+          </Card>
+        ) : job.status === 'food_purchased' ? (
           <Card>
             <Badge label="Purchased" tone="info" />
             <Text variant="subtitle">Verify the pickup</Text>
@@ -322,9 +368,9 @@ export default function JobDetailScreen() {
               loading={acting === 'start_delivery'}
             />
           </Card>
-        ) : job.status === 'delivering' ? (
+        ) : job.status === 'out_for_delivery' ? (
           <Card>
-            <Badge label="Delivering" tone="warning" />
+            <Badge label="Out for delivery" tone="warning" />
             <Text variant="subtitle">On the way to {job.location.name}</Text>
             <Text color="secondary">
               Hand the food over, then mark it delivered — the requester pays you after that.
@@ -354,6 +400,14 @@ export default function JobDetailScreen() {
             <Badge label="Delivered" tone="success" />
             <Text color="secondary">
               Food handed over. The requester now pays you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally — verify their receipt below.
+            </Text>
+          </Card>
+        ) : job.status === 'awaiting_requester_payment' ? (
+          <Card>
+            <Badge label="Awaiting payment" tone="warning" />
+            <Text variant="subtitle">Waiting for payment</Text>
+            <Text color="secondary">
+              The requester has submitted their receipt. Verify the payment below.
             </Text>
           </Card>
         ) : job.status === 'completed' ? (

@@ -130,10 +130,14 @@ export function RequesterPaymentCard({ orderId }: RequesterPaymentCardProps) {
 
   if (
     context.orderStatus === 'assigned' ||
+    context.orderStatus === 'going_to_vendor' ||
     context.orderStatus === 'at_vendor' ||
-    context.orderStatus === 'purchased' ||
+    context.orderStatus === 'food_available' ||
+    context.orderStatus === 'food_purchased' ||
     context.orderStatus === 'picked_up' ||
-    context.orderStatus === 'delivering'
+    context.orderStatus === 'out_for_delivery' ||
+    context.orderStatus === 'delivering' ||
+    context.orderStatus === 'delivered'
   ) {
     return (
       <Card>

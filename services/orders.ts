@@ -62,7 +62,9 @@ interface OrderRow {
   pickup_code: string;
   helper_id: string | null;
   accepted_at: string | null;
+  going_to_vendor_at: string | null;
   arrived_at: string | null;
+  food_available_at: string | null;
   purchased_at: string | null;
   food_cost_cents: number | null;
   delivered_at: string | null;
@@ -123,7 +125,9 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
     pickupCode: row.pickup_code,
     helperId: row.helper_id,
     acceptedAt: row.accepted_at,
+    goingToVendorAt: row.going_to_vendor_at,
     arrivedAt: row.arrived_at,
+    foodAvailableAt: row.food_available_at,
     purchasedAt: row.purchased_at,
     foodCostCents: row.food_cost_cents,
     deliveredAt: row.delivered_at,
@@ -183,7 +187,7 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
 
 const ORDER_SELECT =
   'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
-  ' helper_id, accepted_at, arrived_at, purchased_at, food_cost_cents, delivered_at,' +
+  ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, delivered_at,' +
   ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint),' +
@@ -340,8 +344,10 @@ function friendlyAcceptError(message: string): string {
 }
 
 export type FulfilmentAction =
+  | 'go_to_vendor'
   | 'arrive'
-  | 'report_unavailable'
+  | 'report_food_available'
+  | 'report_food_unavailable'
   | 'purchase'
   | 'verify_pickup'
   | 'start_delivery'

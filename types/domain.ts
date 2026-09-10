@@ -103,19 +103,24 @@ export interface DeliveryLocation {
 }
 
 /**
- * Fulfilment lifecycle. Happy path: pending → assigned → at_vendor →
- * purchased → picked_up → delivering → delivered → completed.
+ * Fulfilment lifecycle. Happy path: pending → assigned → going_to_vendor →
+ * at_vendor → food_available → food_purchased → picked_up → out_for_delivery →
+ * delivered → awaiting_requester_payment → completed.
  * Exception states: cancelled (clean) and disputed (needs settlement).
  * Legacy values stay reserved but unused by current flows.
  */
 export type OrderStatus =
   | 'pending'
   | 'assigned'
+  | 'going_to_vendor'
   | 'at_vendor'
-  | 'purchased'
+  | 'food_available'
+  | 'food_purchased'
   | 'picked_up'
+  | 'out_for_delivery'
   | 'delivering'
   | 'delivered'
+  | 'awaiting_requester_payment'
   | 'completed'
   | 'cancelled'
   | 'disputed'
@@ -145,7 +150,9 @@ export interface Order {
   helperId: string | null;
   /** When the helper accepted; null while pending. */
   acceptedAt: string | null;
+  goingToVendorAt: string | null;
   arrivedAt: string | null;
+  foodAvailableAt: string | null;
   purchasedAt: string | null;
   /** Snapshot of the fronted food cost (= subtotal at purchase). */
   foodCostCents: number | null;

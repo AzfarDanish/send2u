@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { listMyOrders } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -46,6 +47,23 @@ export function useMyOrders(): UseMyOrdersResult {
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  // Live updates (helper accepts, fulfilment advances, payment reviews…).
+  // RLS-scoped server-side: only own rows ever arrive. Silent failures keep
+  // stale data; explicit refresh/retry surfaces errors.
+  const silentReload = useCallback(async () => {
+    try {
+      const next = await listMyOrders();
+      setOrders(next);
+      setStatus(next.length === 0 ? 'empty' : 'ready');
+    } catch {
+      // Keep stale data.
+    }
+  }, []);
+
+  useRealtimeReload([{ table: 'send2u_orders', event: '*' }], () => {
+    void silentReload();
+  });
 
   const retry = useCallback(() => {
     void load(false);

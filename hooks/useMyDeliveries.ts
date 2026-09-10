@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { listMyDeliveries } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -49,6 +50,22 @@ export function useMyDeliveries(): UseMyDeliveriesResult {
       void load(false);
     }, [load]),
   );
+
+  // Live updates (requester confirms, pays, cancels…). RLS-scoped; silent on
+  // failure so the focus/refresh paths stay the source of truth.
+  const silentReload = useCallback(async () => {
+    try {
+      const next = await listMyDeliveries();
+      setDeliveries(next);
+      setStatus(next.length === 0 ? 'empty' : 'ready');
+    } catch {
+      // Keep stale data.
+    }
+  }, []);
+
+  useRealtimeReload([{ table: 'send2u_orders', event: '*' }], () => {
+    void silentReload();
+  });
 
   const retry = useCallback(() => {
     void load(false);

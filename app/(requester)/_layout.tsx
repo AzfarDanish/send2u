@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { HeaderBell } from '@/components/HeaderBell';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -38,6 +39,7 @@ export default function RequesterLayout() {
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.background },
+        headerRight: () => <HeaderBell role="requester" />,
       }}>
       <Tabs.Screen
         name="index"
@@ -58,6 +60,7 @@ export default function RequesterLayout() {
       <Tabs.Screen name="menu/[id]" options={{ href: null, title: 'Item details' }} />
       <Tabs.Screen name="orders/[id]" options={{ href: null, title: 'Order details' }} />
       <Tabs.Screen name="orders/confirmation" options={{ href: null, title: 'Request placed' }} />
+      <Tabs.Screen name="notifications" options={{ href: null, title: 'Notifications' }} />
     </Tabs>
   );
 }

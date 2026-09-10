@@ -14,6 +14,7 @@ import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
 import { cancelOrder, confirmDelivery, getOrderDetail, openDispute } from '@/services/orders';
@@ -104,6 +105,16 @@ export default function OrderDetailScreen() {
       setStatus('missing');
     }
   }, [id]);
+
+  // Live updates (helper advances, reviews payment…). RLS-scoped to this
+  // order; failures fall back to the focus/manual paths.
+  useRealtimeReload(
+    typeof id === 'string' ? [{ table: 'send2u_orders', filter: `id=eq.${id}` }] : [],
+    () => {
+      void reload();
+      setPaymentTick((t) => t + 1);
+    },
+  );
 
   useEffect(() => {
     setStatus('loading');

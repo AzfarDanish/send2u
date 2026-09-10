@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { listAvailableJobs } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -50,6 +51,22 @@ export function useAvailableJobs(): UseAvailableJobsResult {
       void load(false);
     }, [load]),
   );
+
+  // New requests appear live; taken ones drop off on reload. Queue rows are
+  // RLS-visible to helpers, so the subscription is both safe and relevant.
+  const silentReload = useCallback(async () => {
+    try {
+      const next = await listAvailableJobs();
+      setJobs(next);
+      setStatus(next.length === 0 ? 'empty' : 'ready');
+    } catch {
+      // Keep stale data.
+    }
+  }, []);
+
+  useRealtimeReload([{ table: 'send2u_orders', event: '*' }], () => {
+    void silentReload();
+  });
 
   const retry = useCallback(() => {
     void load(false);

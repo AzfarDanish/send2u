@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { HeaderBell } from '@/components/HeaderBell';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -38,6 +39,7 @@ export default function HelperLayout() {
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.background },
+        headerRight: () => <HeaderBell role="helper" />,
       }}>
       <Tabs.Screen
         name="index"
@@ -56,6 +58,7 @@ export default function HelperLayout() {
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
       />
       <Tabs.Screen name="jobs/[id]" options={{ href: null, title: 'Job details' }} />
+      <Tabs.Screen name="notifications" options={{ href: null, title: 'Notifications' }} />
     </Tabs>
   );
 }

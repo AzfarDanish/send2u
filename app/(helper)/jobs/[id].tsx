@@ -13,6 +13,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
 import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
@@ -62,6 +63,16 @@ export default function JobDetailScreen() {
     setPickupCode('');
     void reload();
   }, [id, reload]);
+
+  // Live updates (requester confirms, pays, cancels, reports…). RLS-scoped
+  // to this job; failures fall back to the focus/manual paths.
+  useRealtimeReload(
+    typeof id === 'string' ? [{ table: 'send2u_orders', filter: `id=eq.${id}` }] : [],
+    () => {
+      void reload();
+      setPaymentTick((t) => t + 1);
+    },
+  );
 
   const handleAccept = useCallback(async () => {
     if (!job || accepting) return;

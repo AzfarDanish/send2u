@@ -7,6 +7,7 @@ import 'react-native-url-polyfill/auto';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CartProvider } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 /**
  * Send2U is LIGHT THEME ONLY. The navigation theme is pinned to the light
@@ -26,6 +27,10 @@ export default function RootLayout() {
 
 function AuthedProviders() {
   const { user } = useAuth();
+  // Device push lifecycle (registration, refresh, tap routing). Best-effort:
+  // realtime + the notification center remain the baseline when push is
+  // unavailable (web, denied permission, no device).
+  usePushNotifications();
   // Keyed by user so the local cart resets whenever the session changes.
   return (
     <CartProvider key={user?.id ?? 'guest'}>

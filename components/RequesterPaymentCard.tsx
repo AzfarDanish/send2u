@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { PrivateImage } from '@/components/PrivateImage';
@@ -23,6 +23,8 @@ import {
 
 interface RequesterPaymentCardProps {
   orderId: string;
+  /** Bump to force a reload (e.g. right after confirming receipt on this screen). */
+  refreshToken?: number;
 }
 
 /**
@@ -30,7 +32,7 @@ interface RequesterPaymentCardProps {
  * evidence submission, and verification states. Amounts always come from
  * the order via payment context — the requester can never edit them.
  */
-export function RequesterPaymentCard({ orderId }: RequesterPaymentCardProps) {
+export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPaymentCardProps) {
   const { user } = useAuth();
   const [context, setContext] = useState<PaymentContext | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -56,6 +58,10 @@ export function RequesterPaymentCard({ orderId }: RequesterPaymentCardProps) {
       void load();
     }, [load]),
   );
+
+  useEffect(() => {
+    if (refreshToken > 0) void load();
+  }, [load, refreshToken]);
 
   const handleSubmit = useCallback(async () => {
     if (!user || busy) return;
@@ -129,6 +135,21 @@ export function RequesterPaymentCard({ orderId }: RequesterPaymentCardProps) {
     );
   }
 
+  if (context.orderStatus === 'delivered') {
+    return (
+      <Card>
+        <Badge label="Confirm receipt first" tone="success" />
+        <Text variant="subtitle">No payment yet</Text>
+        <Text color="secondary">
+          You pay {formatMYR(context.totalCents)} ({formatMYR(context.subtotalCents)} food +{' '}
+          {formatMYR(context.deliveryFeeCents)} delivery) only after the food is in your hands.
+          Confirm receipt above first — the helper&apos;s QR and receipt upload
+          open right after confirmation.
+        </Text>
+      </Card>
+    );
+  }
+
   if (
     context.orderStatus === 'assigned' ||
     context.orderStatus === 'going_to_vendor' ||
@@ -137,8 +158,7 @@ export function RequesterPaymentCard({ orderId }: RequesterPaymentCardProps) {
     context.orderStatus === 'food_purchased' ||
     context.orderStatus === 'picked_up' ||
     context.orderStatus === 'out_for_delivery' ||
-    context.orderStatus === 'delivering' ||
-    context.orderStatus === 'delivered'
+    context.orderStatus === 'delivering'
   ) {
     return (
       <Card>

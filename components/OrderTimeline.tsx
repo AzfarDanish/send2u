@@ -36,7 +36,10 @@ function buildEvents(order: OrderWithDetails): TimelineEvent[] {
           ? `${formatMYR(order.foodCostCents)} fronted by helper`
           : undefined,
     },
+    { key: 'picked_up', label: 'Food picked up', at: order.pickedUpAt },
+    { key: 'out_for_delivery', label: 'Out for delivery', at: order.outForDeliveryAt },
     { key: 'delivered', label: 'Delivered', at: order.deliveredAt },
+    { key: 'confirmed', label: 'Delivery confirmed by requester', at: order.confirmedAt },
     {
       key: 'cancelled',
       label: 'Cancelled',

@@ -67,7 +67,10 @@ interface OrderRow {
   food_available_at: string | null;
   purchased_at: string | null;
   food_cost_cents: number | null;
+  picked_up_at: string | null;
+  out_for_delivery_at: string | null;
   delivered_at: string | null;
+  confirmed_at: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
   cancel_reason: string | null;
@@ -130,7 +133,10 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
     foodAvailableAt: row.food_available_at,
     purchasedAt: row.purchased_at,
     foodCostCents: row.food_cost_cents,
+    pickedUpAt: row.picked_up_at,
+    outForDeliveryAt: row.out_for_delivery_at,
     deliveredAt: row.delivered_at,
+    confirmedAt: row.confirmed_at,
     cancelledAt: row.cancelled_at,
     cancelledBy: row.cancelled_by,
     cancelReason: row.cancel_reason,
@@ -187,7 +193,7 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
 
 const ORDER_SELECT =
   'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
-  ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, delivered_at,' +
+  ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, picked_up_at, out_for_delivery_at, delivered_at, confirmed_at,' +
   ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint),' +
@@ -402,6 +408,7 @@ export type FulfilmentAction =
   | 'start_delivery'
   | 'mark_delivered'
   | 'report_failed'
+  | 'abandon'
   | 'release';
 
 /**
@@ -474,6 +481,30 @@ function friendlyCancelError(message: string): string {
   if (/no longer be cancelled/i.test(message))
     return 'This order can no longer be cancelled. It is already delivered or closed.';
   return message ? `Could not cancel the order: ${message}` : 'Could not cancel the order.';
+}
+
+/**
+ * Requester confirms the food arrived. Only the owning requester, only from
+ * `delivered` — a single atomic UPDATE, so duplicates and concurrent
+ * confirms serialize to exactly one winner. Opens the payment flow.
+ */
+export async function confirmDelivery(orderId: string): Promise<{ status: OrderStatus }> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.rpc('send2u_confirm_delivery', { p_order_id: orderId });
+  if (error) throw new Error(friendlyConfirmError(error.message));
+  if (!isRecord(data) || typeof data.status !== 'string') {
+    throw new Error('Confirmation came back in an unexpected shape.');
+  }
+  return { status: data.status as OrderStatus };
+}
+
+function friendlyConfirmError(message: string): string {
+  if (/not authenticated|session expired/i.test(message))
+    return 'Your session expired. Sign in again and retry.';
+  if (/order not found/i.test(message)) return 'That order is not available to you.';
+  if (/not awaiting confirmation/i.test(message))
+    return 'You can confirm once the helper marks the food as delivered.';
+  return message ? `Could not confirm delivery: ${message}` : 'Could not confirm delivery.';
 }
 
 /** Maps database guard-rail errors to honest requester-facing messages. */

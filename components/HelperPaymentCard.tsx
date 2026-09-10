@@ -115,6 +115,19 @@ export function HelperPaymentCard({ orderId, onChanged, refreshToken = 0 }: Help
   }
 
   const payment = context.payment;
+  if (context.orderStatus === 'delivered' && !payment) {
+    return (
+      <Card>
+        <Badge label="Awaiting confirmation" tone="success" />
+        <Text variant="subtitle">Waiting for the requester</Text>
+        <Text color="secondary">
+          They confirm receipt first, then pay you {formatMYR(context.totalCents)} externally.
+          Make sure your payment QR is set in your profile so they can pay you.
+        </Text>
+        <Button title="Refresh" variant="secondary" onPress={() => void load()} />
+      </Card>
+    );
+  }
   if (!payment) {
     return (
       <Card>

@@ -51,6 +51,11 @@ export function HelperHistoryDetail({ job }: { job: OrderWithDetails }) {
             />
             <Text variant="subtitle">This delivery needs settlement</Text>
             <Text color="secondary">
+              {job.disputeReason === 'helper_unable'
+                ? 'You reported you could not continue. '
+                : job.disputeReason === 'late_cancellation'
+                  ? 'The requester cancelled after you had paid. '
+                  : ''}
               {job.foodCostCents
                 ? `Your fronted ${formatMYR(job.foodCostCents)} is recorded. `
                 : ''}

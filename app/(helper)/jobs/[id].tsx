@@ -334,6 +334,15 @@ export default function JobDetailScreen() {
               disabled={busy}
               loading={acting === 'purchase'}
             />
+            <Button
+              title="Release job"
+              variant="secondary"
+              onPress={() => void handleAdvance('release')}
+              disabled={busy}
+            />
+            <Text variant="caption" color="muted">
+              Nothing spent yet — releasing returns the order to the open queue.
+            </Text>
           </Card>
         ) : job.status === 'food_purchased' ? (
           <Card>
@@ -364,6 +373,17 @@ export default function JobDetailScreen() {
               disabled={busy || pickupCode.trim().length === 0}
               loading={acting === 'verify_pickup'}
             />
+            <Button
+              title={acting === 'abandon' ? 'Recording…' : "Can't complete this job"}
+              variant="danger"
+              onPress={() => void handleAdvance('abandon')}
+              disabled={busy}
+              loading={acting === 'abandon'}
+            />
+            <Text variant="caption" color="muted">
+              Only if you truly cannot continue — the order moves to dispute with
+              the food cost you fronted preserved for manual settlement.
+            </Text>
           </Card>
         ) : job.status === 'picked_up' ? (
           <Card>
@@ -381,13 +401,24 @@ export default function JobDetailScreen() {
               disabled={busy}
               loading={acting === 'start_delivery'}
             />
+            <Button
+              title={acting === 'abandon' ? 'Recording…' : "Can't complete this job"}
+              variant="danger"
+              onPress={() => void handleAdvance('abandon')}
+              disabled={busy}
+              loading={acting === 'abandon'}
+            />
+            <Text variant="caption" color="muted">
+              Only if you truly cannot continue — the order moves to dispute with
+              the food cost you fronted preserved for manual settlement.
+            </Text>
           </Card>
         ) : job.status === 'out_for_delivery' ? (
           <Card>
             <Badge label="Out for delivery" tone="warning" />
             <Text variant="subtitle">On the way to {job.location.name}</Text>
             <Text color="secondary">
-              Hand the food over, then mark it delivered — the requester pays you after that.
+              Hand the food over, then mark it delivered — the requester confirms receipt and pays you after that.
             </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
@@ -413,7 +444,18 @@ export default function JobDetailScreen() {
           <Card>
             <Badge label="Delivered" tone="success" />
             <Text color="secondary">
-              Food handed over. The requester now pays you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally — verify their receipt below.
+              Food handed over. Waiting for the requester to confirm receipt —
+              they pay you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally
+              after confirming, and you verify their receipt below.
+            </Text>
+          </Card>
+        ) : job.status === 'confirmed' ? (
+          <Card>
+            <Badge label="Confirmed" tone="success" />
+            <Text variant="subtitle">Requester confirmed receipt</Text>
+            <Text color="secondary">
+              They can now pay you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally
+              using your QR — verify their receipt below.
             </Text>
           </Card>
         ) : job.status === 'awaiting_requester_payment' ? (

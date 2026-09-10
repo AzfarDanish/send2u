@@ -142,8 +142,8 @@ function friendlyPaymentError(message: string): string {
   if (/only.*assigned helper/i.test(message))
     return 'Only the helper assigned to this order can do that.';
   if (/only helpers/i.test(message)) return 'Only helpers can do that.';
-  if (/opens after delivery/i.test(message))
-    return 'Payment opens after the food is delivered.';
+  if (/confirms delivery/i.test(message))
+    return 'Payment opens after you confirm that the food arrived.';
   if (/assigned orders/i.test(message))
     return 'Payment opens once a helper accepts this order.';
   if (/already submitted/i.test(message))

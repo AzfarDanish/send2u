@@ -57,7 +57,9 @@ export function RequesterHistoryDetail({ order }: { order: OrderWithDetails }) {
                 ? `You cancelled after the helper had already paid ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle the food cost with your helper directly — Send2U never moves money itself.`
                 : order.disputeReason === 'delivery_failed'
                   ? 'The delivery could not be completed. Settle any food cost with your helper directly.'
-                  : 'This order is under review.'}
+                  : order.disputeReason === 'helper_unable'
+                    ? `Your helper could not continue after paying ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle the food cost with them directly — Send2U never moves money itself.`
+                    : 'This order is under review.'}
               {order.disputedAt ? ` (flagged ${formatOrderDate(order.disputedAt)})` : ''}
               {order.resolvedAt
                 ? ` Settled${order.resolution ? ` as ${order.resolution}` : ''} on ${formatOrderDate(order.resolvedAt)}.`

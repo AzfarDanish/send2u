@@ -15,14 +15,15 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
-import { cancelOrder, getOrderDetail } from '@/services/orders';
+import { cancelOrder, confirmDelivery, getOrderDetail } from '@/services/orders';
 import type { OrderStatus, OrderWithDetails } from '@/types/domain';
 
 const PROGRESS_STEPS: { key: string; label: string; done: OrderStatus[] }[] = [
-  { key: 'placed', label: 'Placed', done: ['assigned', 'going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'awaiting_requester_payment', 'completed'] },
-  { key: 'helper', label: 'Helper', done: ['going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'awaiting_requester_payment', 'completed'] },
-  { key: 'food', label: 'Food ready', done: ['picked_up', 'out_for_delivery', 'delivering', 'delivered', 'awaiting_requester_payment', 'completed'] },
-  { key: 'delivery', label: 'Delivered', done: ['delivered', 'awaiting_requester_payment', 'completed'] },
+  { key: 'placed', label: 'Placed', done: ['assigned', 'going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
+  { key: 'helper', label: 'Helper', done: ['going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
+  { key: 'food', label: 'Food ready', done: ['picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
+  { key: 'delivery', label: 'Delivered', done: ['delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
+  { key: 'received', label: 'Received', done: ['confirmed', 'awaiting_requester_payment', 'completed'] },
   { key: 'paid', label: 'Completed', done: ['completed'] },
 ];
 
@@ -48,7 +49,9 @@ export default function OrderDetailScreen() {
       case 'delivering':
         return 'Out for delivery';
       case 'delivered':
-        return 'Delivered';
+        return 'Delivered — confirm receipt';
+      case 'confirmed':
+        return 'Confirmed — payment required';
       case 'awaiting_requester_payment':
         return 'Payment required';
       case 'completed':
@@ -68,6 +71,9 @@ export default function OrderDetailScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [paymentTick, setPaymentTick] = useState(0);
 
   const reload = useCallback(async () => {
     if (typeof id !== 'string') {
@@ -91,6 +97,8 @@ export default function OrderDetailScreen() {
     setCancelError(null);
     setCancelled(false);
     setReason('');
+    setConfirmError(null);
+    setPaymentTick(0);
     void reload();
   }, [id, reload]);
 
@@ -108,6 +116,21 @@ export default function OrderDetailScreen() {
       setCancelling(false);
     }
   }, [order, cancelling, reason, reload]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!order || confirming) return;
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      await confirmDelivery(order.id);
+      await reload();
+      setPaymentTick((t) => t + 1);
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : 'Could not confirm delivery.');
+    } finally {
+      setConfirming(false);
+    }
+  }, [order, confirming, reload]);
 
   if (status === 'loading' || !order) {
     return (
@@ -142,12 +165,20 @@ export default function OrderDetailScreen() {
     );
   }
 
+  // Clean cancellation is possible while no food has been purchased — that
+  // includes `food_available` (the purchase step itself leaves that status,
+  // so no money can have been spent there). Past purchase, cancelling moves
+  // the order to dispute with the helper's fronted cost preserved.
   const cancellable =
     !cancelled &&
-    (order.status === 'pending' || order.status === 'assigned' || order.status === 'going_to_vendor' || order.status === 'at_vendor');
+    (order.status === 'pending' ||
+      order.status === 'assigned' ||
+      order.status === 'going_to_vendor' ||
+      order.status === 'at_vendor' ||
+      order.status === 'food_available');
   const lateCancellable =
     !cancelled &&
-    (order.status === 'food_available' || order.status === 'food_purchased' || order.status === 'picked_up' || order.status === 'out_for_delivery' || order.status === 'delivering');
+    (order.status === 'food_purchased' || order.status === 'picked_up' || order.status === 'out_for_delivery' || order.status === 'delivering');
 
   return (
     <>
@@ -267,7 +298,32 @@ export default function OrderDetailScreen() {
           </Card>
         ) : null}
 
-        <RequesterPaymentCard orderId={order.id} />
+        {order.status === 'delivered' ? (
+          <Card>
+            <Badge label="Delivery arrived" tone="success" />
+            <Text variant="subtitle">Confirm you got the food</Text>
+            <Text color="secondary">
+              {order.deliveredAt ? `Delivered ${formatOrderDate(order.deliveredAt)}. ` : ''}
+              Check the handover, then confirm below — payment opens right after
+              confirmation.
+            </Text>
+            {confirmError ? (
+              <ErrorState title="Could not confirm" message={confirmError} retryTitle="Dismiss" onRetry={() => setConfirmError(null)} />
+            ) : null}
+            <Button
+              title={confirming ? 'Confirming…' : 'Confirm receipt'}
+              onPress={() => void handleConfirm()}
+              disabled={confirming}
+              loading={confirming}
+            />
+            <Text variant="caption" color="muted">
+              Only confirm food you actually received. If something is wrong,
+              don&apos;t confirm — talk to your helper first.
+            </Text>
+          </Card>
+        ) : null}
+
+        <RequesterPaymentCard orderId={order.id} refreshToken={paymentTick} />
       </Screen>
     </>
   );

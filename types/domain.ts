@@ -105,7 +105,8 @@ export interface DeliveryLocation {
 /**
  * Fulfilment lifecycle. Happy path: pending → assigned → going_to_vendor →
  * at_vendor → food_available → food_purchased → picked_up → out_for_delivery →
- * delivered → awaiting_requester_payment → completed.
+ * delivered → confirmed (requester confirms receipt) →
+ * awaiting_requester_payment → completed.
  * Exception states: cancelled (clean) and disputed (needs settlement).
  * Legacy values stay reserved but unused by current flows.
  */
@@ -156,7 +157,13 @@ export interface Order {
   purchasedAt: string | null;
   /** Snapshot of the fronted food cost (= subtotal at purchase). */
   foodCostCents: number | null;
+  /** When pickup verification succeeded; null until verified. */
+  pickedUpAt: string | null;
+  /** When the delivery run started; null until started. */
+  outForDeliveryAt: string | null;
   deliveredAt: string | null;
+  /** When the requester confirmed receipt; null until confirmed. */
+  confirmedAt: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;
   cancelReason: string | null;

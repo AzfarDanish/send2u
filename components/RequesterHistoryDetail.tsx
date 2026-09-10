@@ -1,24 +1,64 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
+import { SettlementRecord } from '@/components/SettlementRecord';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, paymentStatusLabel, paymentStatusTone } from '@/lib/orders';
+import { withdrawDispute } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
+/** Reasons the requester can report (and retract) — mirrors the RPC gate. */
+const WITHDRAWABLE_REASONS: ReadonlySet<string> = new Set([
+  'not_received',
+  'incorrect',
+  'damaged',
+  'refused',
+]);
+
 /**
- * Read-only historical order for the requester. Informative only: outcome,
- * items, pricing, helper, timeline, and payment record. Deliberately renders
- * zero buttons/inputs that could mutate the order — cancelling, paying,
- * and receipt submission all live on the active detail screen.
+ * Historical order for the requester. Informative only, with one deliberate
+ * exception: retracting the requester's OWN unresolved delivery report, which
+ * resumes the exact pre-dispute state (`delivered`) rather than mutating a
+ * terminal outcome. Everything else here is strictly read-only.
  */
-export function RequesterHistoryDetail({ order }: { order: OrderWithDetails }) {
+export function RequesterHistoryDetail({
+  order,
+  onChanged,
+}: {
+  order: OrderWithDetails;
+  onChanged: () => void;
+}) {
   const totalCents = order.subtotalCents + order.deliveryFeeCents;
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const canWithdraw =
+    order.status === 'disputed' &&
+    !order.resolvedAt &&
+    !!order.disputeReason &&
+    WITHDRAWABLE_REASONS.has(order.disputeReason);
+
+  const handleWithdraw = async () => {
+    if (withdrawing) return;
+    setWithdrawing(true);
+    setWithdrawError(null);
+    try {
+      await withdrawDispute(order.id);
+      onChanged();
+    } catch (err) {
+      setWithdrawError(err instanceof Error ? err.message : 'Could not withdraw the report.');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -27,12 +67,25 @@ export function RequesterHistoryDetail({ order }: { order: OrderWithDetails }) {
         {order.status === 'completed' ? (
           <>
             <Badge label="Completed" tone="success" />
-            <Text variant="subtitle">Delivered and paid</Text>
-            <Text color="secondary">
-              Placed {formatOrderDate(order.createdAt)}
-              {order.deliveredAt ? ` · delivered ${formatOrderDate(order.deliveredAt)}` : ''}.
-              Thanks for using Send2U — this record is kept for your receipts.
-            </Text>
+            {order.resolvedAt ? (
+              <>
+                <Text variant="subtitle">Settled after dispute</Text>
+                <Text color="secondary">
+                  This order was closed through dispute resolution, not the
+                  normal paid flow.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text variant="subtitle">Delivered and paid</Text>
+                <Text color="secondary">
+                  Placed {formatOrderDate(order.createdAt)}
+                  {order.deliveredAt ? ` · delivered ${formatOrderDate(order.deliveredAt)}` : ''}.
+                  Thanks for using Send2U — this record is kept for your receipts.
+                </Text>
+              </>
+            )}
+            <SettlementRecord order={order} />
           </>
         ) : order.status === 'cancelled' ? (
           <>
@@ -44,6 +97,7 @@ export function RequesterHistoryDetail({ order }: { order: OrderWithDetails }) {
                 : `Cancelled${order.cancelReason ? `: ${order.cancelReason}` : ''}.`}
               {order.cancelledAt ? ` (${formatOrderDate(order.cancelledAt)})` : ''}
             </Text>
+            <SettlementRecord order={order} />
           </>
         ) : (
           <>
@@ -59,12 +113,48 @@ export function RequesterHistoryDetail({ order }: { order: OrderWithDetails }) {
                   ? 'The delivery could not be completed. Settle any food cost with your helper directly.'
                   : order.disputeReason === 'helper_unable'
                     ? `Your helper could not continue after paying ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle the food cost with them directly — Send2U never moves money itself.`
-                    : 'This order is under review.'}
+                    : order.disputeReason === 'not_received'
+                      ? 'You reported the food never reached you.'
+                      : order.disputeReason === 'incorrect'
+                        ? 'You reported the food was wrong or incomplete.'
+                        : order.disputeReason === 'damaged'
+                          ? 'You reported the food arrived damaged or spoiled.'
+                          : order.disputeReason === 'refused'
+                            ? 'You refused the delivery at handover.'
+                            : 'This order is under review.'}
               {order.disputedAt ? ` (flagged ${formatOrderDate(order.disputedAt)})` : ''}
               {order.resolvedAt
                 ? ` Settled${order.resolution ? ` as ${order.resolution}` : ''} on ${formatOrderDate(order.resolvedAt)}.`
                 : ''}
             </Text>
+            {order.disputeDetails ? (
+              <Text color="secondary">
+                Your report: {order.disputeDetails}
+              </Text>
+            ) : null}
+            {order.disputeNote ? (
+              <Text variant="caption" color="muted">
+                Resolution note: {order.disputeNote}
+              </Text>
+            ) : null}
+            {canWithdraw ? (
+              <>
+                {withdrawError ? (
+                  <ErrorState title="Could not withdraw" message={withdrawError} retryTitle="Dismiss" onRetry={() => setWithdrawError(null)} />
+                ) : null}
+                <Button
+                  title={withdrawing ? 'Withdrawing…' : 'Withdraw report'}
+                  variant="secondary"
+                  onPress={() => void handleWithdraw()}
+                  disabled={withdrawing}
+                  loading={withdrawing}
+                />
+                <Text variant="caption" color="muted">
+                  Back to delivered — you can confirm receipt or report again if
+                  needed.
+                </Text>
+              </>
+            ) : null}
           </>
         )}
       </Card>

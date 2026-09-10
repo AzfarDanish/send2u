@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { Screen } from '@/components/ui/Screen';
@@ -15,8 +16,16 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
-import { cancelOrder, confirmDelivery, getOrderDetail } from '@/services/orders';
+import { cancelOrder, confirmDelivery, getOrderDetail, openDispute } from '@/services/orders';
 import type { OrderStatus, OrderWithDetails } from '@/types/domain';
+import type { RequesterDisputeReason } from '@/services/orders';
+
+const DISPUTE_CATEGORIES: { key: RequesterDisputeReason; title: string; subtitle: string }[] = [
+  { key: 'not_received', title: "Didn't receive it", subtitle: 'The food never reached you.' },
+  { key: 'incorrect', title: 'Wrong or incomplete', subtitle: 'Items missing or not what you ordered.' },
+  { key: 'damaged', title: 'Damaged or spoiled', subtitle: 'Food arrived inedible or spilled.' },
+  { key: 'refused', title: 'Refused at handover', subtitle: 'You turned the delivery away.' },
+];
 
 const PROGRESS_STEPS: { key: string; label: string; done: OrderStatus[] }[] = [
   { key: 'placed', label: 'Placed', done: ['assigned', 'going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
@@ -74,6 +83,11 @@ export default function OrderDetailScreen() {
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [paymentTick, setPaymentTick] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState<RequesterDisputeReason | null>(null);
+  const [reportDetails, setReportDetails] = useState('');
+  const [reporting, setReporting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (typeof id !== 'string') {
@@ -99,6 +113,10 @@ export default function OrderDetailScreen() {
     setReason('');
     setConfirmError(null);
     setPaymentTick(0);
+    setReportOpen(false);
+    setReportCategory(null);
+    setReportDetails('');
+    setReportError(null);
     void reload();
   }, [id, reload]);
 
@@ -132,6 +150,20 @@ export default function OrderDetailScreen() {
     }
   }, [order, confirming, reload]);
 
+  const handleReport = useCallback(async () => {
+    if (!order || reporting || !reportCategory) return;
+    setReporting(true);
+    setReportError(null);
+    try {
+      await openDispute(order.id, reportCategory, reportDetails.trim().length > 0 ? reportDetails : null);
+      await reload();
+    } catch (err) {
+      setReportError(err instanceof Error ? err.message : 'Could not report the problem.');
+    } finally {
+      setReporting(false);
+    }
+  }, [order, reporting, reportCategory, reportDetails, reload]);
+
   if (status === 'loading' || !order) {
     return (
       <>
@@ -159,7 +191,7 @@ export default function OrderDetailScreen() {
       <>
         <Stack.Screen options={{ title: `${order.vendor.name} · History` }} />
         <Screen>
-          <RequesterHistoryDetail order={order} />
+          <RequesterHistoryDetail order={order} onChanged={() => void reload()} />
         </Screen>
       </>
     );
@@ -320,6 +352,59 @@ export default function OrderDetailScreen() {
               Only confirm food you actually received. If something is wrong,
               don&apos;t confirm — talk to your helper first.
             </Text>
+            <Button
+              title={reportOpen ? 'Hide problem report' : 'Report a problem'}
+              variant="secondary"
+              onPress={() => setReportOpen((open) => !open)}
+              disabled={confirming}
+            />
+            {reportOpen ? (
+              <View style={styles.reportForm}>
+                <Text color="secondary">What went wrong?</Text>
+                {DISPUTE_CATEGORIES.map((category) => {
+                  const selected = reportCategory === category.key;
+                  return (
+                    <ListRow
+                      key={category.key}
+                      icon="report-problem"
+                      title={category.title}
+                      subtitle={category.subtitle}
+                      showChevron={false}
+                      onPress={() => setReportCategory(category.key)}
+                      right={
+                        selected ? (
+                          <MaterialIcons name="check-circle" size={24} color={colors.primary} />
+                        ) : undefined
+                      }
+                    />
+                  );
+                })}
+                <TextInput
+                  value={reportDetails}
+                  onChangeText={setReportDetails}
+                  placeholder="Details for the record (optional)"
+                  placeholderTextColor={colors.muted}
+                  maxLength={500}
+                  editable={!reporting}
+                  style={styles.reasonInput}
+                  accessibilityLabel="Dispute details"
+                />
+                {reportError ? (
+                  <ErrorState title="Could not report" message={reportError} retryTitle="Dismiss" onRetry={() => setReportError(null)} />
+                ) : null}
+                <Button
+                  title={reporting ? 'Reporting…' : 'Submit problem report'}
+                  variant="danger"
+                  onPress={() => void handleReport()}
+                  disabled={reporting || !reportCategory}
+                  loading={reporting}
+                />
+                <Text variant="caption" color="muted">
+                  Reporting moves the order to dispute for manual settlement — no
+                  automatic refund. Only report genuine problems.
+                </Text>
+              </View>
+            ) : null}
           </Card>
         ) : null}
 
@@ -360,4 +445,5 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.surface,
   },
+  reportForm: { gap: spacing.md },
 });

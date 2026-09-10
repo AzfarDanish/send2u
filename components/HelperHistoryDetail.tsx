@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
+import { SettlementRecord } from '@/components/SettlementRecord';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
@@ -25,12 +26,25 @@ export function HelperHistoryDetail({ job }: { job: OrderWithDetails }) {
         {job.status === 'completed' ? (
           <>
             <Badge label="Completed" tone="success" />
-            <Text variant="subtitle">Delivery complete</Text>
-            <Text color="secondary">
-              Payment verified. Your {formatMYR(job.deliveryFeeCents)} delivery earning is
-              finalized
-              {job.deliveredAt ? ` · delivered ${formatOrderDate(job.deliveredAt)}` : ''}.
-            </Text>
+            {job.resolvedAt ? (
+              <>
+                <Text variant="subtitle">Settled after dispute</Text>
+                <Text color="secondary">
+                  This delivery was closed through dispute resolution, not the
+                  normal paid flow.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text variant="subtitle">Delivery complete</Text>
+                <Text color="secondary">
+                  Payment verified. Your {formatMYR(job.deliveryFeeCents)} delivery earning is
+                  finalized
+                  {job.deliveredAt ? ` · delivered ${formatOrderDate(job.deliveredAt)}` : ''}.
+                </Text>
+              </>
+            )}
+            <SettlementRecord order={job} />
           </>
         ) : job.status === 'cancelled' ? (
           <>
@@ -42,6 +56,7 @@ export function HelperHistoryDetail({ job }: { job: OrderWithDetails }) {
                 : `Cancelled${job.cancelReason ? `: ${job.cancelReason}` : ''}.`}
               {job.cancelledAt ? ` (${formatOrderDate(job.cancelledAt)})` : ''}
             </Text>
+            <SettlementRecord order={job} />
           </>
         ) : (
           <>
@@ -55,7 +70,12 @@ export function HelperHistoryDetail({ job }: { job: OrderWithDetails }) {
                 ? 'You reported you could not continue. '
                 : job.disputeReason === 'late_cancellation'
                   ? 'The requester cancelled after you had paid. '
-                  : ''}
+                  : job.disputeReason === 'not_received' ||
+                      job.disputeReason === 'incorrect' ||
+                      job.disputeReason === 'damaged' ||
+                      job.disputeReason === 'refused'
+                    ? 'The requester reported a problem with the delivery. '
+                    : ''}
               {job.foodCostCents
                 ? `Your fronted ${formatMYR(job.foodCostCents)} is recorded. `
                 : ''}
@@ -65,6 +85,16 @@ export function HelperHistoryDetail({ job }: { job: OrderWithDetails }) {
                 ? ` Settled${job.resolution ? ` as ${job.resolution}` : ''} on ${formatOrderDate(job.resolvedAt)}.`
                 : ''}
             </Text>
+            {job.disputeDetails ? (
+              <Text color="secondary">
+                Requester&apos;s report: {job.disputeDetails}
+              </Text>
+            ) : null}
+            {job.disputeNote ? (
+              <Text variant="caption" color="muted">
+                Resolution note: {job.disputeNote}
+              </Text>
+            ) : null}
           </>
         )}
       </Card>

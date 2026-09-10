@@ -168,6 +168,10 @@ export interface Order {
   cancelledBy: string | null;
   cancelReason: string | null;
   disputeReason: string | null;
+  /** The opener's free-text account; preserved alongside any admin note. */
+  disputeDetails: string | null;
+  /** Admin resolution note written by `send2u_resolve_dispute`, if any. */
+  disputeNote: string | null;
   disputedAt: string | null;
   resolvedAt: string | null;
   resolution: string | null;

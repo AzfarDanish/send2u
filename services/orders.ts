@@ -75,6 +75,8 @@ interface OrderRow {
   cancelled_by: string | null;
   cancel_reason: string | null;
   dispute_reason: string | null;
+  dispute_details: string | null;
+  dispute_note: string | null;
   disputed_at: string | null;
   resolved_at: string | null;
   resolution: string | null;
@@ -141,6 +143,8 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
     cancelledBy: row.cancelled_by,
     cancelReason: row.cancel_reason,
     disputeReason: row.dispute_reason,
+    disputeDetails: row.dispute_details,
+    disputeNote: row.dispute_note,
     disputedAt: row.disputed_at,
     resolvedAt: row.resolved_at,
     resolution: row.resolution,
@@ -194,7 +198,7 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
 const ORDER_SELECT =
   'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
   ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, picked_up_at, out_for_delivery_at, delivered_at, confirmed_at,' +
-  ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, disputed_at, resolved_at, resolution,' +
+  ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, dispute_details, dispute_note, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint),' +
   ' delivery_location:send2u_delivery_locations!inner(id, name),' +
@@ -505,6 +509,63 @@ function friendlyConfirmError(message: string): string {
   if (/not awaiting confirmation/i.test(message))
     return 'You can confirm once the helper marks the food as delivered.';
   return message ? `Could not confirm delivery: ${message}` : 'Could not confirm delivery.';
+}
+
+/** Categories a requester can report a delivered order under. */
+export type RequesterDisputeReason = 'not_received' | 'incorrect' | 'damaged' | 'refused';
+
+/**
+ * Requester opens a delivery dispute. Only the owning requester, only from
+ * `delivered` (pre-payment, so payment history can never overlap a dispute) —
+ * a single atomic UPDATE, so duplicates and concurrent opens serialize to
+ * exactly one winner. Details are the opener's account, preserved separately
+ * from any later admin resolution note. No money moves.
+ */
+export async function openDispute(
+  orderId: string,
+  reason: RequesterDisputeReason,
+  details: string | null,
+): Promise<{ status: OrderStatus }> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.rpc('send2u_open_dispute', {
+    p_order_id: orderId,
+    p_reason: reason,
+    p_details: details,
+  });
+  if (error) throw new Error(friendlyDisputeError(error.message, 'report'));
+  if (!isRecord(data) || typeof data.status !== 'string') {
+    throw new Error('The report came back in an unexpected shape.');
+  }
+  return { status: data.status as OrderStatus };
+}
+
+/**
+ * Requester retracts their OWN delivery report, resuming at `delivered`.
+ * Helper-caused disputes are excluded server-side. A retraction clears the
+ * open claim (it resumes truthfully); the resumed flow records what follows.
+ */
+export async function withdrawDispute(orderId: string): Promise<{ status: OrderStatus }> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.rpc('send2u_withdraw_dispute', { p_order_id: orderId });
+  if (error) throw new Error(friendlyDisputeError(error.message, 'withdraw'));
+  if (!isRecord(data) || typeof data.status !== 'string') {
+    throw new Error('The withdrawal came back in an unexpected shape.');
+  }
+  return { status: data.status as OrderStatus };
+}
+
+function friendlyDisputeError(message: string, action: 'report' | 'withdraw'): string {
+  if (/not authenticated|session expired/i.test(message))
+    return 'Your session expired. Sign in again and retry.';
+  if (/order not found/i.test(message)) return 'That order is not available to you.';
+  if (/invalid dispute reason/i.test(message)) return 'Choose what went wrong with the delivery.';
+  if (/too long/i.test(message)) return 'Keep the details under 500 characters.';
+  if (/only delivered/i.test(message))
+    return 'You can report a problem once the food is marked delivered.';
+  if (/cannot be withdrawn/i.test(message))
+    return 'This report can no longer be withdrawn.';
+  const verb = action === 'report' ? 'report the problem' : 'withdraw the report';
+  return message ? `Could not ${verb}: ${message}` : `Could not ${verb}.`;
 }
 
 /** Maps database guard-rail errors to honest requester-facing messages. */

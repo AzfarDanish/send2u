@@ -58,8 +58,21 @@ interface OrderRow {
   delivery_location_id: string;
   status: string;
   subtotal_cents: number;
+  delivery_fee_cents: number;
+  pickup_code: string;
   helper_id: string | null;
   accepted_at: string | null;
+  arrived_at: string | null;
+  purchased_at: string | null;
+  food_cost_cents: number | null;
+  delivered_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
+  dispute_reason: string | null;
+  disputed_at: string | null;
+  resolved_at: string | null;
+  resolution: string | null;
   created_at: string;
   updated_at: string;
   vendor: { id: string; name: string; location_hint: string | null } | null;
@@ -106,8 +119,21 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
     deliveryLocationId: row.delivery_location_id,
     status: row.status as OrderStatus,
     subtotalCents: row.subtotal_cents,
+    deliveryFeeCents: row.delivery_fee_cents,
+    pickupCode: row.pickup_code,
     helperId: row.helper_id,
     acceptedAt: row.accepted_at,
+    arrivedAt: row.arrived_at,
+    purchasedAt: row.purchased_at,
+    foodCostCents: row.food_cost_cents,
+    deliveredAt: row.delivered_at,
+    cancelledAt: row.cancelled_at,
+    cancelledBy: row.cancelled_by,
+    cancelReason: row.cancel_reason,
+    disputeReason: row.dispute_reason,
+    disputedAt: row.disputed_at,
+    resolvedAt: row.resolved_at,
+    resolution: row.resolution,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     vendor: {
@@ -156,7 +182,10 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
 }
 
 const ORDER_SELECT =
-  'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, helper_id, accepted_at, created_at, updated_at,' +
+  'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
+  ' helper_id, accepted_at, arrived_at, purchased_at, food_cost_cents, delivered_at,' +
+  ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, disputed_at, resolved_at, resolution,' +
+  ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint),' +
   ' delivery_location:send2u_delivery_locations!inner(id, name),' +
   ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at),' +
@@ -308,6 +337,88 @@ function friendlyAcceptError(message: string): string {
   if (/no longer available/i.test(message))
     return 'Someone just took this job. Pick another open request.';
   return message ? `Could not accept the job: ${message}` : 'Could not accept the job.';
+}
+
+export type FulfilmentAction =
+  | 'arrive'
+  | 'report_unavailable'
+  | 'purchase'
+  | 'verify_pickup'
+  | 'start_delivery'
+  | 'mark_delivered'
+  | 'report_failed'
+  | 'release';
+
+/**
+ * Advances fulfilment for the assigned helper. The database validates the
+ * current state atomically; only valid transitions succeed.
+ */
+export async function advanceFulfilment(
+  orderId: string,
+  action: FulfilmentAction,
+  code?: string,
+): Promise<{ status: OrderStatus }> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.rpc('send2u_helper_advance', {
+    p_order_id: orderId,
+    p_action: action,
+    p_code: code ?? null,
+  });
+  if (error) throw new Error(friendlyFulfilmentError(error.message));
+  if (!isRecord(data) || typeof data.status !== 'string') {
+    throw new Error('The update came back in an unexpected shape.');
+  }
+  return { status: data.status as OrderStatus };
+}
+
+function friendlyFulfilmentError(message: string): string {
+  if (/not authenticated|session expired/i.test(message))
+    return 'Your session expired. Sign in again and retry.';
+  if (/pickup code required|invalid pickup code/i.test(message))
+    return 'That pickup code does not match this order. Check it and try again.';
+  if (/invalid action|unknown fulfilment/i.test(message))
+    return 'That action is not available for the current order state. Refresh and try again.';
+  return message ? `Could not update the order: ${message}` : 'Could not update the order.';
+}
+
+export interface CancelResult {
+  status: OrderStatus;
+  /** 'none' when cancelled cleanly, 'food_cost' when settlement may be owed. */
+  liability: 'none' | 'food_cost';
+  foodCostCents: number | null;
+}
+
+/**
+ * Requester cancellation. Before purchase it is clean; after purchase the
+ * order moves to dispute with the helper's fronted cost preserved.
+ */
+export async function cancelOrder(orderId: string, reason: string): Promise<CancelResult> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.rpc('send2u_cancel_order', {
+    p_order_id: orderId,
+    p_reason: reason,
+  });
+  if (error) throw new Error(friendlyCancelError(error.message));
+  if (!isRecord(data) || typeof data.status !== 'string' || typeof data.liability !== 'string') {
+    throw new Error('Cancellation came back in an unexpected shape.');
+  }
+  return {
+    status: data.status as OrderStatus,
+    liability: data.liability === 'food_cost' ? 'food_cost' : 'none',
+    foodCostCents:
+      typeof data.food_cost_cents === 'number' ? (data.food_cost_cents as number) : null,
+  };
+}
+
+function friendlyCancelError(message: string): string {
+  if (/not authenticated|session expired/i.test(message))
+    return 'Your session expired. Sign in again and retry.';
+  if (/order not found/i.test(message)) return 'That order is not available to you.';
+  if (/reason required|too long/i.test(message))
+    return 'Tell us briefly why you are cancelling (under 500 characters).';
+  if (/no longer be cancelled/i.test(message))
+    return 'This order can no longer be cancelled. It is already delivered or closed.';
+  return message ? `Could not cancel the order: ${message}` : 'Could not cancel the order.';
 }
 
 /** Maps database guard-rail errors to honest requester-facing messages. */

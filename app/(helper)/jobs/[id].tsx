@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -14,13 +14,14 @@ import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, orderStatusLabel, orderStatusTone } from '@/lib/orders';
-import { acceptOrder, getJobDetail } from '@/services/orders';
+import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
 /**
  * Helper job detail. Review vendor, items, subtotal, and drop-off, then
- * accept. Acceptance is one atomic server operation — exactly one helper
- * wins; everyone else sees "no longer available".
+ * accept. After acceptance, status-driven fulfilment actions walk the order
+ * through the physical flow (vendor → purchase → pickup code → delivery).
+ * Every transition is one atomic server operation.
  */
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,6 +31,9 @@ export default function JobDetailScreen() {
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [paymentTick, setPaymentTick] = useState(0);
+  const [acting, setActing] = useState<FulfilmentAction | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pickupCode, setPickupCode] = useState('');
 
   const reload = useCallback(async () => {
     if (typeof id !== 'string') {
@@ -53,6 +57,8 @@ export default function JobDetailScreen() {
     setAcceptError(null);
     setAccepted(false);
     setPaymentTick(0);
+    setActionError(null);
+    setPickupCode('');
     void reload();
   }, [id, reload]);
 
@@ -72,6 +78,24 @@ export default function JobDetailScreen() {
       setAccepting(false);
     }
   }, [job, accepting, reload]);
+
+  const handleAdvance = useCallback(
+    async (action: FulfilmentAction, code?: string) => {
+      if (!job || acting) return;
+      setActing(action);
+      setActionError(null);
+      try {
+        await advanceFulfilment(job.id, action, code);
+        await reload();
+        setPaymentTick((t) => t + 1);
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Could not update the order.');
+      } finally {
+        setActing(null);
+      }
+    },
+    [job, acting, reload],
+  );
 
   if (status === 'loading' || !job) {
     return (
@@ -94,6 +118,7 @@ export default function JobDetailScreen() {
   }
 
   const pending = job.status === 'pending' && !accepted;
+  const busy = acting !== null;
 
   return (
     <>
@@ -102,8 +127,8 @@ export default function JobDetailScreen() {
         <View style={styles.heading}>
           <Text variant="title">{job.vendor.name}</Text>
           <Badge
-            label={accepted ? 'Assigned' : orderStatusLabel(job.status)}
-            tone={accepted ? 'success' : orderStatusTone(job.status)}
+            label={accepted && job.status === 'pending' ? 'Assigned' : orderStatusLabel(job.status)}
+            tone={accepted && job.status === 'pending' ? 'success' : orderStatusTone(job.status)}
           />
         </View>
         <Text variant="caption" color="secondary">
@@ -154,13 +179,20 @@ export default function JobDetailScreen() {
 
         <Card>
           <View style={styles.subtotalRow}>
-            <Text variant="subtitle">Subtotal</Text>
+            <Text variant="subtitle">Food subtotal</Text>
             <Text variant="title" color="primary">
               {formatMYR(job.subtotalCents)}
             </Text>
           </View>
+          <View style={styles.subtotalRow}>
+            <Text color="secondary">Delivery earning</Text>
+            <Text variant="subtitle" color="primary">
+              {formatMYR(job.deliveryFeeCents)}
+            </Text>
+          </View>
           <Text variant="caption" color="muted">
-            What the requester pays the vendor — you never handle this money in the app.
+            You front the food cost at the stall with your own money; the requester pays you food +
+            delivery after handover.
           </Text>
         </Card>
 
@@ -192,10 +224,168 @@ export default function JobDetailScreen() {
               told here and nothing is assigned twice.
             </Text>
           </Card>
+        ) : null}
+
+        {job.status === 'assigned' || job.status === 'at_vendor' ? (
+          <Card>
+            <Badge
+              label={job.status === 'at_vendor' ? 'At vendor' : 'Accepted'}
+              tone="info"
+            />
+            <Text variant="subtitle">
+              {job.status === 'at_vendor' ? 'You are at the stall' : 'Head to the vendor'}
+            </Text>
+            <Text color="secondary">
+              {job.status === 'at_vendor'
+                ? 'Check the food is available, pay the stall with your own money, then record the purchase.'
+                : 'Go to the stall, then let the app know you arrived so you can record the purchase.'}
+            </Text>
+            {actionError ? (
+              <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
+            ) : null}
+            {job.status === 'assigned' ? (
+              <Button
+                title={acting === 'arrive' ? 'Recording…' : "I'm at the vendor"}
+                onPress={() => void handleAdvance('arrive')}
+                disabled={busy}
+                loading={acting === 'arrive'}
+              />
+            ) : (
+              <Button
+                title={acting === 'purchase' ? 'Recording…' : 'Food purchased with my money'}
+                onPress={() => void handleAdvance('purchase')}
+                disabled={busy}
+                loading={acting === 'purchase'}
+              />
+            )}
+            <Button
+              title="Food unavailable"
+              variant="secondary"
+              onPress={() => void handleAdvance('report_unavailable')}
+              disabled={busy}
+            />
+            <Button
+              title="Release job"
+              variant="danger"
+              onPress={() => void handleAdvance('release')}
+              disabled={busy}
+            />
+            <Text variant="caption" color="muted">
+              Releasing returns the order to the open queue. Reporting unavailable cancels it
+              cleanly — the requester owes nothing.
+            </Text>
+          </Card>
+        ) : job.status === 'purchased' ? (
+          <Card>
+            <Badge label="Purchased" tone="info" />
+            <Text variant="subtitle">Verify the pickup</Text>
+            <Text color="secondary">
+              Enter the order pickup code ({job.pickupCode}) to confirm you physically received the
+              food from the stall.
+            </Text>
+            {actionError ? (
+              <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
+            ) : null}
+            <TextInput
+              value={pickupCode}
+              onChangeText={setPickupCode}
+              placeholder="Pickup code"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={12}
+              editable={!busy}
+              style={styles.codeInput}
+              accessibilityLabel="Order pickup code"
+            />
+            <Button
+              title={acting === 'verify_pickup' ? 'Verifying…' : 'Verify pickup'}
+              onPress={() => void handleAdvance('verify_pickup', pickupCode)}
+              disabled={busy || pickupCode.trim().length === 0}
+              loading={acting === 'verify_pickup'}
+            />
+          </Card>
+        ) : job.status === 'picked_up' ? (
+          <Card>
+            <Badge label="Picked up" tone="info" />
+            <Text variant="subtitle">Head to the drop-off</Text>
+            <Text color="secondary">
+              Food verified in hand. Start the delivery run when you leave for {job.location.name}.
+            </Text>
+            {actionError ? (
+              <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => void handleAdvance('start_delivery')} />
+            ) : null}
+            <Button
+              title={acting === 'start_delivery' ? 'Starting…' : 'Start delivery'}
+              onPress={() => void handleAdvance('start_delivery')}
+              disabled={busy}
+              loading={acting === 'start_delivery'}
+            />
+          </Card>
+        ) : job.status === 'delivering' ? (
+          <Card>
+            <Badge label="Delivering" tone="warning" />
+            <Text variant="subtitle">On the way to {job.location.name}</Text>
+            <Text color="secondary">
+              Hand the food over, then mark it delivered — the requester pays you after that.
+            </Text>
+            {actionError ? (
+              <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
+            ) : null}
+            <Button
+              title={acting === 'mark_delivered' ? 'Recording…' : 'Mark delivered'}
+              onPress={() => void handleAdvance('mark_delivered')}
+              disabled={busy}
+              loading={acting === 'mark_delivered'}
+            />
+            <Button
+              title="Requester unavailable"
+              variant="danger"
+              onPress={() => void handleAdvance('report_failed')}
+              disabled={busy}
+            />
+            <Text variant="caption" color="muted">
+              If the requester refuses or never appears, record the failed attempt instead — the
+              order moves to dispute with your purchase preserved.
+            </Text>
+          </Card>
+        ) : job.status === 'delivered' ? (
+          <Card>
+            <Badge label="Delivered" tone="success" />
+            <Text color="secondary">
+              Food handed over. The requester now pays you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally — verify their receipt below.
+            </Text>
+          </Card>
+        ) : job.status === 'completed' ? (
+          <Card>
+            <Badge label="Completed" tone="success" />
+            <Text color="secondary">
+              Payment verified. Your {formatMYR(job.deliveryFeeCents)} delivery earning is
+              finalized.
+            </Text>
+          </Card>
+        ) : job.status === 'cancelled' ? (
+          <Card>
+            <Badge label="Cancelled" tone="error" />
+            <Text color="secondary">
+              {job.cancelReason === 'food_unavailable'
+                ? 'The food was unavailable — no money changed hands.'
+                : 'This order was cancelled.'}
+            </Text>
+          </Card>
+        ) : job.status === 'disputed' ? (
+          <Card>
+            <Badge label="Disputed" tone="error" />
+            <Text color="secondary">
+              This order needs settlement
+              {job.foodCostCents ? ` — your fronted ${formatMYR(job.foodCostCents)} is recorded` : ''}.
+              An admin will resolve it; nothing more to do here.
+            </Text>
+          </Card>
         ) : (
           <Card>
             <Text variant="caption" color="muted">
-              This job is already assigned and no longer open.
+              This job is no longer open.
             </Text>
             <Button title="Back to jobs" variant="secondary" onPress={() => router.back()} />
           </Card>
@@ -219,4 +409,17 @@ const styles = StyleSheet.create({
   lineTotal: { fontWeight: '700', color: colors.primary },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   confirmRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  codeInput: {
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: colors.text,
+    backgroundColor: colors.surface,
+    textAlign: 'center',
+  },
 });

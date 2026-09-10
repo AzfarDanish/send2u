@@ -12,18 +12,27 @@ export function formatOrderDate(iso: string): string {
   });
 }
 
-/** Badge tone per status. Only `pending` is created by the current MVP. */
+/** Badge tone per status across the fulfilment lifecycle. */
 export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
   switch (status) {
     case 'pending':
+    case 'assigned':
+    case 'at_vendor':
+    case 'purchased':
+    case 'picked_up':
       return 'info';
-    case 'confirmed':
+    case 'delivering':
+      return 'warning';
     case 'delivered':
+    case 'confirmed':
+      return 'success';
+    case 'completed':
       return 'success';
     case 'cancelled':
+    case 'disputed':
       return 'error';
     default:
-      return 'warning';
+      return 'neutral';
   }
 }
 

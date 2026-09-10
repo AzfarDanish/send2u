@@ -103,24 +103,31 @@ export interface DeliveryLocation {
 }
 
 /**
- * Requester order status. Only `pending` is created by the current MVP;
- * the rest are reserved for helper assignment, fulfilment, and confirmation.
+ * Fulfilment lifecycle. Happy path: pending → assigned → at_vendor →
+ * purchased → picked_up → delivering → delivered → completed.
+ * Exception states: cancelled (clean) and disputed (needs settlement).
+ * Legacy values stay reserved but unused by current flows.
  */
 export type OrderStatus =
   | 'pending'
   | 'assigned'
-  | 'accepted'
-  | 'preparing'
-  | 'ready_for_pickup'
+  | 'at_vendor'
+  | 'purchased'
   | 'picked_up'
   | 'delivering'
   | 'delivered'
-  | 'confirmed'
-  | 'cancelled';
+  | 'completed'
+  | 'cancelled'
+  | 'disputed'
+  | 'accepted'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'confirmed';
 
 /**
- * One vendor fulfilment. A mixed-vendor cart splits into one order per
- * vendor sharing the same delivery location. No payment fields yet.
+ * One vendor fulfilment. The helper fronts the food cost at the physical
+ * stall; the requester later pays food + delivery fee externally.
+ * No payment/helper fields yet beyond assignment. No money moves in-app.
  */
 export interface Order {
   id: string;
@@ -128,12 +135,28 @@ export interface Order {
   vendorId: string;
   deliveryLocationId: string;
   status: OrderStatus;
-  /** Sum of unit price × quantity in MYR cents. No fees or taxes. */
+  /** Food sum (unit × qty) in MYR cents. No fees or taxes. */
   subtotalCents: number;
+  /** Prototype delivery fee in cents; the helper's earning when completed. */
+  deliveryFeeCents: number;
+  /** Vendor-handoff reference, verified by the helper at pickup. */
+  pickupCode: string;
   /** Assigned helper once accepted; null while pending. */
   helperId: string | null;
   /** When the helper accepted; null while pending. */
   acceptedAt: string | null;
+  arrivedAt: string | null;
+  purchasedAt: string | null;
+  /** Snapshot of the fronted food cost (= subtotal at purchase). */
+  foodCostCents: number | null;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  cancelReason: string | null;
+  disputeReason: string | null;
+  disputedAt: string | null;
+  resolvedAt: string | null;
+  resolution: string | null;
   createdAt: string;
   updatedAt: string;
 }

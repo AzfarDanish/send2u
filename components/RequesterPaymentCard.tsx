@@ -22,16 +22,14 @@ import {
 
 interface RequesterPaymentCardProps {
   orderId: string;
-  /** Authoritative amount from the order snapshot. Never editable. */
-  subtotalCents: number;
 }
 
 /**
  * Requester payment section: helper QR, external-payment instructions,
- * evidence submission, and verification states. Amount always comes from
- * the order — the requester can never edit it.
+ * evidence submission, and verification states. Amounts always come from
+ * the order via payment context — the requester can never edit them.
  */
-export function RequesterPaymentCard({ orderId, subtotalCents }: RequesterPaymentCardProps) {
+export function RequesterPaymentCard({ orderId }: RequesterPaymentCardProps) {
   const { user } = useAuth();
   const [context, setContext] = useState<PaymentContext | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -113,7 +111,11 @@ export function RequesterPaymentCard({ orderId, subtotalCents }: RequesterPaymen
     );
   }
 
-  if (!context.helperId) {
+  if (context.orderStatus === 'cancelled' || context.orderStatus === 'disputed') {
+    return null;
+  }
+
+  if (!context.helperId || context.orderStatus === 'pending') {
     return (
       <Card>
         <Badge label="No payment yet" tone="neutral" />
@@ -121,6 +123,26 @@ export function RequesterPaymentCard({ orderId, subtotalCents }: RequesterPaymen
         <Text color="secondary">
           Payment opens here once a helper accepts this order — you&apos;ll pay them externally
           using their QR.
+        </Text>
+      </Card>
+    );
+  }
+
+  if (
+    context.orderStatus === 'assigned' ||
+    context.orderStatus === 'at_vendor' ||
+    context.orderStatus === 'purchased' ||
+    context.orderStatus === 'picked_up' ||
+    context.orderStatus === 'delivering'
+  ) {
+    return (
+      <Card>
+        <Badge label="Pay after delivery" tone="info" />
+        <Text variant="subtitle">No payment yet</Text>
+        <Text color="secondary">
+          You pay {formatMYR(context.totalCents)} ({formatMYR(context.subtotalCents)} food +{' '}
+          {formatMYR(context.deliveryFeeCents)} delivery) only after the food is in your hands.
+          The helper&apos;s QR appears here on delivery.
         </Text>
       </Card>
     );
@@ -141,9 +163,13 @@ export function RequesterPaymentCard({ orderId, subtotalCents }: RequesterPaymen
       <View style={styles.amountRow}>
         <Text color="secondary">Amount due</Text>
         <Text variant="title" color="primary">
-          {formatMYR(subtotalCents)}
+          {formatMYR(context.totalCents)}
         </Text>
       </View>
+      <Text variant="caption" color="secondary">
+        {formatMYR(context.subtotalCents)} food + {formatMYR(context.deliveryFeeCents)} delivery.
+        This total comes from your order — it cannot be edited here.
+      </Text>
 
       {!payment || payment.status === 'rejected' ? (
         <>
@@ -151,7 +177,7 @@ export function RequesterPaymentCard({ orderId, subtotalCents }: RequesterPaymen
             <>
               <PrivateImage path={context.helperQrPath} accessibilityLabel="Helper payment QR code" />
               <Text color="secondary">
-                Pay {formatMYR(subtotalCents)} to your helper externally using this QR, then attach
+                Pay {formatMYR(context.totalCents)} to your helper externally using this QR, then attach
                 your receipt below (PDF or photo, up to 10 MB). No money moves inside Send2U.
               </Text>
             </>

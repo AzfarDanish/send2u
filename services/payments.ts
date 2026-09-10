@@ -29,6 +29,10 @@ export interface PaymentContext {
   orderId: string;
   orderStatus: OrderStatus;
   subtotalCents: number;
+  deliveryFeeCents: number;
+  /** Requester total: food subtotal + delivery fee. */
+  totalCents: number;
+  pickupCode: string | null;
   helperId: string | null;
   helperQrPath: string | null;
   payment: Payment | null;
@@ -63,10 +67,20 @@ export async function getPaymentContext(orderId: string): Promise<PaymentContext
   const { data, error } = await supabase.rpc('send2u_payment_context', { p_order_id: orderId });
   if (error) throw new Error(friendlyPaymentError(error.message));
   if (!isRecord(data)) throw new Error('Payment data came back in an unexpected shape.');
-  const { order_status, subtotal_cents, helper_id, helper_qr_path, payment } = data;
+  const {
+    order_status,
+    subtotal_cents,
+    delivery_fee_cents,
+    pickup_code,
+    helper_id,
+    helper_qr_path,
+    payment,
+  } = data;
   if (
     typeof order_status !== 'string' ||
     typeof subtotal_cents !== 'number' ||
+    typeof delivery_fee_cents !== 'number' ||
+    (pickup_code !== null && typeof pickup_code !== 'string') ||
     (helper_id !== null && typeof helper_id !== 'string') ||
     (helper_qr_path !== null && typeof helper_qr_path !== 'string') ||
     (payment !== null && !isRecord(payment))
@@ -77,6 +91,9 @@ export async function getPaymentContext(orderId: string): Promise<PaymentContext
     orderId,
     orderStatus: order_status as OrderStatus,
     subtotalCents: subtotal_cents,
+    deliveryFeeCents: delivery_fee_cents,
+    totalCents: subtotal_cents + delivery_fee_cents,
+    pickupCode: pickup_code,
     helperId: helper_id,
     helperQrPath: helper_qr_path,
     payment: payment ? toPayment(orderId, payment) : null,
@@ -125,6 +142,8 @@ function friendlyPaymentError(message: string): string {
   if (/only.*assigned helper/i.test(message))
     return 'Only the helper assigned to this order can do that.';
   if (/only helpers/i.test(message)) return 'Only helpers can do that.';
+  if (/opens after delivery/i.test(message))
+    return 'Payment opens after the food is delivered.';
   if (/assigned orders/i.test(message))
     return 'Payment opens once a helper accepts this order.';
   if (/already submitted/i.test(message))

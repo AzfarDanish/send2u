@@ -462,6 +462,25 @@ here conflicts with the actual implementation.
   sign-in (retries succeed; all screens have retry affordances);
   background preview servers used for testing were stopped.
 
+## 2026-09-10 — Fulfilment lifecycle: helper advance, cancel/dispute, delivery fee, pickup code, post-delivery payment
+
+- Target verification (before mutation): app `.env` `EXPO_PUBLIC_SUPABASE_URL` and Supabase MCP project URL both resolve to `sqspqwj…` (canonical); order/assignment/menu/profiles/payment schema confirmed present.
+- Database: migration `send2u_fulfilment_lifecycle` — order status CHECK expanded to include `at_vendor, purchased, completed, disputed` (plus legacy `accepted, preparing, ready_for_pickup, confirmed`); new columns on `send2u_orders`: `delivery_fee_cents` (NOT NULL DEFAULT 200, CHECK >= 0), `pickup_code` (NOT NULL DEFAULT md5-based 6-char), `arrived_at`, `purchased_at`, `food_cost_cents`, `delivered_at`, `cancelled_at`, `cancelled_by`, `cancel_reason`, `dispute_reason`, `dispute_note`, `disputed_at`, `resolved_at`, `resolved_by`, `resolution`. Follow-up migration `fix_send2u_resolve_dispute_var` tidies variable reuse in resolve RPC.
+- RPCs (SECURITY DEFINER, EXECUTE to `authenticated`):
+  - `send2u_helper_advance(p_action, p_order_id, p_food_cost_cents, p_pickup_code, p_note)` — atomic single UPDATE with state validation; actions: arrive, report_unavailable, purchase, verify_pickup (checks 6-char code), start_delivery, mark_delivered, report_failed (→disputed), release (→pending before purchase)
+  - `send2u_cancel_order(p_order_id, p_reason)` — before purchase: clean cancelled; after purchase: disputed with food_cost preserved
+  - `send2u_resolve_dispute(p_order_id, p_resolution, p_note)` — admin-only, sets resolution + note
+  - `send2u_submit_payment` updated: requires `delivered` status, amount = subtotal + delivery_fee
+  - `send2u_review_payment` updated: requires `delivered` status, verified flips to `completed`
+  - `send2u_payment_context` updated: returns `delivery_fee_cents, totalCents, pickupCode`
+  - `send2u_place_orders` updated: records `delivery_fee_cents=200` and `pickup_code` per order
+- App: `types/domain.ts` — OrderStatus expanded (full lifecycle), Order interface gained all lifecycle fields, PlacedOrderSummary has delivery_fee_cents; `services/orders.ts` — OrderRow gains all columns, `FulfilmentAction` type, `advanceFulfilment()` and `cancelOrder()` functions, friendly error helpers; `services/payments.ts` — PaymentContext gains deliveryFeeCents/totalCents/pickupCode, submit/payment-open-after-delivery messaging; `lib/orders.ts` — `orderStatusTone` updated for full lifecycle
+- UI: `app/(helper)/jobs/[id].tsx` — status-driven fulfilment UI (arrive → purchase → pickup code → start delivery → mark delivered / report failed / release), pickup code input field, status cards for every state; `app/(requester)/orders/[id].tsx` — progress bar (5 steps), food subtotal / delivery fee / total breakdown, cancel flow with reason (clean before purchase, warned after), cancelled/disputed/completed states; `components/RequesterPaymentCard.tsx` — shows "pay after delivery" pre-delivery, full QR + submit post-delivery, amount shows `food + delivery = total`, cancels hidden on cancelled/disputed; `components/HelperPaymentCard.tsx` — hidden on cancelled/disputed; `app/(helper)/earnings.tsx` — real earnings from completed orders, `deliveryFeeCents` only, total finalized amount
+- Financial model: helper fronts food cost at stall; requester pays food + delivery fee (RM2) after delivery; delivery fee is helper's earning only; `food_cost_cents` is not earnings, only delivery fee is
+- Decisions: fixed delivery fee (200 cents, not configurable by client); pickup code verified at pickup; payment only opens after `delivered` status; cancel before purchase = clean; cancel after purchase = dispute; resolve dispute is admin-only
+- Validation: `tsc` clean, `eslint` 0 errors, `expo-doctor` 18/18, `expo export -p web --clear` (canonical-only) pass; live RPC tests: two-user race (two helpers advance same order → exactly one winner); concurrent cancel-and-advance test passes; all test users/orders/profiles/storage files removed; one unrelated developer order/user left untouched
+- Known limitations: native-device review not done; web screenshots only; SPA server stability (Python HTTP server periodically crashes on port 8124, requires kill + restart before E2E runs — not a code bug); ephemeral pickup code does not rotate if helper manually shares without verifying at stall (acceptable for MVP)
+
 ## 2026-09-10 — Fixes: stable dev role switching + document receipt picker
 
 - Role switching (`services/auth.ts`, `contexts/AuthContext.tsx`): repeated

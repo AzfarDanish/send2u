@@ -98,6 +98,10 @@ export function HelperPaymentCard({ orderId, onChanged, refreshToken = 0 }: Help
     );
   }
 
+  if (context.orderStatus === 'cancelled' || context.orderStatus === 'disputed') {
+    return null;
+  }
+
   if (!context.helperId) {
     return (
       <Card>

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, Switch, View } from 'react-native';
 
 import { Badge } from '@/components/ui/Badge';
@@ -37,6 +37,12 @@ export default function HelperJobsScreen() {
   // Local UI state only — real availability sync arrives with dispatch.
   const [available, setAvailable] = useState(false);
   const { jobs, status, error, refreshing, retry, refresh } = useAvailableJobs();
+
+  // Going available must show the current queue, not the (possibly stale)
+  // snapshot from when the screen first mounted while offline.
+  useEffect(() => {
+    if (available) void refresh();
+  }, [available, refresh]);
 
   const openJob = useCallback((job: OrderWithDetails) => {
     router.push({ pathname: '/(helper)/jobs/[id]', params: { id: job.id } });

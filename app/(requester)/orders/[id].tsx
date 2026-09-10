@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
@@ -118,11 +119,13 @@ export default function OrderDetailScreen() {
         {order.status === 'pending' ? (
           <Card>
             <Text variant="caption" color="muted">
-              Still pending — no helper has been assigned yet. Helper assignment arrives in a later
-              task.
+              Still pending — no helper has been assigned yet. Once a helper accepts, payment opens
+              below.
             </Text>
           </Card>
         ) : null}
+
+        <RequesterPaymentCard orderId={order.id} subtotalCents={order.subtotalCents} />
       </Screen>
     </>
   );

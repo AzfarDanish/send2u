@@ -355,3 +355,141 @@ here conflicts with the actual implementation.
   (representative, not a substitute); leaked-password protection toggle and
   pre-existing `rls_auto_enable` advisor warns are untouched auth-config
   items.
+
+## 2026-09-10 — Helper: job queue + atomic order acceptance
+
+- Target verification (before mutation): app `.env`
+  `EXPO_PUBLIC_SUPABASE_URL` and Supabase MCP project URL both resolve to
+  `sqspqwj…` (canonical); existing order/locations/menu/profiles schema
+  confirmed present.
+- Database: migration `add_send2u_helper_assignment` — `send2u_orders`
+  gains nullable `helper_id` (FK `auth.users`, SET NULL) + `accepted_at`,
+  CHECK `pending → helper IS NULL`, partial indexes for the open queue and
+  helper lookups. New RLS (requester ownership untouched, still
+  SELECT-only grants, zero client writes): helpers with a `helper` profile
+  role can SELECT pending-unassigned orders (queue) and their assigned
+  orders; order-items policy extended to the same visibility. RPC
+  `send2u_accept_order(p_order_id)` (SECURITY DEFINER, EXECUTE to
+  `authenticated`): derives helper from `auth.uid()`, requires the helper
+  role, claims via a single `UPDATE … WHERE pending AND unassigned`
+  (row lock ⇒ exactly one winner), flips to `assigned` with timestamp, and
+  returns the order summary. Client sends only the order id.
+- App: `Order` gains `helperId`/`acceptedAt` + `AcceptedOrderSummary` type;
+  `services/orders.ts` adds queue/delivery reads (owner-scoped via session),
+  `getJobDetail`, and `acceptOrder` with friendly errors — no `any`.
+  `hooks/useAvailableJobs.ts`, `hooks/useMyDeliveries.ts`. Helper Jobs tab
+  now lists real open jobs (offline toggle kept, pull-to-refresh,
+  loading/empty/error); new `jobs/[id]` detail (pickup, drop-off, snapshot
+  items, subtotal, Accept with progress + taken-state handling, accepted
+  confirmation card); My Deliveries lists assigned jobs. No payment, pickup,
+  proof, or completion UI.
+- Validation (live on `sqspqwj…`): 3-user JWT-claim matrix — helper queue
+  aggregates pending orders across requesters, requester sees own only
+  (incl. after assignment), other helper cannot read an assigned order,
+  requester accept rejected (`Only helpers`), direct UPDATE denied (42501).
+  True concurrent race via PostgREST (Promise.all, two helpers): exactly
+  one `assigned`, loser gets `Order is no longer available`, assignee
+  verified. Full browser flows screenshot-verified: requester place →
+  helper queue (2 open) → job detail → Accept → assigned confirmation → My
+  Deliveries; taken-job URL shows `Job not available` for another helper;
+  requester regression (place → confirmation → My Orders) passes. `tsc`,
+  `eslint` (0 errors), `expo-doctor` 18/18, `expo export -p web --clear`
+  (bundle re-verified canonical-only) pass. All test users/orders removed;
+  one unrelated developer order/user left untouched.
+- Known limitations: native-device review not done; web screenshots only;
+  a developer was concurrently testing live data (their order appeared in
+  the queue mid-verification — handled, never touched).
+
+## 2026-09-10 — Payments: external helper QR + evidence + verification
+
+- Target verification (before every mutation): app `.env`
+  `EXPO_PUBLIC_SUPABASE_URL` and Supabase MCP project URL both resolve to
+  `sqspqwj…` (canonical); order/assignment/menu/profiles schema confirmed.
+- Database: migration `add_send2u_payments` — `send2u_profiles` gains
+  nullable `payment_qr_path` (covered by existing own-row policies);
+  `send2u_payments` (one row per order: order FK cascade + UNIQUE, amount
+  snapshot, evidence path, `submitted|verified|rejected` CHECK; SELECT-only
+  grant + requester/assigned-helper SELECT policies). No row = unpaid, so
+  the fulfilment order status is untouched. RPCs (SECURITY DEFINER, EXECUTE
+  to `authenticated`): `send2u_submit_payment` (own assigned order only,
+  amount from subtotal, evidence path must live under the requester's
+  namespace AND the object must exist, resubmit allowed only after
+  rejection), `send2u_review_payment` (assigned helper only, single
+  conditional UPDATE out of `submitted` ⇒ race-safe), and
+  `send2u_payment_context` (QR reference + payment row for exactly the two
+  parties, plus a null-safe branch for helpers previewing queue jobs — added
+  after live testing exposed the gap). Follow-up
+  `add_send2u_evidence_delete` (owner-namespace evidence DELETE for explicit
+  replace) and `check_send2u_evidence_exists` (phantom-path guard).
+- Storage: private bucket `send2u-private`; paths `qr/<uid>/<ts>.<ext>`
+  and `evidence/<uid>/<order>_<ts>.<ext>` (unique per upload, never
+  `upsert` — upsert pre-flights a read that unsubmitted evidence fails, so
+  replace = new upload + best-effort remove). Seven RLS policies: QR
+  owner-writes, QR reads for owner + requesters of that helper's orders,
+  evidence owner-namespace writes, evidence reads resolved through the
+  payment row for the two parties. Private images render via short-lived
+  signed URLs; QR is NOT required to accept (requester sees an explicit
+  payment-unavailable state instead).
+- App: `expo-image-picker` (~17.0.11) + config plugin (library only, no
+  camera/mic); `services/storage.ts` (pick ≤5 MB images, upload/remove,
+  signed URLs), `services/payments.ts`, `Profile.paymentQrPath`,
+  `Payment` types, order reads now join the payment row (with a to-one
+  normalizer — PostgREST embeds UNIQUE joins as objects, found by live UI
+  test). Helper profile QR manager (upload/replace/remove + empty state);
+  requester order detail payment section (QR, amount from snapshot,
+  instructions, submit/resubmit, pending/verified/rejected states);
+  helper job detail payment card (evidence + Confirm/Reject, accepted
+  confirmation); My Deliveries payment badges. Payment cards refetch on
+  screen focus + after accept (fixes stale queue/pending views from sticky
+  tab mounts — found by live testing).
+- Validation (live on `sqspqwj…`): 3-user matrix — own submit ok, other's
+  order invisible, double-submit/verified-resubmit blocked, pending-order
+  submit blocked, phantom path blocked, requester verify blocked, helper B
+  verify blocked, direct INSERT denied, concurrent verify-vs-reject ⇒ one
+  winner; storage via real sessions — owner upload/read ok, cross-user
+  overwrite/read/profile-hijack denied, signed URLs scoped correctly.
+  Browser E2E screenshot-verified: QR empty→set, requester QR+Unpaid,
+  submit→pending, helper evidence→verify→verified both sides,
+  reject→resubmit affordances both sides, taken-job + empty + error states,
+  requester regression (place→orders). `tsc`, `eslint` (0 errors),
+  `expo-doctor` 18/18, `expo export -p web --clear` (canonical-only) pass.
+  All test users/orders/profiles/storage files removed; one unrelated
+  developer order/user left untouched.
+- Known limitations: native-device review not done (image picking verified
+  on web only — the web File path and native fetch-to-blob path share
+  validation but native upload itself is untested); web screenshots only;
+  occasional transient 401 on the first authenticated call after anon
+  sign-in (retries succeed; all screens have retry affordances);
+  background preview servers used for testing were stopped.
+
+## 2026-09-10 — Fixes: stable dev role switching + document receipt picker
+
+- Role switching (`services/auth.ts`, `contexts/AuthContext.tsx`): repeated
+  requester↔helper switches could mint a new anonymous user (transient
+  empty session read from double-taps or token-refresh races → orphaned
+  identity, assigned jobs "lost"). Fixed three layers deep, dev-only:
+  `continueAsDev` serializes concurrent entries and retries the session
+  lookup before ever signing in; `AuthContext.continueAs` reuses the
+  restored in-memory user via role-only upsert and can never sign in;
+  `switchRole` path never signed in (unchanged, verified). Production auth
+  untouched.
+- Receipt picker (`services/storage.ts`, `RequesterPaymentCard`,
+  `HelperPaymentCard`): evidence now uses `expo-document-picker`
+  (~14.0.8, no config plugin needed) accepting PDF + JPG/PNG/WEBP/HEIC up
+  to 10 MB; helper QR keeps the image library. Storage paths/RPC flow,
+  signed URLs, and authorization unchanged (extension flows into the
+  existing unique-path convention). Helper evidence renders inline for
+  images and as an openable signed-URL file row for PDFs; UI wording is
+  receipt/file-based. Verification flow untouched.
+- Validation (live on `sqspqwj…`): 12-step browser test — sign in, record
+  uid, place, switch helper (same uid), accept own job, switch requester
+  (same uid), switch helper (same uid): all four uids identical, one
+  profile row, accepted job present in My Deliveries. Full PDF E2E:
+  QR set → place → accept → submit PDF → helper PDF row → Confirm →
+  verified both sides; stored path ends `.pdf`. Requester/helper/payment
+  regressions pass. `tsc`, `eslint` (0 errors), `expo-doctor` 18/18,
+  `expo export -p web --clear` (canonical-only) pass. All test
+  users/orders/profiles/storage files removed; one unrelated developer
+  order/user left untouched.
+- Known limitations: native file picking untested (web picker verified);
+  web screenshots only; transient first-call 401s persist under watch.

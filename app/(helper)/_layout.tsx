@@ -55,6 +55,7 @@ export default function HelperLayout() {
         name="profile"
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
       />
+      <Tabs.Screen name="jobs/[id]" options={{ href: null, title: 'Job details' }} />
     </Tabs>
   );
 }

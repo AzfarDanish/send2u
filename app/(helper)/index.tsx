@@ -1,14 +1,21 @@
-import { useState } from 'react';
-import { StyleSheet, Switch, View } from 'react-native';
+import { router } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { RefreshControl, StyleSheet, Switch, View } from 'react-native';
 
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { FeaturePreview } from '@/components/ui/FeaturePreview';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/constants/theme';
+import { useAvailableJobs } from '@/hooks/useAvailableJobs';
+import { formatMYR } from '@/lib/money';
+import { formatOrderDate } from '@/lib/orders';
+import type { OrderWithDetails } from '@/types/domain';
 
 const HOW_HELPING_WORKS = [
   { icon: 'check-circle-outline', title: 'Accept a request', subtitle: 'Pick jobs that fit between your classes.' },
@@ -16,13 +23,35 @@ const HOW_HELPING_WORKS = [
   { icon: 'handshake', title: 'Hand over & confirm', subtitle: 'Meet the requester and confirm delivery.' },
 ] as const;
 
+function jobItemSummary(job: OrderWithDetails): string {
+  const count = job.items.reduce((sum, item) => sum + item.quantity, 0);
+  const first = job.items[0];
+  if (!first) return 'No items';
+  const rest = count - first.quantity;
+  return rest > 0
+    ? `${first.quantity} × ${first.itemName} + ${rest} more`
+    : `${first.quantity} × ${first.itemName}`;
+}
+
 export default function HelperJobsScreen() {
   // Local UI state only — real availability sync arrives with dispatch.
   const [available, setAvailable] = useState(false);
+  const { jobs, status, error, refreshing, retry, refresh } = useAvailableJobs();
+
+  const openJob = useCallback((job: OrderWithDetails) => {
+    router.push({ pathname: '/(helper)/jobs/[id]', params: { id: job.id } });
+  }, []);
 
   return (
-    <Screen>
-      <SectionHeader eyebrow="Helper hub" title="Delivery jobs" />
+    <Screen
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+      }>
+      <SectionHeader
+        eyebrow="Helper hub"
+        title="Delivery jobs"
+        badge={available && status === 'ready' ? `${jobs.length} open` : undefined}
+      />
       <Card>
         <View style={styles.availability}>
           <View style={styles.availabilityText}>
@@ -43,18 +72,50 @@ export default function HelperJobsScreen() {
         </View>
       </Card>
 
-      {available ? (
-        <EmptyState
-          icon="work-outline"
-          title="No open requests"
-          message="New delivery requests near you will appear here with pickup point, drop-off, and payout."
-        />
-      ) : (
+      {!available ? (
         <EmptyState
           icon="schedule"
           title="You're offline"
           message="Flip availability on when you're free to deliver between classes."
         />
+      ) : status === 'loading' ? (
+        <Card style={styles.stateCard}>
+          <LoadingState message="Finding open requests…" />
+        </Card>
+      ) : status === 'error' ? (
+        <Card style={styles.stateCard}>
+          <ErrorState
+            title="Couldn't load jobs"
+            message={error ?? 'Check your connection and try again.'}
+            retryTitle="Try again"
+            onRetry={retry}
+          />
+        </Card>
+      ) : status === 'empty' ? (
+        <EmptyState
+          icon="work-outline"
+          title="No open requests"
+          message="New delivery requests near you will appear here. Pull down to check again."
+        />
+      ) : (
+        jobs.map((job) => (
+          <Card key={job.id} style={styles.jobCard}>
+            <ListRow
+              icon="delivery-dining"
+              title={job.vendor.name}
+              subtitle={`${jobItemSummary(job)} · ${job.location.name} · ${formatOrderDate(job.createdAt)}`}
+              onPress={() => openJob(job)}
+              right={
+                <View style={styles.right}>
+                  <Text variant="secondary" style={styles.subtotal}>
+                    {formatMYR(job.subtotalCents)}
+                  </Text>
+                  <Badge label="Pending" tone="info" />
+                </View>
+              }
+            />
+          </Card>
+        ))
       )}
 
       <SectionHeader title="How helping works" />
@@ -63,14 +124,6 @@ export default function HelperJobsScreen() {
           <ListRow key={step.title} icon={step.icon} title={step.title} subtitle={step.subtitle} />
         ))}
       </Card>
-
-      <SectionHeader title="Open requests" badge="Coming soon" />
-      <FeaturePreview
-        icon="list-alt"
-        title="Job cards will show everything you need"
-        description="Each request lists the full route and reward before you commit."
-        bullets={['Vendor pickup point and ready time', 'Requester drop-off point', 'Payout for the trip', 'One-tap accept']}
-      />
     </Screen>
   );
 }
@@ -78,4 +131,8 @@ export default function HelperJobsScreen() {
 const styles = StyleSheet.create({
   availability: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   availabilityText: { flex: 1, gap: 2 },
+  stateCard: { minHeight: 200, justifyContent: 'center' },
+  jobCard: { gap: 0 },
+  right: { alignItems: 'flex-end', gap: 4 },
+  subtotal: { fontWeight: '700', color: colors.primary },
 });

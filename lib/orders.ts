@@ -1,4 +1,4 @@
-import type { OrderStatus } from '@/types/domain';
+import type { OrderStatus, PaymentStatus } from '@/types/domain';
 
 /** Short honest timestamp for order lists, e.g. "10 Sep, 3:45 PM". */
 export function formatOrderDate(iso: string): string {
@@ -33,4 +33,28 @@ export function orderStatusLabel(status: OrderStatus): string {
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+}
+
+/** Badge tone for the external-payment state (separate from order status). */
+export function paymentStatusTone(status: PaymentStatus): 'info' | 'success' | 'warning' | 'error' {
+  switch (status) {
+    case 'submitted':
+      return 'info';
+    case 'verified':
+      return 'success';
+    case 'rejected':
+      return 'error';
+  }
+}
+
+/** Human label for the payment state. */
+export function paymentStatusLabel(status: PaymentStatus): string {
+  switch (status) {
+    case 'submitted':
+      return 'Verification pending';
+    case 'verified':
+      return 'Payment verified';
+    case 'rejected':
+      return 'Payment rejected';
+  }
 }

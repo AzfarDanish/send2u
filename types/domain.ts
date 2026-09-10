@@ -18,6 +18,8 @@ export type ProfileRole = 'requester' | 'helper' | 'vendor' | 'admin';
 export interface Profile {
   id: string;
   role: ProfileRole;
+  /** Storage path of the helper's payment QR (`qr/<uid>/…`), null when unset. */
+  paymentQrPath: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,7 +120,7 @@ export type OrderStatus =
 
 /**
  * One vendor fulfilment. A mixed-vendor cart splits into one order per
- * vendor sharing the same delivery location. No payment/helper fields yet.
+ * vendor sharing the same delivery location. No payment fields yet.
  */
 export interface Order {
   id: string;
@@ -128,6 +130,10 @@ export interface Order {
   status: OrderStatus;
   /** Sum of unit price × quantity in MYR cents. No fees or taxes. */
   subtotalCents: number;
+  /** Assigned helper once accepted; null while pending. */
+  helperId: string | null;
+  /** When the helper accepted; null while pending. */
+  acceptedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -150,6 +156,8 @@ export interface OrderWithDetails extends Order {
   vendor: Pick<Vendor, 'id' | 'name' | 'locationHint'>;
   location: Pick<DeliveryLocation, 'id' | 'name'>;
   items: OrderItem[];
+  /** Latest payment row when visible to the caller; null when unpaid/hidden. */
+  payment: Payment | null;
 }
 
 /** One line of the cart as sent to `send2u_place_orders` (ids only). */
@@ -167,6 +175,35 @@ export interface PlacedOrderSummary {
   itemCount: number;
   status: OrderStatus;
   createdAt: string;
+}
+
+/** Result returned by `send2u_accept_order` after an atomic claim. */
+export interface AcceptedOrderSummary {
+  orderId: string;
+  vendorId: string;
+  vendorName: string;
+  subtotalCents: number;
+  itemCount: number;
+  status: OrderStatus;
+  acceptedAt: string;
+  createdAt: string;
+}
+
+/**
+ * External-payment state. No row means not submitted. Amount is snapshotted
+ * from the order subtotal at submit time — never supplied by the client.
+ */
+export type PaymentStatus = 'submitted' | 'verified' | 'rejected';
+
+export interface Payment {
+  orderId: string;
+  amountCents: number;
+  evidencePath: string;
+  status: PaymentStatus;
+  submittedAt: string;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -187,14 +224,6 @@ export interface Delivery {
   orderId: string;
   helperId: string;
   status: Extract<OrderStatus, 'assigned' | 'picked_up' | 'delivering' | 'delivered' | 'confirmed'>;
-}
-
-/** Payments are out of scope for the skeleton — shape only. */
-export interface Payment {
-  id: string;
-  orderId: string;
-  amountCents: number;
-  status: 'pending' | 'held' | 'released' | 'failed';
 }
 
 /** Ratings are out of scope for the skeleton — shape only. */

@@ -9,6 +9,7 @@ import {
   fetchProfile,
   getActiveSession,
   onAuthStateChange,
+  setProfileRole,
   signOut as signOutService,
   switchDevRole,
 } from '@/services/auth';
@@ -112,17 +113,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const continueAs = useCallback(async (role: UserRole) => {
-    requireDevAuth();
-    const { user, profile: nextProfile } = await continueAsDev(role);
-    setAuthUser(user);
-    setProfile(nextProfile);
-    setAuthError(null);
-    // The session object also arrives via onAuthStateChange; fetch it
-    // directly so state is consistent even if the event races this update.
-    const active = await getActiveSession();
-    setSession(active?.session ?? null);
-  }, []);
+  const continueAs = useCallback(
+    async (role: UserRole) => {
+      requireDevAuth();
+      // A restored session means identity already exists: only the role
+      // changes. This path can never mint a new anonymous user.
+      if (authUser) {
+        const nextProfile = await setProfileRole(authUser.id, role);
+        setProfile(nextProfile);
+        setAuthError(null);
+        return;
+      }
+      const { user, profile: nextProfile } = await continueAsDev(role);
+      setAuthUser(user);
+      setProfile(nextProfile);
+      setAuthError(null);
+      // The session object also arrives via onAuthStateChange; fetch it
+      // directly so state is consistent even if the event races this update.
+      const active = await getActiveSession();
+      setSession(active?.session ?? null);
+    },
+    [authUser],
+  );
 
   const switchRole = useCallback(async (role: UserRole) => {
     requireDevAuth();

@@ -3,6 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
+import { HelperHistoryDetail } from '@/components/HelperHistoryDetail';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -11,9 +12,9 @@ import { HelperPaymentCard } from '@/components/HelperPaymentCard';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
-import { formatOrderDate, orderStatusLabel, orderStatusTone } from '@/lib/orders';
+import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
 import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -112,6 +113,19 @@ export default function JobDetailScreen() {
               onRetry={() => router.back()}
             />
           )}
+        </Screen>
+      </>
+    );
+  }
+
+  // Terminal deliveries are historical records: same route, strictly read-only
+  // rendering. No accept/advance/verify actions — see HelperHistoryDetail.
+  if (isTerminalOrderStatus(job.status)) {
+    return (
+      <>
+        <Stack.Screen options={{ title: `${job.vendor.name} · History` }} />
+        <Screen>
+          <HelperHistoryDetail job={job} />
         </Screen>
       </>
     );
@@ -410,32 +424,6 @@ export default function JobDetailScreen() {
               The requester has submitted their receipt. Verify the payment below.
             </Text>
           </Card>
-        ) : job.status === 'completed' ? (
-          <Card>
-            <Badge label="Completed" tone="success" />
-            <Text color="secondary">
-              Payment verified. Your {formatMYR(job.deliveryFeeCents)} delivery earning is
-              finalized.
-            </Text>
-          </Card>
-        ) : job.status === 'cancelled' ? (
-          <Card>
-            <Badge label="Cancelled" tone="error" />
-            <Text color="secondary">
-              {job.cancelReason === 'food_unavailable'
-                ? 'The food was unavailable — no money changed hands.'
-                : 'This order was cancelled.'}
-            </Text>
-          </Card>
-        ) : job.status === 'disputed' ? (
-          <Card>
-            <Badge label="Disputed" tone="error" />
-            <Text color="secondary">
-              This order needs settlement
-              {job.foodCostCents ? ` — your fronted ${formatMYR(job.foodCostCents)} is recorded` : ''}.
-              An admin will resolve it; nothing more to do here.
-            </Text>
-          </Card>
         ) : (
           <Card>
             <Text variant="caption" color="muted">
@@ -454,11 +442,11 @@ export default function JobDetailScreen() {
 const styles = StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowText: { flex: 1, gap: 2 },
+  rowText: { flex: 1, gap: spacing.xs },
   vendorName: { fontWeight: '600', color: colors.text },
   itemsCard: { gap: 0 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-  lineText: { flex: 1, gap: 2 },
+  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  lineText: { flex: 1, gap: spacing.xs },
   lineName: { fontWeight: '600', color: colors.text },
   lineTotal: { fontWeight: '700', color: colors.primary },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -466,9 +454,9 @@ const styles = StyleSheet.create({
   codeInput: {
     borderWidth: 1.5,
     borderColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 2,

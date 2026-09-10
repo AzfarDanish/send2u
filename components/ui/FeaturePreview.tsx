@@ -41,5 +41,5 @@ export function FeaturePreview({ icon, title, description, bullets = [] }: Featu
 const styles = StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  bulletText: { flex: 1 },
+  bulletText: { flex: 1, lineHeight: 20 },
 });

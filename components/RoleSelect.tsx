@@ -19,7 +19,11 @@ export function RoleSelect({ onSelect, busyRole = null, currentRole = null, disa
   const busy = busyRole !== null || disabled;
   return (
     <View style={styles.container}>
-      {currentRole && <Text color="secondary">Current role: {currentRole}. Pick again to switch.</Text>}
+      {currentRole && (
+        <Text color="muted" style={styles.hint}>
+          Current role: {currentRole}. Pick again to switch.
+        </Text>
+      )}
       <OptionCard
         icon="shopping-bag"
         title="I'm ordering food"
@@ -44,4 +48,5 @@ export function RoleSelect({ onSelect, busyRole = null, currentRole = null, disa
 
 const styles = StyleSheet.create({
   container: { gap: spacing.md },
+  hint: { textAlign: 'center', marginBottom: spacing.xs },
 });

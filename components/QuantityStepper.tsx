@@ -51,7 +51,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  disabled: { borderColor: colors.border },
+  disabled: {
+    borderColor: colors.disabledBackground,
+    backgroundColor: colors.surfaceSecondary,
+  },
   pressed: { opacity: 0.7 },
-  value: { minWidth: 28, textAlign: 'center' },
+  value: { minWidth: 32, textAlign: 'center' },
 });

@@ -11,7 +11,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useAvailableJobs } from '@/hooks/useAvailableJobs';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate } from '@/lib/orders';
@@ -135,10 +135,10 @@ export default function HelperJobsScreen() {
 }
 
 const styles = StyleSheet.create({
-  availability: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  availabilityText: { flex: 1, gap: 2 },
+  availability: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  availabilityText: { flex: 1, gap: spacing.xs },
   stateCard: { minHeight: 200, justifyContent: 'center' },
   jobCard: { gap: 0 },
-  right: { alignItems: 'flex-end', gap: 4 },
+  right: { alignItems: 'flex-end', gap: spacing.xs },
   subtotal: { fontWeight: '700', color: colors.primary },
 });

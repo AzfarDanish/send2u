@@ -187,12 +187,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: radii.lg,
     padding: spacing.md,
     minHeight: 64,
   },
-  fileText: { flex: 1, gap: 2 },
+  fileText: { flex: 1, gap: spacing.xs },
   fileName: { fontWeight: '600', color: colors.text },
 });
 

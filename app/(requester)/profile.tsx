@@ -9,7 +9,7 @@ import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors, radii } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
 
@@ -82,7 +82,7 @@ export default function RequesterProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   avatar: {
     width: 52,
     height: 52,
@@ -91,5 +91,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  identityText: { flex: 1, gap: 2 },
+  identityText: { flex: 1, gap: spacing.xs },
 });

@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StyleSheet, View } from 'react-native';
 
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { Text } from '@/components/ui/Text';
 
 interface BrandHeaderProps {
@@ -14,7 +14,7 @@ export function BrandHeader({ tagline = 'Student-powered campus delivery' }: Bra
   return (
     <View style={styles.container}>
       <View style={styles.logo}>
-        <MaterialIcons name="send" size={26} color={colors.onPrimary} />
+        <MaterialIcons name="send" size={28} color={colors.onPrimary} />
       </View>
       <Text variant="display">Send2U</Text>
       <Text color="secondary">{tagline}</Text>
@@ -23,14 +23,15 @@ export function BrandHeader({ tagline = 'Student-powered campus delivery' }: Bra
 }
 
 const styles = StyleSheet.create({
-  container: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  container: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.lg },
   logo: {
-    width: 60,
-    height: 60,
-    borderRadius: radii.lg,
+    width: 64,
+    height: 64,
+    borderRadius: radii.xl,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
+    ...shadows.card,
   },
 });

@@ -62,6 +62,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  textBlock: { flex: 1, gap: 2 },
+  textBlock: { flex: 1, gap: spacing.xs },
   title: { fontWeight: '600', color: colors.text },
 });

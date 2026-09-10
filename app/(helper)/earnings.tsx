@@ -11,18 +11,20 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors } from '@/constants/theme';
-import { useMyDeliveries } from '@/hooks/useMyDeliveries';
+import { colors, spacing } from '@/constants/theme';
+import { useMyDeliveryHistory } from '@/hooks/useMyDeliveryHistory';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
 /**
  * Helper earnings: delivery fees finalized on completed orders only.
+ * Reads the HISTORY query (active deliveries never contain completed rows),
+ * so earnings stay correct after the active/history split.
  * Fronted food costs are never counted as earnings — only the fee is.
  */
 export default function HelperEarningsScreen() {
-  const { deliveries, status, error, refreshing, retry, refresh } = useMyDeliveries();
+  const { deliveries, status, error, refreshing, retry, refresh } = useMyDeliveryHistory();
 
   const openDelivery = useCallback((delivery: OrderWithDetails) => {
     router.push({ pathname: '/(helper)/jobs/[id]', params: { id: delivery.id } });
@@ -99,6 +101,6 @@ export default function HelperEarningsScreen() {
 const styles = StyleSheet.create({
   stateCard: { minHeight: 200, justifyContent: 'center' },
   tripCard: { gap: 0 },
-  right: { alignItems: 'flex-end', gap: 4 },
+  right: { alignItems: 'flex-end', gap: spacing.xs },
   fee: { fontWeight: '700', color: colors.success },
 });

@@ -14,7 +14,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
 import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
 import { formatMYR } from '@/lib/money';
@@ -252,12 +252,12 @@ export default function CreateRequestScreen() {
 }
 
 const styles = StyleSheet.create({
-  group: { gap: 8 },
-  vendorHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  vendorText: { flex: 1, gap: 2 },
+  group: { gap: spacing.md },
+  vendorHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  vendorText: { flex: 1, gap: spacing.xs },
   linesCard: { gap: 0 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-  lineText: { flex: 1, gap: 2 },
+  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  lineText: { flex: 1, gap: spacing.xs },
   lineName: { fontWeight: '600', color: colors.text },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   stateCard: { minHeight: 160, justifyContent: 'center' },

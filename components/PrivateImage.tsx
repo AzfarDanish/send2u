@@ -4,7 +4,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
-import { colors, radii } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { signedImageUrl } from '@/services/storage';
 
 interface PrivateImageProps {
@@ -42,7 +42,7 @@ export function PrivateImage({ path, accessibilityLabel, style }: PrivateImagePr
   if (failed) {
     return (
       <View style={[styles.fallback, style]}>
-        <Text variant="caption" color="secondary">
+        <Text variant="caption" color="muted">
           Image unavailable — try again later.
         </Text>
       </View>
@@ -69,7 +69,7 @@ export function PrivateImage({ path, accessibilityLabel, style }: PrivateImagePr
 
 const styles = StyleSheet.create({
   frame: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: radii.lg,
     overflow: 'hidden',
   },
@@ -77,9 +77,9 @@ const styles = StyleSheet.create({
   fallback: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: radii.lg,
     minHeight: 180,
-    padding: 16,
+    padding: spacing.lg,
   },
 });

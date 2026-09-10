@@ -34,12 +34,12 @@ export function StageLegend({ caption = 'Every order moves through these stages.
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.sm },
+  container: { gap: spacing.md },
   track: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
   step: { flex: 1, alignItems: 'center', gap: spacing.xs },
   dot: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: radii.full,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',

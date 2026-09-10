@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
+import { spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { formatMYR } from '@/lib/money';
 import { paymentStatusLabel, paymentStatusTone } from '@/lib/orders';
@@ -230,5 +231,10 @@ export function RequesterPaymentCard({ orderId }: RequesterPaymentCardProps) {
 const styles = StyleSheet.create({
   stateCard: { minHeight: 160, justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
 });

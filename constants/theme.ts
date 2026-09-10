@@ -16,10 +16,16 @@ export const colors = {
 
   background: '#F5F7F9',
   surface: '#FFFFFF',
+  /** Slightly elevated surface for cards/tips/tooltips — subtle lift over background. */
+  surfaceElevated: '#FAFBFC',
+  /** Secondary surface for muted containers (e.g. quantity stepper bg, empty state bg). */
+  surfaceSecondary: '#F0F3F5',
+  /** Thin separator lines between rows or sections. */
+  divider: '#E8ECF0',
 
   text: '#17242C',
   secondary: '#4E5D66',
-  muted: '#69757E',
+  muted: '#8A959E',
 
   border: '#E1E7EB',
 
@@ -65,6 +71,7 @@ export const radii = {
   sm: 8,
   md: 12,
   lg: 16,
+  xl: 20,
   full: 999,
 } as const;
 
@@ -76,12 +83,29 @@ export const touchTargets = {
 } as const;
 
 export const shadows = {
+  /** Subtle lift for cards resting on background. */
+  sm: {
+    shadowColor: '#16232B',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  /** Default card elevation — the standard for Card, ListRow containers. */
   card: {
     shadowColor: '#16232B',
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  /** Raised element — modals, floating action items, elevated cards. */
+  lg: {
+    shadowColor: '#16232B',
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
 } as const;
 

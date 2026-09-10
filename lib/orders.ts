@@ -12,6 +12,28 @@ export function formatOrderDate(iso: string): string {
   });
 }
 
+/**
+ * Terminal states: the fulfilment/payment workflow is over. These orders
+ * are historical records — never actionable. Everything else is active.
+ * Kept as a single source of truth so list queries, badges, and detail
+ * screens agree on what counts as "active work".
+ */
+export const TERMINAL_ORDER_STATUSES = ['completed', 'cancelled', 'disputed'] as const;
+
+export type TerminalOrderStatus = (typeof TERMINAL_ORDER_STATUSES)[number];
+
+const TERMINAL_SET: ReadonlySet<string> = new Set(TERMINAL_ORDER_STATUSES);
+
+/** True for completed/cancelled/disputed — the history bucket. */
+export function isTerminalOrderStatus(status: OrderStatus): status is TerminalOrderStatus {
+  return TERMINAL_SET.has(status);
+}
+
+/** True for every non-terminal status (incl. legacy active values). */
+export function isActiveOrderStatus(status: OrderStatus): boolean {
+  return !TERMINAL_SET.has(status);
+}
+
 /** Badge tone per status across the fulfilment lifecycle. */
 export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
   switch (status) {

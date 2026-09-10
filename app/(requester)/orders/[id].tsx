@@ -3,6 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
+import { RequesterHistoryDetail } from '@/components/RequesterHistoryDetail';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -11,9 +12,9 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
-import { formatOrderDate, orderStatusLabel, orderStatusTone } from '@/lib/orders';
+import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
 import { cancelOrder, getOrderDetail } from '@/services/orders';
 import type { OrderStatus, OrderWithDetails } from '@/types/domain';
 
@@ -128,6 +129,19 @@ export default function OrderDetailScreen() {
     );
   }
 
+  // Terminal orders are historical records: same route, strictly read-only
+  // rendering. No cancel input, no payment actions — see RequesterHistoryDetail.
+  if (isTerminalOrderStatus(order.status)) {
+    return (
+      <>
+        <Stack.Screen options={{ title: `${order.vendor.name} · History` }} />
+        <Screen>
+          <RequesterHistoryDetail order={order} />
+        </Screen>
+      </>
+    );
+  }
+
   const cancellable =
     !cancelled &&
     (order.status === 'pending' || order.status === 'assigned' || order.status === 'going_to_vendor' || order.status === 'at_vendor');
@@ -147,27 +161,25 @@ export default function OrderDetailScreen() {
           Placed {formatOrderDate(order.createdAt)} · Pickup ref {order.pickupCode}
         </Text>
 
-        {order.status !== 'cancelled' && order.status !== 'disputed' ? (
-          <Card>
-            <View style={styles.progress}>
-              {PROGRESS_STEPS.map((step, index) => {
-                const reached = step.done.includes(order.status);
-                return (
-                  <View key={step.key} style={styles.step}>
-                    <View style={[styles.dot, reached && styles.dotDone]}>
-                      <Text variant="caption" color={reached ? 'primary' : 'muted'}>
-                        {index + 1}
-                      </Text>
-                    </View>
+        <Card>
+          <View style={styles.progress}>
+            {PROGRESS_STEPS.map((step, index) => {
+              const reached = step.done.includes(order.status);
+              return (
+                <View key={step.key} style={styles.step}>
+                  <View style={[styles.dot, reached && styles.dotDone]}>
                     <Text variant="caption" color={reached ? 'primary' : 'muted'}>
-                      {step.label}
+                      {index + 1}
                     </Text>
                   </View>
-                );
-              })}
-            </View>
-          </Card>
-        ) : null}
+                  <Text variant="caption" color={reached ? 'primary' : 'muted'}>
+                    {step.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </Card>
 
         <Card>
           <View style={styles.row}>
@@ -219,40 +231,6 @@ export default function OrderDetailScreen() {
           </Text>
         </Card>
 
-        {order.status === 'cancelled' ? (
-          <Card>
-            <Badge label="Cancelled" tone="error" />
-            <Text color="secondary">
-              {order.cancelReason === 'food_unavailable'
-                ? 'The stall had no food, so this order was stopped. You owe nothing.'
-                : `Cancelled${order.cancelReason ? `: ${order.cancelReason}` : ''}.`}
-            </Text>
-          </Card>
-        ) : null}
-
-        {order.status === 'disputed' ? (
-          <Card>
-            <Badge label="Needs settlement" tone="error" />
-            <Text variant="subtitle">This order needs settling up</Text>
-            <Text color="secondary">
-              {order.disputeReason === 'late_cancellation'
-                ? `You cancelled after the helper had already paid ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle the food cost with your helper directly — Send2U never moves money itself.`
-                : order.disputeReason === 'delivery_failed'
-                  ? 'The delivery could not be completed. Settle any food cost with your helper directly.'
-                  : 'This order is under review.'}
-            </Text>
-          </Card>
-        ) : null}
-
-        {order.status === 'completed' ? (
-          <Card>
-            <Badge label="Completed" tone="success" />
-            <Text color="secondary">
-              Delivered and paid. Thanks for using Send2U.
-            </Text>
-          </Card>
-        ) : null}
-
         {cancellable || lateCancellable ? (
           <Card>
             <Text variant="subtitle">Cancel this order</Text>
@@ -300,17 +278,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, fontWeight: '600', color: colors.text },
   itemsCard: { gap: 0 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-  lineText: { flex: 1, gap: 2 },
+  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  lineText: { flex: 1, gap: spacing.xs },
   lineName: { fontWeight: '600', color: colors.text },
   lineTotal: { fontWeight: '700', color: colors.primary },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  progress: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 },
-  step: { flex: 1, alignItems: 'center', gap: 4 },
+  progress: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
+  step: { flex: 1, alignItems: 'center', gap: spacing.xs },
   dot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: colors.disabledBackground,
     alignItems: 'center',
     justifyContent: 'center',
@@ -319,9 +297,9 @@ const styles = StyleSheet.create({
   reasonInput: {
     borderWidth: 1.5,
     borderColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     fontSize: 16,
     color: colors.text,
     backgroundColor: colors.surface,

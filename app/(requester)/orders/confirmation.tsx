@@ -102,9 +102,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.successSoft,
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     paddingVertical: spacing.xxxl,
   },
-  heading: { gap: spacing.xs },
+  heading: { gap: spacing.sm },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

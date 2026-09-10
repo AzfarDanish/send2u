@@ -227,7 +227,12 @@ export async function placeOrders(
   return (data as unknown[]).map(toPlacedSummary);
 }
 
-/** Requester's own orders (as requester), newest first, with snapshots. */
+/**
+ * Requester's ACTIVE orders only (as requester), newest first.
+ * Terminal states (completed/cancelled/disputed) are excluded here by the
+ * query itself — they live in `listMyOrderHistory`. RLS still enforces
+ * ownership; this filter enforces the active/history separation.
+ */
 export async function listMyOrders(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
   const userId = await requireUserId();
@@ -235,8 +240,27 @@ export async function listMyOrders(): Promise<OrderWithDetails[]> {
     .from('send2u_orders')
     .select(ORDER_SELECT)
     .eq('requester_id', userId)
+    .not('status', 'in', '(completed,cancelled,disputed)')
     .order('created_at', { ascending: false });
   if (error) throw new Error(`Could not load your orders: ${error.message}`);
+  return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+}
+
+/**
+ * Requester's HISTORICAL orders only (completed/cancelled/disputed),
+ * newest first. Read-only records — no actions are valid on these.
+ * Nothing is deleted or archived elsewhere; same table, status-filtered.
+ */
+export async function listMyOrderHistory(): Promise<OrderWithDetails[]> {
+  const supabase = requireClient();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from('send2u_orders')
+    .select(ORDER_SELECT)
+    .eq('requester_id', userId)
+    .in('status', ['completed', 'cancelled', 'disputed'])
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Could not load your order history: ${error.message}`);
   return (data as unknown as OrderRow[]).map(toOrderWithDetails);
 }
 
@@ -279,7 +303,12 @@ export async function getJobDetail(orderId: string): Promise<OrderWithDetails | 
   return toOrderWithDetails(data as unknown as OrderRow);
 }
 
-/** Orders assigned to the current helper, newest accepted first. */
+/**
+ * ACTIVE deliveries assigned to the current helper, newest accepted first.
+ * Terminal states are excluded here by the query itself — they live in
+ * `listMyDeliveryHistory`. RLS still enforces assignment; this filter
+ * enforces the active/history separation.
+ */
 export async function listMyDeliveries(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
   const userId = await requireUserId();
@@ -287,9 +316,29 @@ export async function listMyDeliveries(): Promise<OrderWithDetails[]> {
     .from('send2u_orders')
     .select(ORDER_SELECT)
     .eq('helper_id', userId)
+    .not('status', 'in', '(completed,cancelled,disputed)')
     .order('accepted_at', { ascending: false })
     .order('created_at', { ascending: false });
   if (error) throw new Error(`Could not load your deliveries: ${error.message}`);
+  return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+}
+
+/**
+ * HISTORICAL deliveries assigned to the current helper
+ * (completed/cancelled/disputed), newest accepted first. Read-only records.
+ * Food cost stays a fronted expense here — only the delivery fee is earnings.
+ */
+export async function listMyDeliveryHistory(): Promise<OrderWithDetails[]> {
+  const supabase = requireClient();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from('send2u_orders')
+    .select(ORDER_SELECT)
+    .eq('helper_id', userId)
+    .in('status', ['completed', 'cancelled', 'disputed'])
+    .order('accepted_at', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Could not load your delivery history: ${error.message}`);
   return (data as unknown as OrderRow[]).map(toOrderWithDetails);
 }
 

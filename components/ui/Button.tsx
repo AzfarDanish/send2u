@@ -67,6 +67,9 @@ const styles = StyleSheet.create({
   },
   tertiary: { backgroundColor: 'transparent', minHeight: 48 },
   danger: { backgroundColor: 'transparent', minHeight: 48 },
-  disabled: { backgroundColor: colors.disabledBackground, borderColor: colors.disabledBackground },
-  pressed: { opacity: 0.88 },
+  disabled: {
+    backgroundColor: colors.disabledBackground,
+    borderColor: colors.disabledBackground,
+  },
+  pressed: { opacity: 0.85 },
 });

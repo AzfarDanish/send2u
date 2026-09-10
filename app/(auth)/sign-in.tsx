@@ -89,6 +89,6 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  devNote: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  devNote: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm },
   devNoteText: { flex: 1 },
 });

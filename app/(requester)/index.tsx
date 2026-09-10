@@ -12,7 +12,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useMenu } from '@/hooks/useMenu';
 import type { MenuItemWithVendor } from '@/types/domain';
 
@@ -109,8 +109,8 @@ export default function RequesterHomeScreen() {
 
 const styles = StyleSheet.create({
   stateCard: { minHeight: 200, justifyContent: 'center' },
-  vendorSection: { gap: 8 },
-  vendorHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  vendorText: { flex: 1, gap: 2 },
+  vendorSection: { gap: spacing.md },
+  vendorHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  vendorText: { flex: 1, gap: spacing.xs },
   itemsCard: { gap: 0 },
 });

@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: colors.divider,
     padding: spacing.lg,
     ...shadows.card,
   },
@@ -59,11 +59,11 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 52,
     height: 52,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrapSelected: { backgroundColor: colors.primary },
-  textBlock: { flex: 1, gap: 2 },
+  textBlock: { flex: 1, gap: spacing.xs },
 });

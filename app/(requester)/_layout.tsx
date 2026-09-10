@@ -56,6 +56,8 @@ export default function RequesterLayout() {
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
       />
       <Tabs.Screen name="menu/[id]" options={{ href: null, title: 'Item details' }} />
+      <Tabs.Screen name="orders/[id]" options={{ href: null, title: 'Order details' }} />
+      <Tabs.Screen name="orders/confirmation" options={{ href: null, title: 'Request placed' }} />
     </Tabs>
   );
 }

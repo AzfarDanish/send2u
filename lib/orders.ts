@@ -1,0 +1,36 @@
+import type { OrderStatus } from '@/types/domain';
+
+/** Short honest timestamp for order lists, e.g. "10 Sep, 3:45 PM". */
+export function formatOrderDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/** Badge tone per status. Only `pending` is created by the current MVP. */
+export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
+  switch (status) {
+    case 'pending':
+      return 'info';
+    case 'confirmed':
+    case 'delivered':
+      return 'success';
+    case 'cancelled':
+      return 'error';
+    default:
+      return 'warning';
+  }
+}
+
+/** Human label, e.g. "ready_for_pickup" → "Ready for pickup". */
+export function orderStatusLabel(status: OrderStatus): string {
+  return status
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}

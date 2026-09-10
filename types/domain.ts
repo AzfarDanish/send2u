@@ -84,20 +84,93 @@ export interface VendorMenuSection {
   items: MenuItemWithVendor[];
 }
 
-/** Local in-memory cart line. No checkout, no persistence (MVP). */
+/** Local in-memory cart line. Submitted to Supabase via `placeOrders`; never persisted. */
 export interface CartLine {
   item: MenuItemWithVendor;
   quantity: number;
 }
 
+/** Predefined campus drop-off point. Requesters pick from this list. */
 export interface DeliveryLocation {
   id: string;
-  label: string;
-  detail?: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * Order lifecycle for the MVP skeleton.
+ * Requester order status. Only `pending` is created by the current MVP;
+ * the rest are reserved for helper assignment, fulfilment, and confirmation.
+ */
+export type OrderStatus =
+  | 'pending'
+  | 'assigned'
+  | 'accepted'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'picked_up'
+  | 'delivering'
+  | 'delivered'
+  | 'confirmed'
+  | 'cancelled';
+
+/**
+ * One vendor fulfilment. A mixed-vendor cart splits into one order per
+ * vendor sharing the same delivery location. No payment/helper fields yet.
+ */
+export interface Order {
+  id: string;
+  requesterId: string;
+  vendorId: string;
+  deliveryLocationId: string;
+  status: OrderStatus;
+  /** Sum of unit price × quantity in MYR cents. No fees or taxes. */
+  subtotalCents: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Immutable purchase snapshot — survives later menu name/price changes. */
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  /** Null when the menu item was deleted after ordering; snapshot remains. */
+  menuItemId: string | null;
+  itemName: string;
+  unitPriceCents: number;
+  quantity: number;
+  lineTotalCents: number;
+  createdAt: string;
+}
+
+/** Order with its vendor, location, and item snapshots for requester UI. */
+export interface OrderWithDetails extends Order {
+  vendor: Pick<Vendor, 'id' | 'name' | 'locationHint'>;
+  location: Pick<DeliveryLocation, 'id' | 'name'>;
+  items: OrderItem[];
+}
+
+/** One line of the cart as sent to `send2u_place_orders` (ids only). */
+export interface PlaceOrderLine {
+  menuItemId: string;
+  quantity: number;
+}
+
+/** Per-vendor result returned by `send2u_place_orders`. */
+export interface PlacedOrderSummary {
+  orderId: string;
+  vendorId: string;
+  vendorName: string;
+  subtotalCents: number;
+  itemCount: number;
+  status: OrderStatus;
+  createdAt: string;
+}
+
+/**
+ * Order lifecycle stages for the MVP skeleton (high-level journey).
  * Full fulfilment / verification / payout logic comes later.
  */
 export type OrderStage =
@@ -108,36 +181,12 @@ export type OrderStage =
   | 'confirmation'
   | 'payout';
 
-export type OrderStatus =
-  | 'draft'
-  | 'requested'
-  | 'assigned'
-  | 'picked_up'
-  | 'in_transit'
-  | 'delivered_pending_verification'
-  | 'confirmed'
-  | 'paid_out'
-  | 'cancelled';
-
-export interface Order {
-  id: string;
-  requesterId: string;
-  helperId?: string | null;
-  vendorId: string;
-  stage: OrderStage;
-  status: OrderStatus;
-  pickupLocationId?: string | null;
-  dropoffLocationId?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 /** Delivery is the helper-facing view of an order fulfilment. Placeholder only. */
 export interface Delivery {
   id: string;
   orderId: string;
   helperId: string;
-  status: Extract<OrderStatus, 'assigned' | 'picked_up' | 'in_transit' | 'delivered_pending_verification' | 'confirmed'>;
+  status: Extract<OrderStatus, 'assigned' | 'picked_up' | 'delivering' | 'delivered' | 'confirmed'>;
 }
 
 /** Payments are out of scope for the skeleton — shape only. */

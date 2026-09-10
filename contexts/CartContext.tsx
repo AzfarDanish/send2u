@@ -64,8 +64,9 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | null>(null);
 
 /**
- * Local in-memory cart. Intentionally not persisted and never sent to
- * Supabase: checkout and order creation arrive in a later task.
+ * Local in-memory cart. Intentionally not persisted: the Create tab submits
+ * it through `placeOrders` (one order per vendor) and clears it only after
+ * confirmed database success. No fees, checkout, or payment here.
  */
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { lines: [] });

@@ -297,3 +297,61 @@ here conflicts with the actual implementation.
     re-checked); end-to-end `continueAs`/`switchRole` should be exercised on
     device once anon sign-ins are confirmed enabled.
   - Native-device review not done.
+
+## 2026-09-10 — Orders: requester order creation with campus locations
+
+- Target verification (before every mutation): app `.env`
+  `EXPO_PUBLIC_SUPABASE_URL` and Supabase MCP project URL both resolve to
+  `sqspqwj…` (canonical); pre-task `public` held menu + profiles tables only.
+- Database: migration `create_send2u_ordering` — `send2u_delivery_locations`
+  (name, description, is_active, sort_order, timestamps; SELECT-only grant +
+  active-only `TO authenticated` policy), `send2u_orders` (requester FK to
+  `auth.users`, vendor/location FKs RESTRICT, status CHECK covering the
+  future `pending…cancelled` set, `subtotal_cents`; SELECT-only grant + own
+  SELECT policy, no client INSERT/UPDATE/DELETE), `send2u_order_items`
+  (order FK cascade, nullable menu-item FK SET NULL, name/price snapshots,
+  quantity 1–99, `line_total = unit × qty` CHECK; SELECT-only grant + own
+  order policy). Writes go exclusively through `send2u_place_orders`
+  (SECURITY DEFINER, EXECUTE to `authenticated` only): client sends ids +
+  quantities only; requester comes from `auth.uid()`; prices/names, vendor
+  split, subtotals, and `pending` status are derived server-side in one
+  transaction. Two fix migrations corrected a loop-variable reuse and a
+  DISTINCT/ORDER BY error (both caught by live RPC tests before seeding).
+  Seed `seed_send2u_delivery_locations`: 6 fictional demo drop-off points
+  (Block A/B/C, Library, Main Hall, Student Hostel).
+- Decisions: mixed-vendor carts split into one order per vendor sharing the
+  selected location (explained in UI); subtotal is strictly Σ(price × qty),
+  no fees/taxes; no helper assignment, no payment of any kind — orders stay
+  `pending`.
+- App: new `Order`/`OrderStatus`/`OrderItem`/`OrderWithDetails`/
+  `PlacedOrderSummary` types (old skeleton statuses retired);
+  `services/locations.ts`, rewritten `services/orders.ts` (rpc + own reads,
+  explicit errors, no `any`), `hooks/useDeliveryLocations.ts`,
+  `hooks/useMyOrders.ts`, `lib/orders.ts` (date/status format). Create tab is
+  now cart review + vendor groups + location selector + Place Request
+  (disabled without items/location/while submitting; cart kept on failure,
+  cleared only after success); new `orders/confirmation` and `orders/[id]`
+  screens; My Orders lists own orders newest-first with pull-to-refresh.
+- Validation (live on `sqspqwj…`): two-user JWT-claim tests — A places a
+  mixed cart → 2 correct `pending` orders with DB prices; B sees 0 rows;
+  unavailable/inactive-vendor/bad-location/empty-cart calls all abort with
+  counts unchanged (atomic); direct INSERT/UPDATE denied (42501); invalid
+  role/status analogues rejected; menu data byte-identical. Real client-path
+  E2E (anon sign-in → profile → locations → rpc → list → detail) passes with
+  anon toggle confirmed enabled. Full browser click-through verified with
+  screenshots: sign-in, role setup, home menu (28 items), item detail, cart,
+  split-vendor review, location select, confirmation (1- and 2-order),
+  orders list, order detail. `tsc`, `eslint` (0 errors), `expo-doctor`
+  18/18, `expo export -p web` pass. All test users/orders removed (one
+  unrelated developer user/profile left untouched).
+- Incidents found by verification (fixed/documented):
+  - `expo export` baked the WRONG project URL from a stale Metro transform
+    cache despite a correct `.env` (first screenshots hit `xhyhezk…` with
+    422s). Fixed with `expo export -p web --clear`; bundle re-verified to
+    contain only `sqspqwj…`. Always `--clear` after `.env` changes.
+  - One transient 401 on a first profile upsert during UI entry; retried
+    flow succeeded. Kept under watch, not yet root-caused.
+- Known limitations: native-device review not done; visual suite ran on web
+  (representative, not a substitute); leaked-password protection toggle and
+  pre-existing `rls_auto_enable` advisor warns are untouched auth-config
+  items.

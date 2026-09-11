@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { OrderRatingSection } from '@/components/OrderRatingSection';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
@@ -33,9 +34,12 @@ const WITHDRAWABLE_REASONS: ReadonlySet<string> = new Set([
 export function RequesterHistoryDetail({
   order,
   onChanged,
+  refreshToken = 0,
 }: {
   order: OrderWithDetails;
   onChanged: () => void;
+  /** Bump to refetch embedded live sections (e.g. other-party rating). */
+  refreshToken?: number;
 }) {
   const totalCents = order.subtotalCents + order.deliveryFeeCents;
   const [withdrawing, setWithdrawing] = useState(false);
@@ -158,6 +162,10 @@ export function RequesterHistoryDetail({
           </>
         )}
       </Card>
+
+      {order.status === 'completed' ? (
+        <OrderRatingSection order={order} refreshToken={refreshToken} />
+      ) : null}
 
       <Card>
         <View style={styles.heading}>

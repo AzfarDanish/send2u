@@ -106,10 +106,15 @@ export default function OrderDetailScreen() {
     }
   }, [id]);
 
-  // Live updates (helper advances, reviews payment…). RLS-scoped to this
-  // order; failures fall back to the focus/manual paths.
+  // Live updates (helper advances, reviews payment, rates…). RLS-scoped to
+  // this order; failures fall back to the focus/manual paths.
   useRealtimeReload(
-    typeof id === 'string' ? [{ table: 'send2u_orders', filter: `id=eq.${id}` }] : [],
+    typeof id === 'string'
+      ? [
+          { table: 'send2u_orders', filter: `id=eq.${id}` },
+          { table: 'send2u_ratings', filter: `order_id=eq.${id}` },
+        ]
+      : [],
     () => {
       void reload();
       setPaymentTick((t) => t + 1);
@@ -202,7 +207,7 @@ export default function OrderDetailScreen() {
       <>
         <Stack.Screen options={{ title: `${order.vendor.name} · History` }} />
         <Screen>
-          <RequesterHistoryDetail order={order} onChanged={() => void reload()} />
+          <RequesterHistoryDetail order={order} onChanged={() => void reload()} refreshToken={paymentTick} />
         </Screen>
       </>
     );

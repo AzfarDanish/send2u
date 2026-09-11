@@ -267,12 +267,20 @@ export interface Delivery {
   status: Extract<OrderStatus, 'assigned' | 'picked_up' | 'delivering' | 'delivered' | 'confirmed'>;
 }
 
-/** Ratings are out of scope for the skeleton — shape only. */
+/**
+ * Two-sided trust record for one completed order. At most one row per party
+ * per order (requester→helper and helper→requester), written once through
+ * `send2u_submit_rating` and never modified afterwards — ratings are history,
+ * not live state. Only orders with a verified payment are rateable.
+ */
 export interface Rating {
   id: string;
   orderId: string;
   fromUserId: string;
   toUserId: string;
+  /** 1–5 inclusive, validated server-side. */
   score: number;
-  comment?: string;
+  /** Optional free text, trimmed server-side; null when omitted. */
+  comment: string | null;
+  createdAt: string;
 }

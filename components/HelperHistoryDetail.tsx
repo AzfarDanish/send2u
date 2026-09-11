@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StyleSheet, View } from 'react-native';
 
+import { OrderRatingSection } from '@/components/OrderRatingSection';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
@@ -18,7 +19,14 @@ import type { OrderWithDetails } from '@/types/domain';
  * and payment record. Renders no accept/advance/verify actions — those live
  * on the active job screen only.
  */
-export function HelperHistoryDetail({ job }: { job: OrderWithDetails }) {
+export function HelperHistoryDetail({
+  job,
+  refreshToken = 0,
+}: {
+  job: OrderWithDetails;
+  /** Bump to refetch embedded live sections (e.g. other-party rating). */
+  refreshToken?: number;
+}) {
   return (
     <View style={styles.container}>
       <Card>
@@ -98,6 +106,10 @@ export function HelperHistoryDetail({ job }: { job: OrderWithDetails }) {
           </>
         )}
       </Card>
+
+      {job.status === 'completed' ? (
+        <OrderRatingSection order={job} refreshToken={refreshToken} />
+      ) : null}
 
       <Card>
         <View style={styles.heading}>

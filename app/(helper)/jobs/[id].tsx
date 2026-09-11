@@ -64,10 +64,15 @@ export default function JobDetailScreen() {
     void reload();
   }, [id, reload]);
 
-  // Live updates (requester confirms, pays, cancels, reports…). RLS-scoped
-  // to this job; failures fall back to the focus/manual paths.
+  // Live updates (requester confirms, pays, cancels, reports, rates…).
+  // RLS-scoped to this job; failures fall back to the focus/manual paths.
   useRealtimeReload(
-    typeof id === 'string' ? [{ table: 'send2u_orders', filter: `id=eq.${id}` }] : [],
+    typeof id === 'string'
+      ? [
+          { table: 'send2u_orders', filter: `id=eq.${id}` },
+          { table: 'send2u_ratings', filter: `order_id=eq.${id}` },
+        ]
+      : [],
     () => {
       void reload();
       setPaymentTick((t) => t + 1);
@@ -136,7 +141,7 @@ export default function JobDetailScreen() {
       <>
         <Stack.Screen options={{ title: `${job.vendor.name} · History` }} />
         <Screen>
-          <HelperHistoryDetail job={job} />
+          <HelperHistoryDetail job={job} refreshToken={paymentTick} />
         </Screen>
       </>
     );

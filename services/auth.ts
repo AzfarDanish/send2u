@@ -27,6 +27,8 @@ function toProfile(row: {
   id: string;
   role: string;
   payment_qr_path: string | null;
+  is_available: boolean | null;
+  availability_updated_at: string | null;
   created_at: string;
   updated_at: string;
 }): Profile {
@@ -34,6 +36,8 @@ function toProfile(row: {
     id: row.id,
     role: row.role as ProfileRole,
     paymentQrPath: row.payment_qr_path,
+    isAvailable: row.is_available ?? false,
+    availabilityUpdatedAt: row.availability_updated_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -75,11 +79,11 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
   const supabase = requireClient();
   const { data, error } = await supabase
     .from('send2u_profiles')
-    .select('id, role, payment_qr_path, created_at, updated_at')
+    .select('id, role, payment_qr_path, is_available, availability_updated_at, created_at, updated_at')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
-  return data ? toProfile(data) : null;
+  return data ? toProfile(data as any) : null;
 }
 
 /**
@@ -91,10 +95,10 @@ export async function setProfileRole(userId: string, role: UserRole): Promise<Pr
   const { data, error } = await supabase
     .from('send2u_profiles')
     .upsert({ id: userId, role, updated_at: new Date().toISOString() }, { onConflict: 'id' })
-    .select('id, role, payment_qr_path, created_at, updated_at')
+    .select('id, role, payment_qr_path, is_available, availability_updated_at, created_at, updated_at')
     .single();
   if (error) throw error;
-  return toProfile(data);
+  return toProfile(data as any);
 }
 
 export interface DevSession {
@@ -164,10 +168,10 @@ export async function setPaymentQrPath(path: string | null): Promise<Profile> {
     .from('send2u_profiles')
     .update({ payment_qr_path: path, updated_at: new Date().toISOString() })
     .eq('id', active.user.id)
-    .select('id, role, payment_qr_path, created_at, updated_at')
+    .select('id, role, payment_qr_path, is_available, availability_updated_at, created_at, updated_at')
     .single();
   if (error) throw error;
-  return toProfile(data);
+  return toProfile(data as any);
 }
 
 export async function signOut(): Promise<void> {

@@ -20,8 +20,24 @@ export interface Profile {
   role: ProfileRole;
   /** Storage path of the helper's payment QR (`qr/<uid>/…`), null when unset. */
   paymentQrPath: string | null;
+  /** Helper availability — only meaningful when role is helper. */
+  isAvailable: boolean;
+  availabilityUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
+
+export interface JobOffer {
+  id: string;
+  orderId: string;
+  helperId: string;
+  status: OfferStatus;
+  createdAt: string;
+  expiresAt: string;
+  respondedAt: string | null;
+  order: OrderWithDetails | null;
 }
 
 export interface AppUser {

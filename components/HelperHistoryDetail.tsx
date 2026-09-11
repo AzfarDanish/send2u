@@ -141,7 +141,7 @@ export function HelperHistoryDetail({
           </View>
         </View>
         <Text variant="caption" color="muted">
-          Requester {job.requesterId.slice(0, 8)}… · Pickup ref {job.pickupCode}
+          Requester {job.requesterId.slice(0, 8)}…
         </Text>
       </Card>
 

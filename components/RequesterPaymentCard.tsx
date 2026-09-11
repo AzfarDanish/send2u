@@ -12,14 +12,8 @@ import { Text } from '@/components/ui/Text';
 import { spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { formatMYR } from '@/lib/money';
-import { paymentStatusLabel, paymentStatusTone } from '@/lib/orders';
 import { getPaymentContext, submitPaymentEvidence, type PaymentContext } from '@/services/payments';
-import {
-  evidencePathFor,
-  pickReceiptFile,
-  removeObject,
-  uploadObject,
-} from '@/services/storage';
+import { evidencePathFor, pickReceiptFile, removeObject, uploadObject } from '@/services/storage';
 
 interface RequesterPaymentCardProps {
   orderId: string;
@@ -28,9 +22,10 @@ interface RequesterPaymentCardProps {
 }
 
 /**
- * Requester payment section: helper QR, external-payment instructions,
- * evidence submission, and verification states. Amounts always come from
- * the order via payment context — the requester can never edit them.
+ * Requester payment section: helper QR, payment instructions, and receipt
+ * submission. Receipt submission writes verified and closes the order in one
+ * step — no helper review and no rejected/resubmit state. Amounts always come
+ * from the order via payment context.
  */
 export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPaymentCardProps) {
   const { user } = useAuth();
@@ -180,7 +175,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       <View style={styles.header}>
         <Text variant="subtitle">Payment</Text>
         {payment ? (
-          <Badge label={paymentStatusLabel(payment.status)} tone={paymentStatusTone(payment.status)} />
+          <Badge label="Recorded" tone="success" />
         ) : (
           <Badge label="Unpaid" tone="warning" />
         )}
@@ -196,7 +191,14 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
         This total comes from your order — it cannot be edited here.
       </Text>
 
-      {!payment || payment.status === 'rejected' ? (
+      {payment ? (
+        <>
+          <Text color="secondary">
+            Payment of {formatMYR(payment.amountCents)} recorded. Thanks — no further action needed.
+          </Text>
+          <Button title="Refresh" variant="secondary" onPress={() => void load()} />
+        </>
+      ) : (
         <>
           {context.helperQrPath ? (
             <>
@@ -212,36 +214,15 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
               message="Your helper hasn't added a payment QR yet. Check back soon — don't pay anyone outside this QR."
             />
           )}
-          {payment?.status === 'rejected' ? (
-            <Text color="secondary">
-              Your last receipt was rejected. Pay again if needed and attach the new receipt.
-            </Text>
-          ) : null}
           {submitError ? (
             <ErrorState title="Submission failed" message={submitError} retryTitle="Try again" onRetry={() => void handleSubmit()} />
           ) : null}
           <Button
-            title={busy ? (busyMessage ?? 'Working…') : payment ? 'Resubmit receipt' : 'Submit payment receipt'}
+            title={busy ? (busyMessage ?? 'Working…') : 'Submit payment receipt'}
             onPress={() => void handleSubmit()}
             disabled={busy || !context.helperQrPath}
             loading={busy}
           />
-        </>
-      ) : payment.status === 'submitted' ? (
-        <>
-          <Text color="secondary">
-            Receipt submitted for {formatMYR(payment.amountCents)}. Your helper is verifying it —
-            nothing more to do right now.
-          </Text>
-          <Button title="Refresh status" variant="secondary" onPress={() => void load()} />
-        </>
-      ) : (
-        <>
-          <Text color="secondary">
-            Payment of {formatMYR(payment.amountCents)} verified. Thanks — your helper will proceed
-            with the delivery.
-          </Text>
-          <Button title="Refresh status" variant="secondary" onPress={() => void load()} />
         </>
       )}
     </Card>

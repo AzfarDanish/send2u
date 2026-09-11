@@ -172,7 +172,7 @@ export function RequesterHistoryDetail({
           <Text variant="title">{order.vendor.name}</Text>
         </View>
         <Text variant="caption" color="secondary">
-          Placed {formatOrderDate(order.createdAt)} · Pickup ref {order.pickupCode}
+          Placed {formatOrderDate(order.createdAt)}
         </Text>
         <View style={styles.row}>
           <MaterialIcons name="place" size={20} color={colors.primary} />

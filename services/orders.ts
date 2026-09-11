@@ -408,7 +408,7 @@ export type FulfilmentAction =
   | 'report_food_available'
   | 'report_food_unavailable'
   | 'purchase'
-  | 'verify_pickup'
+  | 'mark_picked_up'
   | 'start_delivery'
   | 'mark_delivered'
   | 'report_failed'
@@ -422,13 +422,11 @@ export type FulfilmentAction =
 export async function advanceFulfilment(
   orderId: string,
   action: FulfilmentAction,
-  code?: string,
 ): Promise<{ status: OrderStatus }> {
   const supabase = requireClient();
   const { data, error } = await supabase.rpc('send2u_helper_advance', {
     p_order_id: orderId,
     p_action: action,
-    p_code: code ?? null,
   });
   if (error) throw new Error(friendlyFulfilmentError(error.message));
   if (!isRecord(data) || typeof data.status !== 'string') {
@@ -440,8 +438,6 @@ export async function advanceFulfilment(
 function friendlyFulfilmentError(message: string): string {
   if (/not authenticated|session expired/i.test(message))
     return 'Your session expired. Sign in again and retry.';
-  if (/pickup code required|invalid pickup code/i.test(message))
-    return 'That pickup code does not match this order. Check it and try again.';
   if (/invalid action|unknown fulfilment/i.test(message))
     return 'That action is not available for the current order state. Refresh and try again.';
   return message ? `Could not update the order: ${message}` : 'Could not update the order.';

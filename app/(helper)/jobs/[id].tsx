@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { HelperHistoryDetail } from '@/components/HelperHistoryDetail';
 import { Badge } from '@/components/ui/Badge';
@@ -12,7 +12,7 @@ import { HelperPaymentCard } from '@/components/HelperPaymentCard';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
@@ -22,7 +22,7 @@ import type { OrderWithDetails } from '@/types/domain';
 /**
  * Helper job detail. Review vendor, items, subtotal, and drop-off, then
  * accept. After acceptance, status-driven fulfilment actions walk the order
- * through the physical flow (vendor → purchase → pickup code → delivery).
+ * through the physical flow (vendor → purchase → pickup → delivery).
  * Every transition is one atomic server operation.
  */
 export default function JobDetailScreen() {
@@ -35,7 +35,6 @@ export default function JobDetailScreen() {
   const [paymentTick, setPaymentTick] = useState(0);
   const [acting, setActing] = useState<FulfilmentAction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [pickupCode, setPickupCode] = useState('');
 
   const reload = useCallback(async () => {
     if (typeof id !== 'string') {
@@ -60,7 +59,6 @@ export default function JobDetailScreen() {
     setAccepted(false);
     setPaymentTick(0);
     setActionError(null);
-    setPickupCode('');
     void reload();
   }, [id, reload]);
 
@@ -97,12 +95,12 @@ export default function JobDetailScreen() {
   }, [job, accepting, reload]);
 
   const handleAdvance = useCallback(
-    async (action: FulfilmentAction, code?: string) => {
+    async (action: FulfilmentAction) => {
       if (!job || acting) return;
       setActing(action);
       setActionError(null);
       try {
-        await advanceFulfilment(job.id, action, code);
+        await advanceFulfilment(job.id, action);
         await reload();
         setPaymentTick((t) => t + 1);
       } catch (err) {
@@ -363,31 +361,18 @@ export default function JobDetailScreen() {
         ) : job.status === 'food_purchased' ? (
           <Card>
             <Badge label="Purchased" tone="info" />
-            <Text variant="subtitle">Verify the pickup</Text>
+            <Text variant="subtitle">Confirm you have the food</Text>
             <Text color="secondary">
-              Enter the order pickup code ({job.pickupCode}) to confirm you physically received the
-              food from the stall.
+              You paid at the stall. Confirm the food is in your hands, then start the delivery run.
             </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
-            <TextInput
-              value={pickupCode}
-              onChangeText={setPickupCode}
-              placeholder="Pickup code"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={12}
-              editable={!busy}
-              style={styles.codeInput}
-              accessibilityLabel="Order pickup code"
-            />
             <Button
-              title={acting === 'verify_pickup' ? 'Verifying…' : 'Verify pickup'}
-              onPress={() => void handleAdvance('verify_pickup', pickupCode)}
-              disabled={busy || pickupCode.trim().length === 0}
-              loading={acting === 'verify_pickup'}
+              title={acting === 'mark_picked_up' ? 'Recording…' : 'Confirm pickup'}
+              onPress={() => void handleAdvance('mark_picked_up')}
+              disabled={busy}
+              loading={acting === 'mark_picked_up'}
             />
             <Button
               title={acting === 'abandon' ? 'Recording…' : "Can't complete this job"}
@@ -406,7 +391,7 @@ export default function JobDetailScreen() {
             <Badge label="Picked up" tone="info" />
             <Text variant="subtitle">Head to the drop-off</Text>
             <Text color="secondary">
-              Food verified in hand. Start the delivery run when you leave for {job.location.name}.
+              Food in hand. Start the delivery run when you leave for {job.location.name}.
             </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => void handleAdvance('start_delivery')} />
@@ -462,7 +447,7 @@ export default function JobDetailScreen() {
             <Text color="secondary">
               Food handed over. Waiting for the requester to confirm receipt —
               they pay you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally
-              after confirming, and you verify their receipt below.
+              after confirming, then submit their receipt to close the job.
             </Text>
           </Card>
         ) : job.status === 'confirmed' ? (
@@ -471,15 +456,7 @@ export default function JobDetailScreen() {
             <Text variant="subtitle">Requester confirmed receipt</Text>
             <Text color="secondary">
               They can now pay you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally
-              using your QR — verify their receipt below.
-            </Text>
-          </Card>
-        ) : job.status === 'awaiting_requester_payment' ? (
-          <Card>
-            <Badge label="Awaiting payment" tone="warning" />
-            <Text variant="subtitle">Waiting for payment</Text>
-            <Text color="secondary">
-              The requester has submitted their receipt. Verify the payment below.
+              using your QR, then submit their receipt to close the job.
             </Text>
           </Card>
         ) : (
@@ -491,7 +468,7 @@ export default function JobDetailScreen() {
           </Card>
         )}
 
-        <HelperPaymentCard orderId={job.id} onChanged={() => void reload()} refreshToken={paymentTick} />
+        <HelperPaymentCard orderId={job.id} refreshToken={paymentTick} />
       </Screen>
     </>
   );
@@ -509,17 +486,4 @@ const styles = StyleSheet.create({
   lineTotal: { fontWeight: '700', color: colors.primary },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   confirmRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  codeInput: {
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: colors.text,
-    backgroundColor: colors.surface,
-    textAlign: 'center',
-  },
 });

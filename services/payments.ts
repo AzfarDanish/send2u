@@ -4,9 +4,10 @@ import type { OrderStatus, Payment, PaymentStatus } from '@/types/domain';
 /**
  * Payment service layer.
  *
- * State transitions go through `send2u_submit_payment` /
- * `send2u_review_payment` (client sends ids + Storage paths only; identity,
- * amounts, and states are derived server-side). `send2u_payment_context`
+ * State transitions go through `send2u_submit_payment` (client sends ids +
+ * Storage paths only; identity, amounts, and states are derived server-side).
+ * The requester's submitted receipt IS the payment record — there is no helper
+ * review step, so submission closes the order immediately. `send2u_payment_context`
  * exposes exactly the QR reference + payment row the two parties may see.
  * Errors are thrown explicitly; nothing is swallowed.
  */
@@ -32,7 +33,6 @@ export interface PaymentContext {
   deliveryFeeCents: number;
   /** Requester total: food subtotal + delivery fee. */
   totalCents: number;
-  pickupCode: string | null;
   helperId: string | null;
   helperQrPath: string | null;
   payment: Payment | null;
@@ -71,7 +71,6 @@ export async function getPaymentContext(orderId: string): Promise<PaymentContext
     order_status,
     subtotal_cents,
     delivery_fee_cents,
-    pickup_code,
     helper_id,
     helper_qr_path,
     payment,
@@ -80,7 +79,6 @@ export async function getPaymentContext(orderId: string): Promise<PaymentContext
     typeof order_status !== 'string' ||
     typeof subtotal_cents !== 'number' ||
     typeof delivery_fee_cents !== 'number' ||
-    (pickup_code !== null && typeof pickup_code !== 'string') ||
     (helper_id !== null && typeof helper_id !== 'string') ||
     (helper_qr_path !== null && typeof helper_qr_path !== 'string') ||
     (payment !== null && !isRecord(payment))
@@ -93,45 +91,27 @@ export async function getPaymentContext(orderId: string): Promise<PaymentContext
     subtotalCents: subtotal_cents,
     deliveryFeeCents: delivery_fee_cents,
     totalCents: subtotal_cents + delivery_fee_cents,
-    pickupCode: pickup_code,
     helperId: helper_id,
     helperQrPath: helper_qr_path,
     payment: payment ? toPayment(orderId, payment) : null,
   };
 }
 
-/** Submits (or resubmits after rejection) evidence for the caller's order. */
+/** Submits the caller's payment evidence and closes the order immediately. */
 export async function submitPaymentEvidence(
   orderId: string,
   evidencePath: string,
-): Promise<{ amountCents: number }> {
+): Promise<{ amountCents: number; status: PaymentStatus }> {
   const supabase = requireClient();
   const { data, error } = await supabase.rpc('send2u_submit_payment', {
     p_order_id: orderId,
     p_evidence_path: evidencePath,
   });
   if (error) throw new Error(friendlyPaymentError(error.message));
-  if (!isRecord(data) || typeof data.amount_cents !== 'number') {
+  if (!isRecord(data) || typeof data.amount_cents !== 'number' || typeof data.status !== 'string') {
     throw new Error('Payment submission came back in an unexpected shape.');
   }
-  return { amountCents: data.amount_cents };
-}
-
-/** Assigned helper verifies or rejects submitted evidence. */
-export async function reviewPayment(
-  orderId: string,
-  decision: 'verified' | 'rejected',
-): Promise<{ status: PaymentStatus }> {
-  const supabase = requireClient();
-  const { data, error } = await supabase.rpc('send2u_review_payment', {
-    p_order_id: orderId,
-    p_decision: decision,
-  });
-  if (error) throw new Error(friendlyPaymentError(error.message));
-  if (!isRecord(data) || typeof data.status !== 'string') {
-    throw new Error('Payment review came back in an unexpected shape.');
-  }
-  return { status: data.status as PaymentStatus };
+  return { amountCents: data.amount_cents, status: data.status as PaymentStatus };
 }
 
 function friendlyPaymentError(message: string): string {
@@ -139,18 +119,13 @@ function friendlyPaymentError(message: string): string {
     return 'Your session expired. Sign in again and retry.';
   if (/order not found/i.test(message))
     return 'That order is not available to you.';
-  if (/only.*assigned helper/i.test(message))
-    return 'Only the helper assigned to this order can do that.';
-  if (/only helpers/i.test(message)) return 'Only helpers can do that.';
   if (/confirms delivery/i.test(message))
     return 'Payment opens after you confirm that the food arrived.';
   if (/assigned orders/i.test(message))
     return 'Payment opens once a helper accepts this order.';
   if (/already submitted/i.test(message))
-    return 'Evidence is already submitted and awaiting verification.';
+    return 'This payment is already recorded. Refresh to see the latest state.';
   if (/already verified/i.test(message)) return 'This payment is already verified.';
-  if (/no longer awaiting/i.test(message))
-    return 'This payment was already reviewed. Refresh to see the latest state.';
   if (/invalid evidence|was not uploaded|receipt could not be attached/i.test(message))
     return 'That receipt could not be attached. Upload it again.';
   return message ? `Payment failed: ${message}` : 'Payment failed.';

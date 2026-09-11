@@ -14,28 +14,25 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
 import { paymentStatusLabel, paymentStatusTone } from '@/lib/orders';
-import { getPaymentContext, reviewPayment, type PaymentContext } from '@/services/payments';
+import { getPaymentContext, type PaymentContext } from '@/services/payments';
 import { signedImageUrl } from '@/services/storage';
 
 interface HelperPaymentCardProps {
   orderId: string;
-  /** Refresh the parent job so badges stay truthful after a review. */
-  onChanged: () => void;
   /** Bump to force a reload (e.g. right after accepting on this screen). */
   refreshToken?: number;
 }
 
 /**
- * Helper payment section for an assigned job: live payment state,
- * evidence inspection, and verify/reject. Only the assigned helper ever
- * sees this — enforced by the database, not the UI.
+ * Helper payment section for an assigned job: live payment state and
+ * receipt inspection. There is no helper review step — the requester's
+ * submitted receipt closes the order, so this card is read-only.
+ * Only the assigned helper ever sees this (enforced by the database, not the UI).
  */
-export function HelperPaymentCard({ orderId, onChanged, refreshToken = 0 }: HelperPaymentCardProps) {
+export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCardProps) {
   const [context, setContext] = useState<PaymentContext | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'verified' | 'rejected' | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setStatus('loading');
@@ -58,25 +55,6 @@ export function HelperPaymentCard({ orderId, onChanged, refreshToken = 0 }: Help
   useEffect(() => {
     if (refreshToken > 0) void load();
   }, [load, refreshToken]);
-
-  const handleReview = useCallback(
-    async (decision: 'verified' | 'rejected') => {
-      if (busy) return;
-      setBusy(decision);
-      setActionError(null);
-      try {
-        await reviewPayment(orderId, decision);
-        await load();
-        onChanged();
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : 'Could not review the payment.');
-        await load();
-      } finally {
-        setBusy(null);
-      }
-    },
-    [busy, orderId, load, onChanged],
-  );
 
   if (status === 'loading') {
     return (
@@ -152,39 +130,14 @@ export function HelperPaymentCard({ orderId, onChanged, refreshToken = 0 }: Help
         {formatMYR(payment.amountCents)} receipt from the requester:
       </Text>
       <EvidenceView path={payment.evidencePath} />
-      {payment.status === 'submitted' ? (
-        <>
-          {actionError ? (
-            <ErrorState
-              title="Review failed"
-              message={actionError}
-              retryTitle="Reload"
-              onRetry={() => void load()}
-            />
-          ) : null}
-          <Button
-            title={busy === 'verified' ? 'Confirming…' : 'Confirm payment'}
-            onPress={() => void handleReview('verified')}
-            disabled={busy !== null}
-            loading={busy === 'verified'}
-          />
-          <Button
-            title={busy === 'rejected' ? 'Rejecting…' : 'Reject receipt'}
-            variant="danger"
-            onPress={() => void handleReview('rejected')}
-            disabled={busy !== null}
-            loading={busy === 'rejected'}
-          />
-          <Text variant="caption" color="muted">
-            Confirm only if the money actually arrived. Rejecting lets the requester resubmit.
-          </Text>
-        </>
-      ) : payment.status === 'verified' ? (
-        <Text color="secondary">You confirmed this payment. Proceed with the delivery.</Text>
+      {payment.status === 'verified' ? (
+        <Text color="secondary">
+          Payment recorded. Your {formatMYR(payment.amountCents)} delivery earning is finalized.
+        </Text>
       ) : (
         <>
           <Text color="secondary">
-            You rejected this receipt. The requester can attach a new one.
+            Receipt submitted — awaiting settlement.
           </Text>
           <Button title="Refresh" variant="secondary" onPress={() => void load()} />
         </>

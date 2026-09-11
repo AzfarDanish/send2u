@@ -29,11 +29,11 @@ const DISPUTE_CATEGORIES: { key: RequesterDisputeReason; title: string; subtitle
 ];
 
 const PROGRESS_STEPS: { key: string; label: string; done: OrderStatus[] }[] = [
-  { key: 'placed', label: 'Placed', done: ['assigned', 'going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
-  { key: 'helper', label: 'Helper', done: ['going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
-  { key: 'food', label: 'Food ready', done: ['picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
-  { key: 'delivery', label: 'Delivered', done: ['delivered', 'confirmed', 'awaiting_requester_payment', 'completed'] },
-  { key: 'received', label: 'Received', done: ['confirmed', 'awaiting_requester_payment', 'completed'] },
+  { key: 'placed', label: 'Placed', done: ['assigned', 'going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'completed'] },
+  { key: 'helper', label: 'Helper', done: ['going_to_vendor', 'at_vendor', 'food_available', 'food_purchased', 'picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'completed'] },
+  { key: 'food', label: 'Food ready', done: ['picked_up', 'out_for_delivery', 'delivering', 'delivered', 'confirmed', 'completed'] },
+  { key: 'delivery', label: 'Delivered', done: ['delivered', 'confirmed', 'completed'] },
+  { key: 'received', label: 'Received', done: ['confirmed', 'completed'] },
   { key: 'paid', label: 'Completed', done: ['completed'] },
 ];
 
@@ -62,8 +62,6 @@ export default function OrderDetailScreen() {
         return 'Delivered — confirm receipt';
       case 'confirmed':
         return 'Confirmed — payment required';
-      case 'awaiting_requester_payment':
-        return 'Payment required';
       case 'completed':
         return 'Completed';
       case 'cancelled':
@@ -237,7 +235,7 @@ export default function OrderDetailScreen() {
           <Badge label={getStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
         </View>
         <Text variant="caption" color="secondary">
-          Placed {formatOrderDate(order.createdAt)} · Pickup ref {order.pickupCode}
+          Placed {formatOrderDate(order.createdAt)}
         </Text>
 
         <Card>

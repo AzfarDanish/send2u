@@ -1,3 +1,5 @@
+import { dedupeRequest } from '@/lib/dedupe';
+import { orderTotalCents } from '@/lib/orders';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { OrderStatus, Payment, PaymentStatus } from '@/types/domain';
 
@@ -61,12 +63,17 @@ function toPayment(orderId: string, value: Record<string, unknown>): Payment {
   };
 }
 
-/** QR reference + payment row visible to this order's two parties. */
+/**
+ * QR reference + payment row visible to this order's two parties.
+ * In-flight deduped per order: detail screens mount the payment card next
+ * to rating/evidence views that ask for the same context simultaneously.
+ */
 export async function getPaymentContext(orderId: string): Promise<PaymentContext> {
-  const supabase = requireClient();
-  const { data, error } = await supabase.rpc('send2u_payment_context', { p_order_id: orderId });
-  if (error) throw new Error(friendlyPaymentError(error.message));
-  if (!isRecord(data)) throw new Error('Payment data came back in an unexpected shape.');
+  return dedupeRequest(`send2u:payment-context:${orderId}`, async () => {
+    const supabase = requireClient();
+    const { data, error } = await supabase.rpc('send2u_payment_context', { p_order_id: orderId });
+    if (error) throw new Error(friendlyPaymentError(error.message));
+    if (!isRecord(data)) throw new Error('Payment data came back in an unexpected shape.');
   const {
     order_status,
     subtotal_cents,
@@ -90,11 +97,12 @@ export async function getPaymentContext(orderId: string): Promise<PaymentContext
     orderStatus: order_status as OrderStatus,
     subtotalCents: subtotal_cents,
     deliveryFeeCents: delivery_fee_cents,
-    totalCents: subtotal_cents + delivery_fee_cents,
+    totalCents: orderTotalCents(subtotal_cents, delivery_fee_cents),
     helperId: helper_id,
     helperQrPath: helper_qr_path,
     payment: payment ? toPayment(orderId, payment) : null,
   };
+  });
 }
 
 /** Submits the caller's payment evidence and closes the order immediately. */

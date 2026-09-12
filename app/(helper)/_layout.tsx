@@ -1,13 +1,14 @@
 import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import type { ColorValue } from 'react-native';
 
 import { HeaderBell } from '@/components/HeaderBell';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
 function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
-  function TabIcon({ color, size }: { color: string; size: number }) {
-    return <MaterialIcons name={name} size={size} color={color} />;
+  function TabIcon({ color, size }: { color: ColorValue; size: number }) {
+    return <MaterialIcons name={name} size={size} color={color as string} />;
   }
   return TabIcon;
 }

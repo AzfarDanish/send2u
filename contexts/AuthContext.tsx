@@ -5,13 +5,14 @@ import { DEV_AUTH_ENABLED } from '@/config/dev';
 import { isSupabaseConfigured } from '@/config/env';
 import { getSupabaseClient } from '@/lib/supabase';
 import {
-  continueAsDev,
+  claimMissingProfile as claimMissingProfileService,
   fetchProfile,
   getActiveSession,
   onAuthStateChange,
-  setProfileRole,
+  signInWithPassword,
   signOut as signOutService,
-  switchDevRole,
+  signUpAccount,
+  type SignUpResult,
 } from '@/services/auth';
 import type { AppUser, Profile, UserRole } from '@/types/domain';
 
@@ -24,13 +25,19 @@ interface AuthContextValue {
   /** True until the initial session + profile restore completes. */
   isLoading: boolean;
   isSupabaseEnabled: boolean;
+  /** Gates dev-only UI (the test-account switcher). Never a prod capability. */
   devAuthEnabled: boolean;
   /** Last restore error (e.g. network), if any. Cleared on next success. */
   authError: string | null;
-  /** Dev-only entry: real anonymous session + profile role. No credentials. */
-  continueAs: (role: UserRole) => Promise<void>;
-  /** Dev-only role switch for the signed-in user. No credentials. */
-  switchRole: (role: UserRole) => Promise<void>;
+  /** Real account signup with a permanent role. Returns the signup outcome. */
+  signUp: (email: string, password: string, role: UserRole) => Promise<SignUpResult>;
+  /** Real account login. */
+  signIn: (email: string, password: string) => Promise<void>;
+  /**
+   * One-time repair for accounts with no profile row. INSERT-only — it throws
+   * when a profile already exists, so it can never change a role.
+   */
+  claimMissingProfile: (role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -47,12 +54,6 @@ function toAppUser(user: User, profile: Profile | null): AppUser {
   };
 }
 
-function requireDevAuth(): void {
-  if (!DEV_AUTH_ENABLED) {
-    throw new Error('Development auth is disabled in this build.');
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -61,9 +62,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Initial restore: session first, then the profile row for auth.uid().
+  // Legacy anonymous sessions are signed out: the app only admits real
+  // accounts, and keeping a stale anon identity would strand the user on a
+  // role-less session with no upgrade path.
   useEffect(() => {
     let mounted = true;
     let unsubscribe: (() => void) | null = null;
+    const clearToSignedOut = () => {
+      setSession(null);
+      setAuthUser(null);
+      setProfile(null);
+    };
     (async () => {
       try {
         if (!getSupabaseClient()) {
@@ -72,14 +81,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const active = await getActiveSession();
         if (!mounted) return;
-        setSession(active?.session ?? null);
-        setAuthUser(active?.user ?? null);
-        if (active) {
-          const restored = await fetchProfile(active.user.id);
-          if (mounted) setProfile(restored);
+        if (active && active.user.is_anonymous) {
+          await signOutService().catch(() => {});
+          if (mounted) clearToSignedOut();
+        } else {
+          setSession(active?.session ?? null);
+          setAuthUser(active?.user ?? null);
+          if (active) {
+            const restored = await fetchProfile(active.user.id);
+            if (mounted) setProfile(restored);
+          }
         }
         unsubscribe = onAuthStateChange(async (nextSession) => {
           if (!mounted) return;
+          if (nextSession && nextSession.user.is_anonymous) {
+            await signOutService().catch(() => {});
+            if (mounted) clearToSignedOut();
+            return;
+          }
           setSession(nextSession);
           setAuthUser(nextSession?.user ?? null);
           if (!nextSession) {
@@ -113,32 +132,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const continueAs = useCallback(
-    async (role: UserRole) => {
-      requireDevAuth();
-      // A restored session means identity already exists: only the role
-      // changes. This path can never mint a new anonymous user.
-      if (authUser) {
-        const nextProfile = await setProfileRole(authUser.id, role);
-        setProfile(nextProfile);
-        setAuthError(null);
-        return;
-      }
-      const { user, profile: nextProfile } = await continueAsDev(role);
-      setAuthUser(user);
-      setProfile(nextProfile);
+  const signUp = useCallback(async (email: string, password: string, role: UserRole) => {
+    const result = await signUpAccount(email, password, role);
+    if (result.status === 'active') {
+      setAuthUser(result.user);
+      setSession(result.session);
+      setProfile(result.profile);
       setAuthError(null);
-      // The session object also arrives via onAuthStateChange; fetch it
-      // directly so state is consistent even if the event races this update.
-      const active = await getActiveSession();
-      setSession(active?.session ?? null);
-    },
-    [authUser],
-  );
+    }
+    // The session object also arrives via onAuthStateChange; setting it
+    // directly keeps state consistent even if the event races this update.
+    // Confirmation-required signups deliberately set nothing: there is no
+    // session yet, and inventing one would bypass email verification.
+    return result;
+  }, []);
 
-  const switchRole = useCallback(async (role: UserRole) => {
-    requireDevAuth();
-    const nextProfile = await switchDevRole(role);
+  const signIn = useCallback(async (email: string, password: string) => {
+    const result = await signInWithPassword(email, password);
+    setAuthUser(result.user);
+    setSession(result.session);
+    setProfile(result.profile);
+    setAuthError(null);
+  }, []);
+
+  const claimMissingProfile = useCallback(async (role: UserRole) => {
+    const nextProfile = await claimMissingProfileService(role);
     setProfile(nextProfile);
     setAuthError(null);
   }, []);
@@ -169,12 +187,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSupabaseEnabled: isSupabaseConfigured(),
       devAuthEnabled: DEV_AUTH_ENABLED,
       authError,
-      continueAs,
-      switchRole,
+      signUp,
+      signIn,
+      claimMissingProfile,
       signOut,
       refreshProfile,
     };
-  }, [session, authUser, profile, isLoading, authError, continueAs, switchRole, signOut, refreshProfile]);
+  }, [session, authUser, profile, isLoading, authError, signUp, signIn, claimMissingProfile, signOut, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

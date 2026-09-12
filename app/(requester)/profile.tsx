@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -14,20 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
 
 export default function RequesterProfileScreen() {
-  const { user, devAuthEnabled, switchRole, signOut } = useAuth();
-  const [isSwitching, setIsSwitching] = useState(false);
-
-  const handleSwitch = async () => {
-    setIsSwitching(true);
-    try {
-      // No manual navigation: the group layout redirects on role change.
-      await switchRole('helper');
-    } catch (error) {
-      Alert.alert('Could not switch role', error instanceof Error ? error.message : 'Please try again.');
-    } finally {
-      setIsSwitching(false);
-    }
-  };
+  const { user, signOut } = useAuth();
 
   return (
     <Screen>
@@ -40,7 +27,7 @@ export default function RequesterProfileScreen() {
           <View style={styles.identityText}>
             <Text variant="subtitle">Campus requester</Text>
             <Text variant="caption" color="secondary">
-              ID {user?.id.slice(0, 8)}… · {user?.isAnonymous ? 'Test session' : user?.email ?? 'Signed in'}
+              {user?.email ?? 'Signed in'} · ID {user?.id.slice(0, 8)}…
             </Text>
           </View>
           <Badge label="Requester" tone="primary" />
@@ -51,30 +38,11 @@ export default function RequesterProfileScreen() {
         <ListRow
           icon="receipt-long"
           title="My orders"
-          subtitle="Track deliveries and order history"
           onPress={() => router.push('/(requester)/orders')}
-        />
-        <ListRow
-          icon="location-on"
-          title="Saved drop-off points"
-          subtitle="Hostel, faculty, library — coming soon"
         />
       </Card>
 
-      {devAuthEnabled && (
-        <Card>
-          <Badge label="Development" tone="warning" />
-          <Text variant="subtitle">Preview the helper side</Text>
-          <Text color="secondary">Switch roles instantly without signing in again.</Text>
-          <Button
-            title={isSwitching ? 'Switching…' : 'Switch to helper'}
-            variant="secondary"
-            onPress={handleSwitch}
-            disabled={isSwitching}
-            loading={isSwitching}
-          />
-        </Card>
-      )}
+      <DevProfileSwitcher />
 
       <Button title="Sign out" variant="danger" onPress={signOut} />
     </Screen>

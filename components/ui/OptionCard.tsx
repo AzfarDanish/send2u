@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 interface OptionCardProps extends Omit<PressableProps, 'style'> {
   icon: keyof typeof MaterialIcons.glyphMap;
   title: string;
-  description: string;
+  description?: string;
   selected?: boolean;
   loading?: boolean;
 }
@@ -29,9 +29,11 @@ export function OptionCard({ icon, title, description, selected = false, loading
       </View>
       <View style={styles.textBlock}>
         <Text variant="subtitle">{title}</Text>
-        <Text variant="secondary" color="secondary">
-          {description}
-        </Text>
+        {description ? (
+          <Text variant="secondary" color="secondary">
+            {description}
+          </Text>
+        ) : null}
       </View>
       <MaterialIcons
         name={loading ? 'hourglass-empty' : 'chevron-right'}

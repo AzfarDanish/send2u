@@ -11,7 +11,6 @@ import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { StageLegend } from '@/components/ui/StageLegend';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { useMyDeliveries } from '@/hooks/useMyDeliveries';
@@ -21,6 +20,7 @@ import {
   formatOrderDate,
   orderStatusLabel,
   orderStatusTone,
+  orderTotalCents,
   paymentStatusLabel,
   paymentStatusTone,
 } from '@/lib/orders';
@@ -29,25 +29,19 @@ import type { OrderWithDetails } from '@/types/domain';
 export default function HelperDeliveriesScreen() {
   const [tab, setTab] = useState<HistoryTab>('active');
   const active = useMyDeliveries();
-  const history = useMyDeliveryHistory();
+  // History loads only when visible — except when Active is empty, where the
+  // count decides the empty-state copy. Focus refetches while visible stay.
+  const history = useMyDeliveryHistory(tab === 'history' || active.status === 'empty');
 
   const openDelivery = useCallback((delivery: OrderWithDetails) => {
     router.push({ pathname: '/(helper)/jobs/[id]', params: { id: delivery.id } });
   }, []);
 
-  const refreshing = active.refreshing || history.refreshing;
+  const refreshing = active.refreshing || (tab === 'history' && history.refreshing);
   const handleRefresh = useCallback(async () => {
-    await Promise.all([active.refresh(), history.refresh()]);
-  }, [active, history]);
-
-  const badge =
-    tab === 'active'
-      ? active.status === 'ready'
-        ? `${active.deliveries.length} active`
-        : undefined
-      : history.status === 'ready'
-        ? `${history.deliveries.length} in history`
-        : undefined;
+    // Refresh the visible list; the hidden one loads (or reloads) on visit.
+    await Promise.all([active.refresh(), tab === 'history' ? history.refresh() : Promise.resolve()]);
+  }, [active, history, tab]);
 
   return (
     <Screen
@@ -57,7 +51,6 @@ export default function HelperDeliveriesScreen() {
       <SectionHeader
         eyebrow="Deliveries"
         title={tab === 'active' ? 'Your active jobs' : 'Delivery history'}
-        badge={badge}
       />
       <ActiveHistoryToggle tab={tab} onChange={setTab} historyCount={history.deliveries.length} />
       {tab === 'active' ? (
@@ -83,8 +76,8 @@ export default function HelperDeliveriesScreen() {
               title={history.deliveries.length > 0 ? 'No active deliveries' : 'No deliveries yet'}
               message={
                 history.deliveries.length > 0
-                  ? 'Nothing needs your attention right now. Closed jobs live in History.'
-                  : 'Accepted jobs show here with pickup and drop-off details. Find one in Jobs.'
+                  ? 'Closed jobs live in History.'
+                  : 'Accepted jobs appear here.'
               }
               actionTitle="Browse jobs"
               onAction={() => router.push('/(helper)')}
@@ -101,7 +94,7 @@ export default function HelperDeliveriesScreen() {
                     right={
                       <View style={styles.right}>
                         <Text variant="secondary" style={styles.subtotal}>
-                          {formatMYR(delivery.subtotalCents)}
+                          {formatMYR(orderTotalCents(delivery.subtotalCents, delivery.deliveryFeeCents))}
                         </Text>
                         <Badge
                           label={orderStatusLabel(delivery.status)}
@@ -141,7 +134,7 @@ export default function HelperDeliveriesScreen() {
             <EmptyState
               icon="history"
               title="No history yet"
-              message="Completed, cancelled, and settled deliveries will appear here as read-only records."
+              message="Completed and cancelled deliveries appear here."
             />
           ) : null}
           {history.status === 'ready'
@@ -154,6 +147,9 @@ export default function HelperDeliveriesScreen() {
                     onPress={() => openDelivery(delivery)}
                     right={
                       <View style={styles.right}>
+                        <Text variant="secondary" style={styles.subtotal}>
+                          {formatMYR(orderTotalCents(delivery.subtotalCents, delivery.deliveryFeeCents))}
+                        </Text>
                         <Badge
                           label={orderStatusLabel(delivery.status)}
                           tone={orderStatusTone(delivery.status)}
@@ -166,9 +162,6 @@ export default function HelperDeliveriesScreen() {
             : null}
         </>
       )}
-      <Card>
-        <StageLegend caption="Each delivery follows these five stages to payout." />
-      </Card>
     </Screen>
   );
 }

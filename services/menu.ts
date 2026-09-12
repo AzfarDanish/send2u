@@ -113,19 +113,24 @@ export async function listVendors(): Promise<Vendor[]> {
 /** Full requester menu: active vendors with their items, in display order. */
 export async function listVendorSections(): Promise<VendorMenuSection[]> {
   const supabase = requireClient();
-  const { data: vendorRows, error: vendorError } = await supabase
-    .from('send2u_vendors')
-    .select('*')
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
-  if (vendorError) throw toMenuError(vendorError, 'Could not load vendors');
+  // Independent queries — one roundtrip instead of two serial ones.
+  const [vendorRes, itemRes] = await Promise.all([
+    supabase
+      .from('send2u_vendors')
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true }),
+    supabase
+      .from('send2u_menu_items')
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true }),
+  ]);
+  if (vendorRes.error) throw toMenuError(vendorRes.error, 'Could not load vendors');
+  if (itemRes.error) throw toMenuError(itemRes.error, 'Could not load menu items');
 
-  const { data: itemRows, error: itemError } = await supabase
-    .from('send2u_menu_items')
-    .select('*')
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
-  if (itemError) throw toMenuError(itemError, 'Could not load menu items');
+  const vendorRows = vendorRes.data;
+  const itemRows = itemRes.data;
 
   const vendors = (vendorRows as VendorRow[]).map(toVendor);
   const itemsByVendor = new Map<string, MenuItemWithVendor[]>();

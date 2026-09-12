@@ -17,12 +17,17 @@ export type ProfileRole = 'requester' | 'helper' | 'vendor' | 'admin';
 
 export interface Profile {
   id: string;
+  /** Permanent account role, set once at signup. Never mutated afterwards. */
   role: ProfileRole;
   /** Storage path of the helper's payment QR (`qr/<uid>/…`), null when unset. */
   paymentQrPath: string | null;
   /** Helper availability — only meaningful when role is helper. */
   isAvailable: boolean;
   availabilityUpdatedAt: string | null;
+  /** Admin-flagged development/test account. Never settable from the app. */
+  isDevAccount: boolean;
+  /** Optional dev label (seeded out-of-band). Never PII or auth data. */
+  displayName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -229,6 +234,8 @@ export interface PlacedOrderSummary {
   vendorId: string;
   vendorName: string;
   subtotalCents: number;
+  /** Fixed RM2.00 delivery fee recorded server-side per order. */
+  deliveryFeeCents: number;
   itemCount: number;
   status: OrderStatus;
   createdAt: string;
@@ -248,7 +255,9 @@ export interface AcceptedOrderSummary {
 
 /**
  * External-payment state. No row means not submitted. Amount is snapshotted
- * from the order subtotal at submit time — never supplied by the client.
+ * as food subtotal + delivery fee at submit time — never supplied by the
+ * client. It is the full receipt amount, NOT the helper's earning (which
+ * is the delivery fee alone).
  */
 export type PaymentStatus = 'submitted' | 'verified' | 'rejected';
 

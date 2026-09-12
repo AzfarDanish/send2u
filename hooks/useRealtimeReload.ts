@@ -11,7 +11,9 @@ export interface RealtimeTopic {
 
 /**
  * Subscribes to Postgres changes and invokes `onEvent` (debounced) on any
- * match, on (re)subscribe (reconnect reconciliation), and never otherwise.
+ * match and on re-subscribe (reconnect reconciliation) — but NOT on the
+ * initial subscribe, since the caller just loaded and firing there would
+ * double every mount fetch. Never fires otherwise.
  *
  * Security: RLS still applies server-side — the client only receives rows it
  * may SELECT, so an unfiltered subscription is safe. Failures (realtime
@@ -25,14 +27,25 @@ export function useRealtimeReload(
   enabled = true,
 ): void {
   const saved = useRef(onEvent);
-  saved.current = onEvent;
+  // Synced in an effect (never written during render): readers only run in
+  // async callbacks (debounce timer, channel events), which always execute
+  // after commit, so this is identical in practice.
+  useEffect(() => {
+    saved.current = onEvent;
+  });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether the channel has completed its first subscribe, so the
+  // initial SUBSCRIBED (data was just loaded by the caller) is skipped while
+  // later re-subscribes (reconnects) still trigger a reconciling reload.
+  const hasSubscribedOnce = useRef(false);
   const topicsKey = JSON.stringify(topics);
 
   useEffect(() => {
     if (!enabled) return;
     const supabase = getSupabaseClient();
     if (!supabase) return;
+    // Fresh channel below: its first SUBSCRIBED must be skipped (see below).
+    hasSubscribedOnce.current = false;
     const parsed: RealtimeTopic[] = JSON.parse(topicsKey) as RealtimeTopic[];
     if (parsed.length === 0) return;
 
@@ -62,7 +75,16 @@ export function useRealtimeReload(
       );
     }
     channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') fire();
+      // Reconnect reconciliation only: the caller already loaded on mount,
+      // so firing on the FIRST subscribe would fetch everything twice.
+      // Later re-subscribes (socket reconnect) still refetch, which heals
+      // missed events while offline.
+      if (status !== 'SUBSCRIBED') return;
+      if (!hasSubscribedOnce.current) {
+        hasSubscribedOnce.current = true;
+        return;
+      }
+      fire();
     });
 
     return () => {

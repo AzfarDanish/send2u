@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
+import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { PrivateImage } from '@/components/PrivateImage';
-import { Badge } from '@/components/ui/Badge';
+import { StagedFileCard } from '@/components/StagedFileCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
@@ -14,37 +15,50 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { setPaymentQrPath } from '@/services/auth';
-import { pickPaymentImage, qrPathFor, removeObject, uploadObject } from '@/services/storage';
+import {
+  displayFileName,
+  pickPaymentImage,
+  qrPathFor,
+  removeObject,
+  uploadObject,
+  type PickedImage,
+} from '@/services/storage';
 
 export default function HelperProfileScreen() {
-  const { user, profile, devAuthEnabled, switchRole, signOut, refreshProfile } = useAuth();
-  const [isSwitching, setIsSwitching] = useState(false);
+  const { user, profile, signOut, refreshProfile } = useAuth();
   const [qrBusy, setQrBusy] = useState(false);
+  const [qrBusyMessage, setQrBusyMessage] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
+  // Picked-but-not-uploaded QR awaiting explicit confirmation. Nothing
+  // reaches Storage or the profile until the user confirms.
+  const [stagedQr, setStagedQr] = useState<PickedImage | null>(null);
 
-  const handleSwitch = async () => {
-    setIsSwitching(true);
-    try {
-      // No manual navigation: the group layout redirects on role change.
-      await switchRole('requester');
-    } catch (error) {
-      Alert.alert('Could not switch role', error instanceof Error ? error.message : 'Please try again.');
-    } finally {
-      setIsSwitching(false);
-    }
-  };
-
-  const handleQrUpload = useCallback(async () => {
+  const handleQrChoose = useCallback(async () => {
     if (!user || qrBusy) return;
     setQrBusy(true);
+    setQrBusyMessage('Choosing image…');
+    setQrError(null);
+    try {
+      const picked = await pickPaymentImage();
+      if (picked) setStagedQr(picked);
+    } catch (error) {
+      setQrError(error instanceof Error ? error.message : 'Could not choose the QR code.');
+    } finally {
+      setQrBusy(false);
+      setQrBusyMessage(null);
+    }
+  }, [user, qrBusy]);
+
+  const handleQrConfirm = useCallback(async () => {
+    if (!user || qrBusy || !stagedQr) return;
+    setQrBusy(true);
+    setQrBusyMessage('Uploading QR…');
     setQrError(null);
     let uploadedPath: string | null = null;
     try {
-      const picked = await pickPaymentImage();
-      if (!picked) return;
       const previous = profile?.paymentQrPath ?? null;
-      const path = qrPathFor(user.id, picked.extension);
-      await uploadObject(path, picked);
+      const path = qrPathFor(user.id, stagedQr.extension, stagedQr.name);
+      await uploadObject(path, stagedQr);
       uploadedPath = path;
       await setPaymentQrPath(path);
       if (previous && previous !== path) {
@@ -54,6 +68,7 @@ export default function HelperProfileScreen() {
           // Stale QR file is harmless; the profile already points at the new one.
         }
       }
+      setStagedQr(null);
       await refreshProfile();
     } catch (error) {
       if (uploadedPath) {
@@ -66,8 +81,9 @@ export default function HelperProfileScreen() {
       setQrError(error instanceof Error ? error.message : 'Could not update the QR code.');
     } finally {
       setQrBusy(false);
+      setQrBusyMessage(null);
     }
-  }, [user, qrBusy, profile?.paymentQrPath, refreshProfile]);
+  }, [user, qrBusy, stagedQr, profile, refreshProfile]);
 
   const handleQrRemove = useCallback(async () => {
     if (!user || qrBusy) return;
@@ -101,47 +117,40 @@ export default function HelperProfileScreen() {
           <View style={styles.identityText}>
             <Text variant="subtitle">Student helper</Text>
             <Text variant="caption" color="secondary">
-              ID {user?.id.slice(0, 8)}… · {user?.isAnonymous ? 'Test session' : user?.email ?? 'Signed in'}
+              {user?.email ?? 'Signed in'} · ID {user?.id.slice(0, 8)}…
             </Text>
           </View>
-          <Badge label="Helper" tone="success" />
         </View>
-        <Text variant="caption" color="muted">
-          Student verification arrives with production sign-in.
-        </Text>
       </Card>
 
       <Card>
         <ListRow
           icon="delivery-dining"
           title="My deliveries"
-          subtitle="Active jobs and delivery history"
           onPress={() => router.push('/(helper)/deliveries')}
         />
         <ListRow
           icon="payments"
           title="Payouts"
-          subtitle="Earnings summary — coming soon"
+          onPress={() => router.push('/(helper)/earnings')}
         />
       </Card>
 
       <Card>
-        <View style={styles.qrHeader}>
-          <Text variant="subtitle">Payment QR</Text>
-          {profile?.paymentQrPath ? (
-            <Badge label="Set" tone="success" />
-          ) : (
-            <Badge label="Not set" tone="warning" />
-          )}
-        </View>
-        <Text color="secondary">
-          Requesters pay you externally using this QR after you accept their order.
+        <Text variant="subtitle">Payment QR</Text>
+        <Text variant="caption" color="muted">
+          {profile?.paymentQrPath ? 'QR set' : 'No QR set'}
         </Text>
         {profile?.paymentQrPath ? (
-          <PrivateImage path={profile.paymentQrPath} accessibilityLabel="Your payment QR code" />
+          <>
+            <PrivateImage path={profile.paymentQrPath} accessibilityLabel="Your payment QR code" />
+            <Text variant="caption" color="muted">
+              {displayFileName(profile.paymentQrPath)}
+            </Text>
+          </>
         ) : (
           <Text variant="caption" color="muted">
-            No QR yet — without one, requesters see payment as unavailable on your jobs.
+            Requesters can&apos;t pay you without one.
           </Text>
         )}
         {qrError ? (
@@ -149,37 +158,37 @@ export default function HelperProfileScreen() {
             {qrError}
           </Text>
         ) : null}
-        <Button
-          title={qrBusy ? 'Working…' : profile?.paymentQrPath ? 'Replace QR' : 'Upload QR'}
-          variant="secondary"
-          onPress={() => void handleQrUpload()}
-          disabled={qrBusy}
-          loading={qrBusy}
-        />
+        {stagedQr ? (
+          <StagedFileCard
+            file={stagedQr}
+            title="Review your new QR"
+            busy={qrBusy}
+            busyMessage={qrBusyMessage}
+            confirmTitle={profile?.paymentQrPath ? 'Confirm & replace QR' : 'Confirm & set QR'}
+            onConfirm={() => void handleQrConfirm()}
+            onRechoose={() => void handleQrChoose()}
+            onCancel={() => setStagedQr(null)}
+          />
+        ) : (
+          <Button
+            title={qrBusy ? (qrBusyMessage ?? 'Working…') : profile?.paymentQrPath ? 'Replace QR' : 'Upload QR'}
+            variant="secondary"
+            onPress={() => void handleQrChoose()}
+            disabled={qrBusy}
+            loading={qrBusy}
+          />
+        )}
         {profile?.paymentQrPath ? (
           <Button
             title="Remove QR"
             variant="danger"
             onPress={() => void handleQrRemove()}
-            disabled={qrBusy}
+            disabled={qrBusy || stagedQr !== null}
           />
         ) : null}
       </Card>
 
-      {devAuthEnabled ? (
-        <Card>
-          <Badge label="Development" tone="warning" />
-          <Text variant="subtitle">Preview the requester side</Text>
-          <Text color="secondary">Switch roles instantly without signing in again.</Text>
-          <Button
-            title={isSwitching ? 'Switching…' : 'Switch to requester'}
-            variant="secondary"
-            onPress={handleSwitch}
-            disabled={isSwitching}
-            loading={isSwitching}
-          />
-        </Card>
-      ) : null}
+      <DevProfileSwitcher />
 
       <Button title="Sign out" variant="danger" onPress={signOut} />
     </Screen>
@@ -197,5 +206,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   identityText: { flex: 1, gap: spacing.xs },
-  qrHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

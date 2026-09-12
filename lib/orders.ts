@@ -70,6 +70,17 @@ export function orderStatusLabel(status: OrderStatus): string {
     .join(' ');
 }
 
+/**
+ * Payable total for one order: food subtotal + delivery fee. Both inputs
+ * are database snapshots (the fee is fixed at RM2.00 server-side per
+ * order) — the fee is never a client constant and is added exactly once,
+ * here. Every surface showing a payable total must use this instead of
+ * re-adding the two fields inline.
+ */
+export function orderTotalCents(subtotalCents: number, deliveryFeeCents: number): number {
+  return subtotalCents + deliveryFeeCents;
+}
+
 /** Badge tone for the external-payment state (separate from order status). */
 export function paymentStatusTone(status: PaymentStatus): 'info' | 'success' | 'warning' | 'error' {
   switch (status) {

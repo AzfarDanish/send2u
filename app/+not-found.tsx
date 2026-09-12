@@ -12,7 +12,6 @@ export default function NotFoundScreen() {
         <EmptyState
           icon="search-off"
           title="This screen doesn't exist"
-          message="The page you're looking for moved or was never part of Send2U."
         />
         <Link href="/" asChild>
           <Button title="Back to Send2U home" variant="secondary" />

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { RequesterHistoryDetail } from '@/components/RequesterHistoryDetail';
+import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -15,17 +16,16 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
-import { formatMYR } from '@/lib/money';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
 import { cancelOrder, confirmDelivery, getOrderDetail, openDispute } from '@/services/orders';
 import type { OrderStatus, OrderWithDetails } from '@/types/domain';
 import type { RequesterDisputeReason } from '@/services/orders';
 
-const DISPUTE_CATEGORIES: { key: RequesterDisputeReason; title: string; subtitle: string }[] = [
-  { key: 'not_received', title: "Didn't receive it", subtitle: 'The food never reached you.' },
-  { key: 'incorrect', title: 'Wrong or incomplete', subtitle: 'Items missing or not what you ordered.' },
-  { key: 'damaged', title: 'Damaged or spoiled', subtitle: 'Food arrived inedible or spilled.' },
-  { key: 'refused', title: 'Refused at handover', subtitle: 'You turned the delivery away.' },
+const DISPUTE_CATEGORIES: { key: RequesterDisputeReason; title: string }[] = [
+  { key: 'not_received', title: "Didn't receive it" },
+  { key: 'incorrect', title: 'Wrong or incomplete' },
+  { key: 'damaged', title: 'Damaged or spoiled' },
+  { key: 'refused', title: 'Refused at handover' },
 ];
 
 const PROGRESS_STEPS: { key: string; label: string; done: OrderStatus[] }[] = [
@@ -270,41 +270,14 @@ export default function OrderDetailScreen() {
           </Text>
         </Card>
 
-        <Card style={styles.itemsCard}>
-          {order.items.map((item) => (
-            <View key={item.id} style={styles.line}>
-              <View style={styles.lineText}>
-                <Text variant="secondary" style={styles.lineName}>
-                  {item.quantity} × {item.itemName}
-                </Text>
-                <Text variant="caption" color="secondary">
-                  {formatMYR(item.unitPriceCents)} each
-                </Text>
-              </View>
-              <Text variant="secondary" style={styles.lineTotal}>
-                {formatMYR(item.lineTotalCents)}
-              </Text>
-            </View>
-          ))}
-        </Card>
-
         <Card>
-          <View style={styles.subtotalRow}>
-            <Text color="secondary">Food subtotal</Text>
-            <Text variant="subtitle">{formatMYR(order.subtotalCents)}</Text>
-          </View>
-          <View style={styles.subtotalRow}>
-            <Text color="secondary">Delivery fee</Text>
-            <Text variant="subtitle">{formatMYR(order.deliveryFeeCents)}</Text>
-          </View>
-          <View style={styles.subtotalRow}>
-            <Text variant="subtitle">Total to pay helper</Text>
-            <Text variant="title" color="primary">
-              {formatMYR(order.subtotalCents + order.deliveryFeeCents)}
-            </Text>
-          </View>
+          <OrderBreakdown
+            items={order.items}
+            subtotalCents={order.subtotalCents}
+            deliveryFeeCents={order.deliveryFeeCents}
+          />
           <Text variant="caption" color="muted">
-            You pay after the food is in your hands — never before delivery.
+            Pay only after the food is in your hands.
           </Text>
         </Card>
 
@@ -313,12 +286,12 @@ export default function OrderDetailScreen() {
             <Text variant="subtitle">Cancel this order</Text>
             {lateCancellable ? (
               <Text color="secondary">
-                The helper already paid for your food with their own money. Cancelling now may make
+                The helper already paid for your food. Cancelling now may make
                 you responsible for the food cost — settle it with them directly.
               </Text>
             ) : (
               <Text color="secondary">
-                You can cancel free of charge before the food is purchased.
+                Free of charge before the food is purchased.
               </Text>
             )}
             {cancelError ? (
@@ -350,8 +323,7 @@ export default function OrderDetailScreen() {
             <Text variant="subtitle">Confirm you got the food</Text>
             <Text color="secondary">
               {order.deliveredAt ? `Delivered ${formatOrderDate(order.deliveredAt)}. ` : ''}
-              Check the handover, then confirm below — payment opens right after
-              confirmation.
+              Confirm below — payment opens after confirmation.
             </Text>
             {confirmError ? (
               <ErrorState title="Could not confirm" message={confirmError} retryTitle="Dismiss" onRetry={() => setConfirmError(null)} />
@@ -363,8 +335,7 @@ export default function OrderDetailScreen() {
               loading={confirming}
             />
             <Text variant="caption" color="muted">
-              Only confirm food you actually received. If something is wrong,
-              don&apos;t confirm — talk to your helper first.
+              Only confirm food you received.
             </Text>
             <Button
               title={reportOpen ? 'Hide problem report' : 'Report a problem'}
@@ -382,7 +353,6 @@ export default function OrderDetailScreen() {
                       key={category.key}
                       icon="report-problem"
                       title={category.title}
-                      subtitle={category.subtitle}
                       showChevron={false}
                       onPress={() => setReportCategory(category.key)}
                       right={
@@ -414,8 +384,7 @@ export default function OrderDetailScreen() {
                   loading={reporting}
                 />
                 <Text variant="caption" color="muted">
-                  Reporting moves the order to dispute for manual settlement — no
-                  automatic refund. Only report genuine problems.
+                  Reporting moves the order to dispute — no automatic refund.
                 </Text>
               </View>
             ) : null}
@@ -432,12 +401,6 @@ const styles = StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, fontWeight: '600', color: colors.text },
-  itemsCard: { gap: 0 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  lineText: { flex: 1, gap: spacing.xs },
-  lineName: { fontWeight: '600', color: colors.text },
-  lineTotal: { fontWeight: '700', color: colors.primary },
-  subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   progress: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
   step: { flex: 1, alignItems: 'center', gap: spacing.xs },
   dot: {

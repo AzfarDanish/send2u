@@ -4,7 +4,6 @@ import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { QuantityStepper } from '@/components/QuantityStepper';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -107,9 +106,13 @@ export default function MenuItemDetailScreen() {
               ) : null}
             </View>
             {item.isAvailable ? (
-              <Badge label="Available" tone="success" />
+              <Text variant="secondary" style={{ color: colors.success }}>
+                Available
+              </Text>
             ) : (
-              <Badge label="Unavailable" tone="warning" />
+              <Text variant="secondary" style={{ color: colors.warning }}>
+                Unavailable
+              </Text>
             )}
           </View>
           {!item.vendor.isOpen ? (
@@ -147,7 +150,7 @@ export default function MenuItemDetailScreen() {
               disabled={!item.isAvailable}
             />
             <Text variant="caption" color="muted">
-              Adds to your local cart only — no order is created yet.
+              Adds to cart only.
             </Text>
           </Card>
         )}

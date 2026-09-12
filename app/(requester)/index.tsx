@@ -16,12 +16,6 @@ import { colors, spacing } from '@/constants/theme';
 import { useMenu } from '@/hooks/useMenu';
 import type { MenuItemWithVendor } from '@/types/domain';
 
-const HOW_IT_WORKS = [
-  { icon: 'receipt-long', title: 'Request in seconds', subtitle: 'Pick your meal and drop-off point on campus.' },
-  { icon: 'delivery-dining', title: 'A helper picks it up', subtitle: 'A verified student collects it from the vendor.' },
-  { icon: 'check-circle-outline', title: 'Delivered & confirmed', subtitle: 'Handed to you and confirmed in the app.' },
-] as const;
-
 export default function RequesterHomeScreen() {
   const { sections, itemCount, status, error, refreshing, retry, refresh } = useMenu();
 
@@ -39,11 +33,9 @@ export default function RequesterHomeScreen() {
       <Card>
         <Badge label="No active order" tone="neutral" />
         <Text variant="subtitle">Nothing on the way</Text>
-        <Text color="secondary">Your current delivery will show up here with live status.</Text>
         <ListRow
           icon="add-circle-outline"
           title="Start a request"
-          subtitle="Browse the menu and order in under a minute"
           onPress={() => router.push('/(requester)/create')}
         />
       </Card>
@@ -71,7 +63,7 @@ export default function RequesterHomeScreen() {
         <EmptyState
           icon="storefront"
           title="No menu today"
-          message="The campus vendors haven't published anything yet. Pull down to check again."
+          message="Pull down to check again."
         />
       ) : null}
       {status === 'ready'
@@ -96,13 +88,6 @@ export default function RequesterHomeScreen() {
             </View>
           ))
         : null}
-
-      <SectionHeader title="How Send2U works" />
-      <Card>
-        {HOW_IT_WORKS.map((step) => (
-          <ListRow key={step.title} icon={step.icon} title={step.title} subtitle={step.subtitle} />
-        ))}
-      </Card>
     </Screen>
   );
 }

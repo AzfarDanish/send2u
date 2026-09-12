@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { HelperHistoryDetail } from '@/components/HelperHistoryDetail';
+import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -15,7 +16,7 @@ import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
-import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
+import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone, orderTotalCents } from '@/lib/orders';
 import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -187,40 +188,14 @@ export default function JobDetailScreen() {
           </View>
         </Card>
 
-        <Card style={styles.itemsCard}>
-          {job.items.map((item) => (
-            <View key={item.id} style={styles.line}>
-              <View style={styles.lineText}>
-                <Text variant="secondary" style={styles.lineName}>
-                  {item.quantity} × {item.itemName}
-                </Text>
-                <Text variant="caption" color="secondary">
-                  {formatMYR(item.unitPriceCents)} each
-                </Text>
-              </View>
-              <Text variant="secondary" style={styles.lineTotal}>
-                {formatMYR(item.lineTotalCents)}
-              </Text>
-            </View>
-          ))}
-        </Card>
-
         <Card>
-          <View style={styles.subtotalRow}>
-            <Text variant="subtitle">Food subtotal</Text>
-            <Text variant="title" color="primary">
-              {formatMYR(job.subtotalCents)}
-            </Text>
-          </View>
-          <View style={styles.subtotalRow}>
-            <Text color="secondary">Delivery earning</Text>
-            <Text variant="subtitle" color="primary">
-              {formatMYR(job.deliveryFeeCents)}
-            </Text>
-          </View>
+          <OrderBreakdown
+            items={job.items}
+            subtotalCents={job.subtotalCents}
+            deliveryFeeCents={job.deliveryFeeCents}
+          />
           <Text variant="caption" color="muted">
-            You front the food cost at the stall with your own money; the requester pays you food +
-            delivery after handover.
+            You pay the stall first; the requester repays food + delivery.
           </Text>
         </Card>
 
@@ -230,9 +205,6 @@ export default function JobDetailScreen() {
               <MaterialIcons name="check-circle" size={24} color={colors.success} />
               <Text variant="subtitle">Job accepted — it&apos;s yours</Text>
             </View>
-            <Text color="secondary">
-              This request left the open queue and is waiting in My Deliveries.
-            </Text>
             <Button title="View My Deliveries" onPress={() => router.replace('/(helper)/deliveries')} />
             <Button title="Back to jobs" variant="secondary" onPress={() => router.back()} />
           </Card>
@@ -247,10 +219,6 @@ export default function JobDetailScreen() {
               disabled={accepting}
               loading={accepting}
             />
-            <Text variant="caption" color="muted">
-              One tap claims the job atomically — if another helper takes it first, you&apos;ll be
-              told here and nothing is assigned twice.
-            </Text>
           </Card>
         ) : null}
 
@@ -258,9 +226,6 @@ export default function JobDetailScreen() {
           <Card>
             <Badge label="Assigned" tone="info" />
             <Text variant="subtitle">Go to the vendor</Text>
-            <Text color="secondary">
-              Head to {job.vendor.name} to check the food availability and make the purchase.
-            </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
@@ -276,17 +241,11 @@ export default function JobDetailScreen() {
               onPress={() => void handleAdvance('release')}
               disabled={busy}
             />
-            <Text variant="caption" color="muted">
-              Releasing returns the order to the open queue.
-            </Text>
           </Card>
         ) : job.status === 'going_to_vendor' ? (
           <Card>
             <Badge label="Going to vendor" tone="info" />
             <Text variant="subtitle">On the way to {job.vendor.name}</Text>
-            <Text color="secondary">
-              Let the app know when you arrive at the stall so you can check food availability.
-            </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
@@ -307,9 +266,6 @@ export default function JobDetailScreen() {
           <Card>
             <Badge label="At vendor" tone="info" />
             <Text variant="subtitle">Check food availability</Text>
-            <Text color="secondary">
-              Ask the stall if the requested food is available. Report the status below.
-            </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
@@ -336,9 +292,6 @@ export default function JobDetailScreen() {
           <Card>
             <Badge label="Food available" tone="info" />
             <Text variant="subtitle">Purchase the food</Text>
-            <Text color="secondary">
-              Pay the stall with your own money, then record the purchase. You front the food cost.
-            </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
@@ -355,16 +308,13 @@ export default function JobDetailScreen() {
               disabled={busy}
             />
             <Text variant="caption" color="muted">
-              Nothing spent yet — releasing returns the order to the open queue.
+              Nothing spent yet — releasing returns the order to the queue.
             </Text>
           </Card>
         ) : job.status === 'food_purchased' ? (
           <Card>
             <Badge label="Purchased" tone="info" />
             <Text variant="subtitle">Confirm you have the food</Text>
-            <Text color="secondary">
-              You paid at the stall. Confirm the food is in your hands, then start the delivery run.
-            </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
@@ -382,17 +332,13 @@ export default function JobDetailScreen() {
               loading={acting === 'abandon'}
             />
             <Text variant="caption" color="muted">
-              Only if you truly cannot continue — the order moves to dispute with
-              the food cost you fronted preserved for manual settlement.
+              Stopping here moves the order to dispute; your fronted cost is recorded.
             </Text>
           </Card>
         ) : job.status === 'picked_up' ? (
           <Card>
             <Badge label="Picked up" tone="info" />
             <Text variant="subtitle">Head to the drop-off</Text>
-            <Text color="secondary">
-              Food in hand. Start the delivery run when you leave for {job.location.name}.
-            </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => void handleAdvance('start_delivery')} />
             ) : null}
@@ -410,17 +356,13 @@ export default function JobDetailScreen() {
               loading={acting === 'abandon'}
             />
             <Text variant="caption" color="muted">
-              Only if you truly cannot continue — the order moves to dispute with
-              the food cost you fronted preserved for manual settlement.
+              Stopping here moves the order to dispute; your fronted cost is recorded.
             </Text>
           </Card>
         ) : job.status === 'out_for_delivery' ? (
           <Card>
             <Badge label="Out for delivery" tone="warning" />
             <Text variant="subtitle">On the way to {job.location.name}</Text>
-            <Text color="secondary">
-              Hand the food over, then mark it delivered — the requester confirms receipt and pays you after that.
-            </Text>
             {actionError ? (
               <ErrorState title="Update failed" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
             ) : null}
@@ -437,17 +379,14 @@ export default function JobDetailScreen() {
               disabled={busy}
             />
             <Text variant="caption" color="muted">
-              If the requester refuses or never appears, record the failed attempt instead — the
-              order moves to dispute with your purchase preserved.
+              No-show moves the order to dispute; your purchase is recorded.
             </Text>
           </Card>
         ) : job.status === 'delivered' ? (
           <Card>
             <Badge label="Delivered" tone="success" />
             <Text color="secondary">
-              Food handed over. Waiting for the requester to confirm receipt —
-              they pay you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally
-              after confirming, then submit their receipt to close the job.
+              Waiting for the requester to confirm receipt.
             </Text>
           </Card>
         ) : job.status === 'confirmed' ? (
@@ -455,8 +394,8 @@ export default function JobDetailScreen() {
             <Badge label="Confirmed" tone="success" />
             <Text variant="subtitle">Requester confirmed receipt</Text>
             <Text color="secondary">
-              They can now pay you {formatMYR(job.subtotalCents + job.deliveryFeeCents)} externally
-              using your QR, then submit their receipt to close the job.
+              They pay you {formatMYR(orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} externally
+              using your QR.
             </Text>
           </Card>
         ) : (
@@ -479,11 +418,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, gap: spacing.xs },
   vendorName: { fontWeight: '600', color: colors.text },
-  itemsCard: { gap: 0 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  lineText: { flex: 1, gap: spacing.xs },
-  lineName: { fontWeight: '600', color: colors.text },
-  lineTotal: { fontWeight: '700', color: colors.primary },
-  subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   confirmRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });

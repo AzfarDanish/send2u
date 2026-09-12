@@ -18,8 +18,12 @@ interface UseMyOrderHistoryResult {
  * Requester's terminal orders (completed/cancelled/disputed), newest first.
  * Read-only records — the query itself excludes every active status, so
  * terminal orders can never leak into the Active list and vice versa.
+ *
+ * Pass `enabled={false}` while the history UI is hidden (e.g. the Active
+ * tab is showing) to skip the mount fetch; the query runs on the first
+ * flip to `true`. Defaults to `true` to preserve the plain mount-load.
  */
-export function useMyOrderHistory(): UseMyOrderHistoryResult {
+export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [status, setStatus] = useState<MyOrderHistoryStatus>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +49,8 @@ export function useMyOrderHistory(): UseMyOrderHistoryResult {
   }, []);
 
   useEffect(() => {
-    void load(false);
-  }, [load]);
+    if (enabled) void load(false);
+  }, [enabled, load]);
 
   const retry = useCallback(() => {
     void load(false);

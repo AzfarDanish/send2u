@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StyleSheet, View } from 'react-native';
 
 import { OrderRatingSection } from '@/components/OrderRatingSection';
+import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
@@ -30,24 +31,21 @@ export function HelperHistoryDetail({
   return (
     <View style={styles.container}>
       <Card>
-        <Badge label="History · read-only" tone="neutral" />
+        <Text variant="caption" color="muted">
+          Read-only record
+        </Text>
         {job.status === 'completed' ? (
           <>
             <Badge label="Completed" tone="success" />
             {job.resolvedAt ? (
               <>
                 <Text variant="subtitle">Settled after dispute</Text>
-                <Text color="secondary">
-                  This delivery was closed through dispute resolution, not the
-                  normal paid flow.
-                </Text>
               </>
             ) : (
               <>
                 <Text variant="subtitle">Delivery complete</Text>
                 <Text color="secondary">
-                  Payment verified. Your {formatMYR(job.deliveryFeeCents)} delivery earning is
-                  finalized
+                  Your {formatMYR(job.deliveryFeeCents)} earning is finalized
                   {job.deliveredAt ? ` · delivered ${formatOrderDate(job.deliveredAt)}` : ''}.
                 </Text>
               </>
@@ -60,7 +58,7 @@ export function HelperHistoryDetail({
             <Text variant="subtitle">This job was cancelled</Text>
             <Text color="secondary">
               {job.cancelReason === 'food_unavailable'
-                ? 'The food was unavailable — no money changed hands.'
+                ? 'No food — no money changed hands.'
                 : `Cancelled${job.cancelReason ? `: ${job.cancelReason}` : ''}.`}
               {job.cancelledAt ? ` (${formatOrderDate(job.cancelledAt)})` : ''}
             </Text>
@@ -75,20 +73,19 @@ export function HelperHistoryDetail({
             <Text variant="subtitle">This delivery needs settlement</Text>
             <Text color="secondary">
               {job.disputeReason === 'helper_unable'
-                ? 'You reported you could not continue. '
+                ? 'You stopped after paying. '
                 : job.disputeReason === 'late_cancellation'
-                  ? 'The requester cancelled after you had paid. '
+                  ? 'Cancelled after you paid. '
                   : job.disputeReason === 'not_received' ||
                       job.disputeReason === 'incorrect' ||
                       job.disputeReason === 'damaged' ||
                       job.disputeReason === 'refused'
-                    ? 'The requester reported a problem with the delivery. '
+                    ? 'Requester reported a problem. '
                     : ''}
               {job.foodCostCents
                 ? `Your fronted ${formatMYR(job.foodCostCents)} is recorded. `
                 : ''}
-              An admin will resolve it; nothing more to do here.
-              {job.disputedAt ? ` (flagged ${formatOrderDate(job.disputedAt)})` : ''}
+              {job.disputedAt ? `(flagged ${formatOrderDate(job.disputedAt)})` : ''}
               {job.resolvedAt
                 ? ` Settled${job.resolution ? ` as ${job.resolution}` : ''} on ${formatOrderDate(job.resolvedAt)}.`
                 : ''}
@@ -145,44 +142,15 @@ export function HelperHistoryDetail({
         </Text>
       </Card>
 
-      <Card style={styles.itemsCard}>
-        {job.items.map((item) => (
-          <View key={item.id} style={styles.line}>
-            <View style={styles.lineText}>
-              <Text variant="secondary" style={styles.lineName}>
-                {item.quantity} × {item.itemName}
-              </Text>
-              <Text variant="caption" color="secondary">
-                {formatMYR(item.unitPriceCents)} each
-              </Text>
-            </View>
-            <Text variant="secondary" style={styles.lineTotal}>
-              {formatMYR(item.lineTotalCents)}
-            </Text>
-          </View>
-        ))}
-      </Card>
-
       <Card>
-        <View style={styles.moneyRow}>
-          <Text color="secondary">Food subtotal</Text>
-          <Text variant="subtitle">{formatMYR(job.subtotalCents)}</Text>
-        </View>
-        <View style={styles.moneyRow}>
-          <Text color="secondary">Food you fronted</Text>
-          <Text variant="subtitle">
-            {job.foodCostCents !== null ? formatMYR(job.foodCostCents) : '—'}
-          </Text>
-        </View>
-        <View style={styles.moneyRow}>
-          <Text variant="subtitle">Delivery earning</Text>
-          <Text variant="title" color="primary">
-            {formatMYR(job.deliveryFeeCents)}
-          </Text>
-        </View>
+        <OrderBreakdown
+          items={job.items}
+          subtotalCents={job.subtotalCents}
+          deliveryFeeCents={job.deliveryFeeCents}
+          frontedCents={job.foodCostCents}
+        />
         <Text variant="caption" color="muted">
-          Food you paid at the stall is an expense, not earnings — only the delivery fee counts
-          as your payout.
+          Only the delivery fee counts as your payout.
         </Text>
       </Card>
 
@@ -211,9 +179,6 @@ export function HelperHistoryDetail({
               .
             </Text>
             <ReceiptEvidenceView path={job.payment.evidencePath} />
-            <Text variant="caption" color="muted">
-              Receipt kept for disputes and accounting. No verification action is available here.
-            </Text>
           </>
         ) : (
           <Text color="secondary">
@@ -233,10 +198,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, gap: spacing.xs },
   placeName: { fontWeight: '600', color: colors.text },
-  itemsCard: { gap: 0 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  lineText: { flex: 1, gap: spacing.xs },
-  lineName: { fontWeight: '600', color: colors.text },
-  lineTotal: { fontWeight: '700', color: colors.primary },
   moneyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

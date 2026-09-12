@@ -3,17 +3,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { PrivateImage } from '@/components/PrivateImage';
+import { OrderBreakdown } from '@/components/OrderBreakdown';
+import { StagedFileCard } from '@/components/StagedFileCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
-import { spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { formatMYR } from '@/lib/money';
 import { getPaymentContext, submitPaymentEvidence, type PaymentContext } from '@/services/payments';
 import { evidencePathFor, pickReceiptFile, removeObject, uploadObject } from '@/services/storage';
+import type { PickedReceipt } from '@/services/storage';
 
 interface RequesterPaymentCardProps {
   orderId: string;
@@ -35,6 +37,9 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
   const [busy, setBusy] = useState(false);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Picked-but-not-submitted receipt awaiting explicit confirmation. Nothing
+  // is uploaded or recorded until the user confirms.
+  const [staged, setStaged] = useState<PickedReceipt | null>(null);
 
   const load = useCallback(async () => {
     setStatus('loading');
@@ -58,25 +63,35 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
     if (refreshToken > 0) void load();
   }, [load, refreshToken]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleChoose = useCallback(async () => {
     if (!user || busy) return;
     setBusy(true);
     setBusyMessage('Choosing receipt…');
     setSubmitError(null);
-    let uploadedPath: string | null = null;
     try {
       const picked = await pickReceiptFile();
-      if (!picked) {
-        setBusy(false);
-        setBusyMessage(null);
-        return;
-      }
-      const path = evidencePathFor(user.id, orderId, picked.extension);
-      setBusyMessage('Uploading receipt…');
-      await uploadObject(path, picked);
+      if (picked) setStaged(picked);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Could not choose the receipt.');
+    } finally {
+      setBusy(false);
+      setBusyMessage(null);
+    }
+  }, [user, busy]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!user || busy || !staged) return;
+    setBusy(true);
+    setBusyMessage('Uploading receipt…');
+    setSubmitError(null);
+    let uploadedPath: string | null = null;
+    try {
+      const path = evidencePathFor(user.id, orderId, staged.extension, staged.fileName);
+      await uploadObject(path, staged);
       uploadedPath = path;
       setBusyMessage('Submitting…');
       await submitPaymentEvidence(orderId, path);
+      setStaged(null);
       await load();
     } catch (err) {
       if (uploadedPath) {
@@ -91,7 +106,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       setBusy(false);
       setBusyMessage(null);
     }
-  }, [user, busy, orderId, load]);
+  }, [user, busy, staged, orderId, load]);
 
   if (status === 'loading') {
     return (
@@ -122,10 +137,6 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       <Card>
         <Badge label="No payment yet" tone="neutral" />
         <Text variant="subtitle">Waiting for a helper</Text>
-        <Text color="secondary">
-          Payment opens here once a helper accepts this order — you&apos;ll pay them externally
-          using their QR.
-        </Text>
       </Card>
     );
   }
@@ -136,10 +147,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
         <Badge label="Confirm receipt first" tone="success" />
         <Text variant="subtitle">No payment yet</Text>
         <Text color="secondary">
-          You pay {formatMYR(context.totalCents)} ({formatMYR(context.subtotalCents)} food +{' '}
-          {formatMYR(context.deliveryFeeCents)} delivery) only after the food is in your hands.
-          Confirm receipt above first — the helper&apos;s QR and receipt upload
-          open right after confirmation.
+          Confirm receipt above to open payment.
         </Text>
       </Card>
     );
@@ -159,11 +167,6 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       <Card>
         <Badge label="Pay after delivery" tone="info" />
         <Text variant="subtitle">No payment yet</Text>
-        <Text color="secondary">
-          You pay {formatMYR(context.totalCents)} ({formatMYR(context.subtotalCents)} food +{' '}
-          {formatMYR(context.deliveryFeeCents)} delivery) only after the food is in your hands.
-          The helper&apos;s QR appears here on delivery.
-        </Text>
       </Card>
     );
   }
@@ -180,21 +183,15 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
           <Badge label="Unpaid" tone="warning" />
         )}
       </View>
-      <View style={styles.amountRow}>
-        <Text color="secondary">Amount due</Text>
-        <Text variant="title" color="primary">
-          {formatMYR(context.totalCents)}
-        </Text>
-      </View>
-      <Text variant="caption" color="secondary">
-        {formatMYR(context.subtotalCents)} food + {formatMYR(context.deliveryFeeCents)} delivery.
-        This total comes from your order — it cannot be edited here.
-      </Text>
+      <OrderBreakdown
+        subtotalCents={context.subtotalCents}
+        deliveryFeeCents={context.deliveryFeeCents}
+      />
 
       {payment ? (
         <>
           <Text color="secondary">
-            Payment of {formatMYR(payment.amountCents)} recorded. Thanks — no further action needed.
+            Payment of {formatMYR(payment.amountCents)} recorded.
           </Text>
           <Button title="Refresh" variant="secondary" onPress={() => void load()} />
         </>
@@ -204,8 +201,8 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
             <>
               <PrivateImage path={context.helperQrPath} accessibilityLabel="Helper payment QR code" />
               <Text color="secondary">
-                Pay {formatMYR(context.totalCents)} to your helper externally using this QR, then attach
-                your receipt below (PDF or photo, up to 10 MB). No money moves inside Send2U.
+                Pay {formatMYR(context.totalCents)} externally using this QR, then attach your
+                receipt below (PDF or image, up to 10 MB).
               </Text>
             </>
           ) : (
@@ -215,14 +212,33 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
             />
           )}
           {submitError ? (
-            <ErrorState title="Submission failed" message={submitError} retryTitle="Try again" onRetry={() => void handleSubmit()} />
+            <ErrorState title="Submission failed" message={submitError} retryTitle="Try again" onRetry={() => void handleChoose()} />
           ) : null}
-          <Button
-            title={busy ? (busyMessage ?? 'Working…') : 'Submit payment receipt'}
-            onPress={() => void handleSubmit()}
-            disabled={busy || !context.helperQrPath}
-            loading={busy}
-          />
+          {staged ? (
+            <StagedFileCard
+              file={{
+                uri: staged.uri,
+                name: staged.fileName,
+                sizeBytes: staged.sizeBytes,
+                mimeType: staged.mimeType,
+              }}
+              title="Review your receipt"
+              note="Confirming records this as your payment."
+              busy={busy}
+              busyMessage={busyMessage}
+              confirmTitle={`Confirm & submit (${formatMYR(context.totalCents)})`}
+              onConfirm={() => void handleConfirm()}
+              onRechoose={() => void handleChoose()}
+              onCancel={() => setStaged(null)}
+            />
+          ) : (
+            <Button
+              title={busy ? (busyMessage ?? 'Working…') : 'Submit payment receipt'}
+              onPress={() => void handleChoose()}
+              disabled={busy || !context.helperQrPath}
+              loading={busy}
+            />
+          )}
         </>
       )}
     </Card>
@@ -232,10 +248,4 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
 const styles = StyleSheet.create({
   stateCard: { minHeight: 160, justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
 });

@@ -83,7 +83,7 @@ export function NotificationCenter({ role }: { role: UserRole }) {
         <EmptyState
           icon="notifications-none"
           title="No notifications yet"
-          message="Order updates for you will appear here as they happen."
+          message="Order updates appear here."
         />
       ) : null}
       {status === 'ready'

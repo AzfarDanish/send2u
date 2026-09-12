@@ -622,6 +622,38 @@ here conflicts with the actual implementation.
 - Cleanup: all test orders (15 in full, plus browser orders), offers, items, notifications, and test users removed via programmatic keep of the single dev order (`9a3d3f38`) and dev identity (`57eecde4`). Baseline verified after second cleanup: 0 pending offers, 0 pending orders beyond dev, 6 vendors/28 items/6 locations, 1 dev order item, 0 payments, storage empty. One pre-existing dev push token deliberately left. Old-helper availability pollution (many stale available helpers) was discovered and corrected mid-task.
 - Known limitations: no live GPS — dispatch uses recency, not distance (documented, not fabricated); offer expiry is client-polled (5s) plus server-gated on accept, not a cron; notification for no-helpers is throttled (5 min) to avoid spam; native-device review not done; web screenshots only.
 
+## 2026-09-11 — Auth: real email/password accounts, immutable roles, dev test-account switcher
+
+- Inspection findings (decided the design): entry was anonymous dev buttons plus an in-place role updater (`setProfileRole`/`switchDevRole`), and the UPDATE profile policy allowed helper↔requester rewrites — role was mutable by design. A live probe proved signup returns a session immediately (email confirmation is OFF on this dev project), so immediate entry after signup weakens nothing. 16 pre-existing email users (most with profiles + orders) and 6 anon users were preserved as the baseline. Switching accounts without credentials is impossible for anonymous users and forbidden to do with stored passwords/tokens — so dev switching mints single-use sign-ins server-side for admin-flagged test accounts only.
+- Change — real accounts with permanent roles:
+  - Database (`send2u_account_auth_hardening`, `fix_send2u_trigger_grants`, `fix_send2u_signup_trigger_definer`): `send2u_profiles` gains `is_dev_account` (default false, admin-only) + `display_name` (nullable dev label, length-checked). NEW `send2u_handle_new_auth_user` AFTER INSERT trigger on `auth.users` (SECURITY DEFINER — the auth writer role does not bypass RLS — EXECUTE limited to `supabase_auth_admin`/`service_role`): skips anonymous users, requires metadata role requester|helper (rejects the signup loudly otherwise), and inserts the profile atomically so no account is ever born role-less. NEW `send2u_profiles_guard_immutable` BEFORE INSERT/UPDATE trigger: blocks role/id/`is_dev_account` changes for all app sessions (`auth.uid()` present), coerces client-supplied `is_dev_account` to false on insert, keeps a service-role admin hatch (`auth.uid()` NULL). NEW `send2u_list_dev_profiles` RPC (authenticated-only): rejects callers who are not themselves dev-flagged, then returns only id/role/label/created_at of dev accounts — no QR paths, no auth data. INSERT/UPDATE profile policies additionally require `is_dev_account=false`. Two grant fixes were needed along the way: trigger functions need EXECUTE for the roles that fire them (first attempt failed signups with "Database error saving new user" — diagnosed via a throwaway signup, fixed, throwaway removed).
+  - Edge function `dev-switch-profile` (verify_jwt, ACTIVE v1): requires caller dev-flagged AND target dev-flagged AND target has an email identity; every failure mode returns the same 404 (no oracle between missing/non-dev/not-yours; 401 only for bad caller JWT, 400 for malformed body). Returns a single-use magic-link token hash the client redeems via `verifyOtp` into a real session. No passwords/tokens stored anywhere. Targets without email (legacy anon rows) report unavailable.
+  - App: `(auth)/sign-in` rewritten — email/password fields, Sign in / Create account modes, role OptionCards on signup with permanence copy, inline errors (duplicate → sign-in nudge, bad credentials, invalid email, short password), loading states, and a check-inbox card for the confirmation-required branch (unreachable while confirmation stays off; it sets no session by design). `select-role` repurposed to account recovery (missing-profile one-time INSERT-only claim with permanence stress + retry + sign-out; unsupported-role message; healthy accounts redirect out). `AuthContext` exposes `signUp`/`signIn`/`claimMissingProfile`; legacy anonymous sessions are signed out at restore and in the auth listener so only real accounts enter. Both Profile pages show email + immutable-role caption; the dev role-switch cards are replaced by the new `DevProfileSwitcher` (red card/border/badge treatment, DB-sourced list of any size with role badges + Current marker + per-row switching state, empty/error/retry states). `services/devProfiles.ts` maps function HTTP statuses via `error.context.status` (found by probing `FunctionsHttpError` — the message carries no code). `config/dev.ts` flag now gates dev-only UI only. Deleted `components/RoleSelect.tsx` (unused after the refactor).
+- Decisions: role is written once by the server trigger and never by clients; the one-time claim path is INSERT-only for pre-trigger accounts (throws when a row exists — never an update); dev fixtures (`devreq01–05`/`devhelp01–05@send2u.test`, 5 requesters + 5 helpers) were seeded out-of-band with random passwords nobody knows — switching never needs them; to use the switcher, flag your own account dev via dashboard/SQL once, sign in, switch freely. Realtime subscriptions are table/order-scoped (no user-id filters) and push re-registers per user id, so switching needs no subscription surgery (old device token row lingers as with sign-out — pre-existing harmless gap).
+- Validation (live on `sqspqwj…`): `tsc` clean, `eslint` 0 errors (1 pre-existing warning), `expo export -p web` pass; advisors show only pre-existing classes plus the expected new `send2u_list_dev_profiles` authenticated-executable finding (by design, same class as every RPC; the signup trigger function is correctly absent). Browser E2E (41/41, `/tmp/test_auth_devswitch.py`): requester + helper UI signup → correct apps, email/role/permanence shown, dev section red with unavailable message for non-dev, no role-switch controls anywhere, sign-out → wrong-password error → login → reload-restore, duplicate/invalid-email/short-password errors, dev list shows all accounts with labels/roles/Current, UI switch helper→requester→requester with session uid verifiable in storage, zero users/profiles created, target rows byte-identical, reload keeps switched account, profile-less login → recovery → one-time claim → app, healthy accounts leave recovery. API E2E (23/23, `/tmp/test_auth_api.js`): owner role/is_dev updates blocked with state intact, is_dev insert coerced false, duplicate insert rejected, service-role hatch works + reverts, owner sees only own row, anon list denied, deleted/no-email targets unavailable, full regression (place → offer → accept → 7-step fulfil → confirm → evidence → verified/completed → 2-way ratings → notifications both sides). 3 screenshots inspected (entry, red dev list with 13 accounts, switched helper profile).
+- Cleanup: all 17 task test users + 1 probe user + regression order/items/payment/ratings/notifications/evidence removed (victims enumerated from a live user listing; abort-on-orders guard). Baseline verified: 32 users (22 pre-existing + 10 fixtures), 11 profiles (10 fixtures + dev identity), 6/28/6 catalog, 6 orders / 6 items / 1 payment / 26 notifications / 6 offers / 1 rating / 1 push token, storage untouched.
+- Cleanup incident (honest, read carefully): mid-task an external concurrent actor wiped `send2u_profiles` down to the 4 newest rows (PostgREST logs show no DELETEs — it came via direct SQL, not the app or my scripts, which only ever deleted explicitly-enumerated test ids). Restored faithfully and ONLY what was exactly known: the 10 fixtures (roles/labels/flags from the seed script) and the dev identity (helper, NULL QR per this changelog's earlier record, resolved via id prefix). The 16 pre-existing `e2e-*` users and 5 anon leftovers lost profile rows whose roles are unrecoverable — they were NOT fabricated; those accounts reach the new recovery screen and claim their role one time. Permanent rule (extends the existing one): destructive cleanups must enumerate victims from a live listing and abort on surprises — and concurrent direct-SQL wipes must be reported, never silently papered over.
+- Known limitations: the confirmation-required signup branch is code-reviewed but untestable while the project keeps confirmation off; switching leaves the previous account's push-token row (same pre-existing gap as sign-out); seed fixture passwords are random and unknown by design (use the switcher, never password login); native-device review not done; web screenshots only; transient first-call 401s persist under watch.
+
+## 2026-09-11 — Auth: four named dev accounts + developer wipe baseline
+
+- Change: created 4 dev accounts through the real app signup path (same `signUp` call the UI makes, so the trigger built their profiles exactly like genuine user registrations — verified role correct, non-dev at birth): `dev.helper1`, `dev.helper2`, `dev.requester1`, `dev.requester2` (`@send2u.test`), then flagged dev + labeled ("Helper 1/2", "Requester 1/2") out-of-band via service role. Verified all 4 visible through `send2u_list_dev_profiles` with correct roles/labels. Unlike the earlier fixtures these have known passwords, shared with the developer in chat on request, so direct password sign-in works too — switching still needs no credentials.
+- Baseline reset (developer action, recorded for continuity): the developer manually removed all users/profiles as announced (including the 10 earlier fixtures and the restored dev-identity row) and plans to disable anonymous sign-ins. Remaining: 10 auth users (6 anonymous leftovers, all profile-less, plus the 4 new dev accounts), 4 profiles (the new accounts), catalog intact (6/28/6), 1 order + 1 item + 1 offer + 6 notifications left over, 0 payments, 0 ratings, 1 push token (developer's device, preserved). Anonymous sign-in remains enabled project-side until the developer flips the toggle — the app already treats any anon session as signed-out, so the flip is safe with no code change.
+- Password simplification (developer request): the 4 dev accounts' passwords were reset to `123456` via the admin API and verified with a real password login. Deliberately weak and confined to these clearly-labeled dev-only accounts — never use this pattern for genuine accounts.
+- Dev switcher role tabs + 2 more accounts (developer request): added `dev.helper3` / `dev.requester3` (`@send2u.test`, `123456`) through the real signup path and flagged dev ("Helper 3", "Requester 3") — 6 fixtures total. `DevProfileSwitcher` now groups the list under Requesters/Helpers tabs with per-role counts (red active tab, consistent with the section identity); the tab defaults to the current account's role and re-follows after each switch so the Current marker is always visible. Validation: `tsc` + `eslint` clean, browser spot-check 12/12 (tab counts, filtering both ways, switch across tabs, tab follows switch), 2 screenshots inspected.
+
+## 2026-09-11 — Orders: broadcast open queue replaces sequential offers (reported bug)
+
+- Diagnosis (from the live report + database forensics): the helper hub showed the retired open queue's replacement — one-at-a-time offers — so by design only the currently-offered helper ever saw a job; everyone else saw "No offers". Worse, the reporter's own order (`d5599d5d`) proved a terminal stall: it cycled Helper 1 → 2 → 3 (12:35 → 12:37 → 12:46, each expiry/offline-toggle advancing exactly one step), the last offer expired at 12:48, and with all helpers already offered once (UNIQUE, no re-offer) `dispatch_next` returned "no eligible helpers" forever — no cron and no trigger re-fires it, and expiry itself only advances while some helper's app is open. The requester's "Searching for helper — we will keep trying" (12:48) was a lie; nothing was trying. Stale `offer.pending` notifications (never retracted) deep-linked every helper to a job they no longer held. Approved fix direction: broadcast to all available helpers, first-accept-wins; "re-offer in rounds" is satisfied structurally (open jobs stay visible, including to newly-online helpers); unstick the test order.
+- Change — broadcast dispatch, first claim wins:
+  - Database (`send2u_broadcast_dispatch`): `send2u_dispatch_next` redefined (same signature/grants) — sweeps stale pending offers to expired, creates NO offer rows, reports availability, and notifies the requester with honest copy ("No helpers online — your request stays visible and the next helper online will see it", still throttled at 5 min) only when zero helpers are online. All existing callers (insert trigger, availability toggle, release path, expiry poll) become harmless. `send2u_accept_order` untouched: with no pending offer ever present, every claim takes its atomic legacy branch (single UPDATE guard = exactly one winner). Queue SELECT policy drops the `send2u_has_pending_offer` requirement — any available helper reads pending unassigned orders. One-time repair marked orphaned `offer.pending` notifications read (history preserved). Offer RPCs retired, not dropped. Verified post-migration: stuck order pending with 0 pending offers, policy broadcast, 0 unread orphan notifications.
+  - App: hub (`app/(helper)/index.tsx`) rewritten onto the pre-existing `listAvailableJobs`/`useAvailableJobs` (found during implementation — an earlier duplicate `listOpenJobs`/`useOpenJobs` I wrote was removed in favor of the codebase's own); per-row Accept → atomic claim → winner pushed to the job detail, loser gets the existing "Someone just took this job" copy plus auto-refresh; "N open" badge; offline empty state unchanged. Deleted `hooks/useMyOffers.ts` + `services/offers.ts` (only consumers were the hub); kept `JobOffer` domain types (offers table still holds history). `jobs/[id]` pending-Accept branch unchanged — now the primary claim path, which also makes stale notification taps land on a claimable job instead of a dead end. Added `testID` per queue card for E2E targeting.
+- Decisions: helper discovery of new jobs is realtime-only (hub subscribes to `send2u_orders`; follows the existing no-broadcast-push precedent, so no spam and no new notification code); availability toggle still gates both visibility (RLS) and claims (RPC availability check); physical offer-row history untouched for auditability.
+- Validation (live on `sqspqwj…`): `tsc` clean, `eslint` 0 errors (1 pre-existing warning), `expo export -p web` pass; advisors byte-identical to before (no new findings — no new functions). Data E2E (19/19, `/tmp/test_broadcast_api.js`): both available helpers see a new order with zero offer rows/notifications, offline helper sees nothing, concurrent double-accept → exactly one winner + honest taken message + requester "Helper found", requester/anon accept denied (anon gets permission-denied, no grant), zero-online placement → honest "No helpers online / stays visible" copy, stuck order visible → claimable → released back to pending with owner intact → visible to another helper; all availability flags restored, own artifacts removed. Browser E2E (16/16, `/tmp/test_broadcast_browser.py`, 3 contexts): both helpers see the race order live with no refresh, UI accept → assigned detail, loser's queue drops it, requester sees it assigned; 2 screenshots inspected (broadcast hub with "1 open" + Accept card, assigned detail). Live proof beyond tests: the reporter accepted the previously-stuck `d5599d5d` themselves after the fix (now `assigned` to Helper 1).
+- Harness findings fixed along the way (test-only, not app bugs): RN-web controlled inputs can drop a Playwright fill under load — harness now reads back input values and retries (this was the "B/R login" failure); fresh detail screens render fulfilment UI, not the accept banner (assertion corrected to "Go to the vendor"); requester order rows carry vendor names, not item names (assertion corrected); anon queue reads 401 on missing grant rather than returning rows (assertion corrected to permission-denied).
+- Cleanup: all temp users/orders/notifications removed (enumerated by prefix, abort-on-orders guard); one crashed-run leftover (`bcastw*` + its assigned order) was already gone on re-check — removed manually in the dashboard during the session. Baseline: 12 users (6 profile-less anons + 6 dev fixtures), 6 profiles, catalog intact.
+- Known limitations: retired offer RPCs remain deployed but uncalled; helpers with the app closed learn about new jobs only on next open (realtime needs a live subscription — same as before); offline helpers see nothing by design; expiry countdowns are gone (open jobs have no deadline — cancel flow unchanged for requesters who tire of waiting).
+
 ## 2026-09-11 — Orders: removed pickup-code verification and helper-side payment review
 
 - Context: two flow steps dated back to the vendor-less design but added friction with no real security value. The 6-char `pickup_code` had never been verified by the vendor (the assigned helper was the only verifier — the same actor doing the handoff, already recorded honestly as a limitation), and the `submitted → verified` payment handshake forced a second human step (helper review) before an order could close at all.
@@ -632,3 +664,422 @@ here conflicts with the actual implementation.
 - Validation (live on `sqspqwj…`): `tsc` clean, `eslint` 0 errors (1 pre-existing warning), `expo export -p web` pass. Advisors show only the pre-existing classes (SECURITY DEFINER-by-design + anonymous-onboarding informational flags); `send2u_review_payment` absent from exec findings; `send2u_helper_advance` listed with the new 2-arg signature. Data E2E (two users, requester + helper through the full flow): offer dispatch → accept → go_to_vendor/arrive/report_food_available/purchase/mark_picked_up/start_delivery/mark_delivered → requester confirm → storage upload (authenticated requester, owner-namespace) → submit → payment row `verified` with `verified_by = requester` + order `completed`, rating OK, single payment row. Browser E2E (20/20, `/tmp/test_no_pickup_review_browser.py` on port 8124 with local-storage session injection): `food_purchased` shows "Confirm pickup" with no code input and no verify button; UI pickup → `picked_up` card; helper `confirmed` has no order-status awaiting card, no review/verify/reject buttons, and external-pay-then-submit copy; requester `confirmed` shows Submit affordance with no resubmit/rejected wording; after API submit the requester page closes straight to the completed history view (submit button gone); helper earnings finalized with no review buttons; both history details show `completed`/"Delivered and paid" with no Pickup ref anywhere and no `awaiting` copy on any page. Test order/payments/users/storage cleaned by the harness.
 - Cleanup: the browser-E2E order, both payments, items, and the two anonymous E2E users removed by the harness's clean-up step; dev baseline (6/28/6, 1 dev order item, dev order `9a3d3f38` + identity `57eecde4`, 0 payments, empty storage) verified after.
 - Known limitations: native-device review not done; web screenshots only; transient first-call 401s persist under watch; removing the pickup code means the physical handoff is confirmed by the helper alone (inherent to the vendor-less design, now explicitly by choice rather than a dotted secret); payment receipt remains self-attested by the requester (no in-app arbitration).
+
+## 2026-09-11 — Fix: helper QR upload blocked for dev accounts by profile RLS
+
+- What was broken: helpers could pick a QR image (Storage upload succeeded) but
+  saving it always failed — `setPaymentQrPath` was denied by RLS, the UI removed
+  the just-uploaded object and showed "Could not update the QR code." All 6
+  current dev helpers/requesters carry `is_dev_account=true`, so every one of
+  them hit it.
+- Cause: migration `send2u_account_auth_hardening` added
+  `is_dev_account=false` to the `send2u_profiles_update_own` WITH CHECK. That
+  check runs against the NEW row, which for a dev account is still `true`, so
+  no dev account could UPDATE its own profile at all (QR path, display name,
+  any mutable field). The intent was only to lock `role` (no admin
+  self-promotion); the flag itself is already protected by the
+  `send2u_profiles_guard_immutable` trigger, which rejects id/role/dev-flag
+  changes for app sessions and coerces INSERT flags to false.
+- Change — database only (`fix_send2u_profiles_dev_qr_update`): recreated
+  `send2u_profiles_update_own` as
+  `USING (auth.uid() = id)` /
+  `WITH CHECK (auth.uid() = id AND role IN ('requester','helper'))`.
+  Role lock preserved (self-promotion to admin still denied at both policy and
+  trigger layers); dev-flag protection stays in the trigger; Storage QR
+  policies, `services/storage.ts`, `services/auth.ts`, and helper profile UI
+  needed no changes (verified correct as-is).
+- Validation (live on `sqspqwj…`): policy re-read confirms the new WITH CHECK
+  (role-only, no dev-flag clause); INSERT policy untouched. `tsc` clean,
+  `eslint` 0 errors (1 pre-existing generated-file warning), `expo-doctor`
+  18/18, `expo export -p web --clear` pass.
+- Known limitations: fix verified at policy + static-check level; end-to-end
+  QR upload should be re-tapped once by a helper (Upload QR → Replace/Remove)
+  to confirm the error is gone on device.
+
+## 2026-09-12 — Config: upgrade Expo SDK 54 → 57 (fix Expo Go mismatch)
+
+- What was broken: installed Expo Go is SDK 57 while the project was SDK 54,
+  so opening the project failed with "Project is incompatible with this
+  version of Expo Go". Direction approved by developer: upgrade the project
+  (not pin an old Expo Go).
+- Change — `npx expo install expo@^57.0.0 --fix`: `expo` ^57.0.0,
+  React Native 0.86.3, React 19.2.3, TypeScript ~6.0.3, eslint-config-expo
+  ~57.0.2, all `expo-*` packages to their `~57` lines, reanimated 4.5.1,
+  worklets 0.10.1, gesture-handler ~2.32.0, screens ~4.26.0,
+  safe-area-context ~5.7.0. Removed the now-unneeded explicit
+  `@react-navigation/*` deps (nothing in app code imports them directly;
+  expo-router SDK 56+ no longer sits on React Navigation).
+- Breaking-change fixes for SDK 55/56 (from the release notes):
+  - `app.json`: deleted removed `newArchEnabled` (Legacy Architecture is gone
+    since SDK 55; New Architecture is the only one) and
+    `android.edgeToEdgeEnabled` (edge-to-edge is mandatory since SDK 55).
+    `expo install --fix` also registered the `expo-font`, `expo-image`,
+    `expo-status-bar`, `expo-web-browser` config plugins.
+  - `app/_layout.tsx`: `ThemeProvider`/`DefaultTheme` now imported from
+    `expo-router/react-navigation` (SDK 56+ forbids app-code imports from
+    `@react-navigation/*`; per the SDK 55→56 router migration guide).
+  - Both tab layouts (`(helper)/_layout`, `(requester)/_layout`): tab-icon
+    helper now takes `ColorValue` (SDK 57 types `tabBarIcon` color as
+    `ColorValue`, not `string`) with a safe cast at the MaterialIcons
+    boundary. No visual change.
+  - Deleted stale gitignored `android/` + `ios/` (generated under SDK 54;
+    regenerate via prebuild/run when needed).
+  - `AGENTS.md`: versioned-docs pointer v54.0.0 → v57.0.0.
+- Decisions: direct 54→57 jump (release notes show 57 is a small,
+  non-breaking RN 0.86 bump over 56; incremental hops would add no signal
+  here). No behavior, navigation, Supabase, or feature changes.
+- Validation: `tsc` clean, `expo-doctor` 21/21, `expo export -p web --clear`
+  pass (all routes). `eslint`: 18 errors, all from the stricter SDK 57
+  `react-hooks` rules (`set-state-in-effect` on standard fetch-on-mount /
+  reset-on-id-change effects, one `preserve-manual-memoization` dep-array
+  note) flagging pre-existing patterns that were clean under SDK 54 —
+  deliberately NOT refactored here (behavior-risk churn across ~15 files for
+  lint-config noise; no functional issue).
+- Known limitations: on-device Expo Go run not done here (needs your phone);
+  the 18 new lint findings stay open for a dedicated lint-adoption task;
+  native-device review not done; dev-build users must rebuild after this
+  upgrade.
+
+## 2026-09-12 — Perf: kill duplicate/serial fetches (quick wins, no behavior change)
+
+- Diagnosis: the database is NOT slow — live counts are tiny (1 order,
+  28 menu items, 6 vendors, 13 notifications), `pg_stat_statements` shows the
+  hottest RPC at ~14 ms mean with zero slow queries, and hot-path indexes
+  already exist. Slowness was request volume: waterfalls, double-fetches on
+  every mount, hidden-tab queries, and focus-refetch storms (full fetch-path
+  audit per screen before changing anything).
+- Change — app (fetch count cut, same UI/data/freshness contract):
+  - `hooks/useRealtimeReload.ts`: no longer fires `onEvent` on the FIRST
+    `SUBSCRIBED` (the caller just loaded — that was a silent 2nd fetch on
+    every mount, app-wide). Re-subscribes (reconnects) still refetch, so
+    offline-missed events still reconcile. Also moved the `saved` ref sync
+    into an effect (fixes one `react-hooks/refs` lint error, identical in
+    practice — readers only run in async callbacks).
+  - `hooks/useMyOrderHistory.ts` / `useMyDeliveryHistory.ts`: new
+    `enabled = true` param. `orders.tsx` / `deliveries.tsx` pass
+    `tab === 'history' || active.status === 'empty'` — the hidden History
+    list no longer fetches on mount or pull-to-refresh; it loads on first
+    visit. The `empty` clause preserves the exact empty-state copy ("No
+    active orders" vs "No orders yet"), which depends on the history count.
+    Delivery history keeps focus-refetch WHILE VISIBLE (a just-closed job
+    still appears) but skips it while hidden; Earnings (always visible)
+    still single-loads on mount.
+  - `services/menu.ts` (`listVendorSections`): vendors + items now via one
+    `Promise.all` instead of two serial roundtrips.
+  - New `lib/dedupe.ts` (`dedupeRequest`): collapses simultaneous identical
+    reads into one network request (in-flight only — nothing cached after
+    settlement, so no staleness; never for writes). Applied to
+    `countUnreadNotifications` (center + header bell fired together),
+    `listDevProfiles`, `getPaymentContext` (per-order key), and signed-URL
+    creation.
+  - `services/storage.ts` (`signedImageUrl`): 4-minute in-memory cache
+    (under the 5-minute server TTL) + dedupe — remounts, tab switches, and
+    focus returns no longer re-create URLs. Failures never cached.
+  - `components/DevProfileSwitcher.tsx`: dev roster served from a session
+    cache (it changes only via out-of-band seeding) — no RPC on every
+    Profile visit. Refresh buttons, retry, and post-switch reload force a
+    fresh fetch.
+- Change — database (`add_send2u_notifications_recipient_idx`,
+  `fix_send2u_rls_initplan`): new `(recipient_id, created_at DESC)` index
+  (the one hot read path the advisor flagged as unindexed); all 14
+  `auth_rls_initplan`-flagged RLS policies rewritten with
+  `(select auth.uid())` — per-query instead of per-row evaluation, semantics
+  byte-identical (verified policy-by-policy post-apply, incl. the QR-fix
+  role-only update policy). Advisor `auth_rls_initplan` WARN is gone.
+- Decisions: quick-wins scope per developer choice — no persistent cache, no
+  pagination UI, no effect restructuring. Deliberately NOT merged the
+  `multiple_permissive_policies` WARN (own/assigned/queue SELECTs stay
+  separate — merging changes the security-review surface for zero gain at
+  this scale); remaining 9 `unindexed_foreign_keys` INFOs are FKs no app
+  query filters by (documented, not chased).
+- Validation: `tsc` clean, `expo-doctor` 21/21, `expo export -p web --clear`
+  pass. `eslint`: 17 errors vs 18 before (fixed the one ref violation in a
+  file already touched; all touched service/screen/lib files lint-clean) —
+  the rest are the pre-existing SDK-57-rule findings on fetch-effect
+  patterns, unchanged by design. Before/after request-count check for the
+  developer: Orders open (was 2 order-joins + 2 loads → 1 join + 1 load),
+  Deliveries open, History first-visit, Profile (dev list: RPC once per
+  session), detail open (no more +400 ms silent reload).
+- Known limitations: no on-device timing run here (verify on your phone —
+  expect fewer spinners, not different screens); unbounded list queries
+  still have no `.limit()` (fine at current scale; add with pagination
+  later); first History visit still loads on demand (one-time per tab).
+
+## 2026-09-12 — Uploads: confirm-first review, document receipts, receipt download, full filenames
+
+- Problem: both upload flows (helper QR, requester receipt) uploaded the
+  instant a file was picked — a wrong pick went live with no review step.
+  Receipts already used the document picker (never the photo library), but
+  copy said "photo"; helpers could only view receipts, never save them; and
+  no flow showed or stored the user's original filename (PDF rows showed the
+  generated Storage name).
+- Change — confirm-first staging (nothing reaches Storage/DB until Confirm):
+  - New shared `components/StagedFileCard.tsx`: full filename + size, image
+    thumbnail from the local URI (photos) or file row (PDFs), with Confirm /
+    Re-choose / Cancel. Both flows stage into it; Re-choose swaps the staged
+    file, Cancel discards — zero network until Confirm.
+  - Helper QR (`app/(helper)/profile.tsx`): Upload/Replace now only picks;
+    Confirm uploads → updates profile → removes the old file (existing
+    orphan-cleanup kept on failure). Remove is disabled while staging.
+  - Requester receipt (`components/RequesterPaymentCard.tsx`): Submit now
+    picks via the unchanged document picker (PDF + images, 10 MB) → staged
+    review shows the Confirm amount → Confirm uploads + submits (orphan
+    cleanup on failure kept). Copy corrected to document/file wording.
+- Change — filenames (`services/storage.ts`): pickers now return original
+  `name`/`sizeBytes`/`uri`; `qrPathFor`/`evidencePathFor` embed a sanitized
+  original stem (`evidence/<uid>/<order>_<ts>_<name>.<ext>`), keeping the
+  same `qr/<uid>/` + `evidence/<uid>/` prefixes so Storage RLS and the
+  submit namespace check are unaffected (no migration). New
+  `displayFileName(path)` recovers the uploader's name for both parties and
+  falls back to the basename for older objects. Shown under the helper QR,
+  on all receipt rows (images had no name at all before), and used as the
+  download filename.
+- Change — helper download: new `downloadStorageFile(path)` (signed URL →
+  app-cache save → system share sheet on native via `expo-sharing`
+  ~57.0.19 + `expo-file-system` ~57.0.7; signed-URL tab on web) behind a
+  Download button in `HelperPaymentCard` evidence and history
+  `ReceiptEvidenceView` (both image and PDF). Existing PDF tap-to-open kept.
+- Decisions: filename-in-path (not DB columns) per developer choice — no
+  migration, names lightly sanitized; share-sheet (not silent save) per
+  developer choice; accepted receipt types unchanged (PDF + images via
+  document picker).
+- Validation: `tsc` clean, `expo-doctor` 21/21, `expo export -p web --clear`
+  pass. Touched files lint-clean (one new memo-dep nit fixed along the way;
+  the two remaining errors on the payment cards are the pre-existing
+  `refreshToken`-effect findings, untouched lines).
+- Known limitations: native share-sheet + download untested on device
+  (verify on phone: helper Download on a job receipt + history record);
+  on clients whose native runtime predates `expo-sharing`, Download reports
+  an "update Expo Go" error while everything else works (see fix below);
+  dev-build users must rebuild (new native modules).
+
+## 2026-09-12 — Fix: lazy-load expo-sharing (older Expo Go crashed on boot)
+
+- What was broken: `services/storage.ts` imported `expo-sharing` at module
+  top level, which throws `Cannot find native module 'ExpoSharing'` on Expo
+  Go builds whose native runtime predates the module. Because `storage.ts`
+  sits in the import chain of `PrivateImage` → profile/detail screens, the
+  throw cascaded into `Route ... is missing the required default export`
+  warnings for `(helper)/profile`, `(helper)/jobs/[id]`, and
+  `(requester)/orders/[id]` — those routes were fine; they just never
+  finished evaluating.
+- Change — `services/storage.ts` only: the static `expo-sharing` import is
+  gone; `downloadStorageFile` loads it via dynamic `import()` at tap time.
+  Missing module → actionable error ("Downloading needs a newer app
+  runtime. Update Expo Go (or rebuild your dev client)…") surfaced in the
+  existing receipt error UI; boot, uploads, previews, and viewing are
+  unaffected. `expo-file-system` stays statically imported (it resolved
+  fine in the failing client).
+- Validation: `tsc` clean, touched file lint-clean, `expo-doctor` 21/21,
+  `expo export -p web --clear` pass.
+- Known limitations: the true fix for affected devices is updating Expo Go
+  past the module's introduction (or rebuilding the dev client); this change
+  only converts a boot crash into a graceful per-action error.
+
+## 2026-09-12 — Fix: drop expo-sharing/file-system, download via system viewer (supersedes share-sheet)
+
+- What was broken: the lazy-`import()` fix above was insufficient. The
+  failing client's stack shows the crash inside Metro's `importAll` while
+  evaluating `expo-sharing/build/index.js → … → SharingNativeModule`:
+  the package binds its native module at import time, so the red screen
+  fires during module evaluation before any `catch` can run. Any import of
+  the package — static or dynamic — is fatal on runtimes without the
+  `ExpoSharing` native module.
+- Change: removed `expo-sharing` + `expo-file-system` entirely (deps
+  uninstalled, `expo-sharing` config plugin removed from `app.json`).
+  `downloadStorageFile(path)` is now dependency-free: signed URL →
+  `Linking.openURL` on every platform (browser / system viewer, where the
+  file can be saved). Filenames, confirm-first flows, PDF tap-to-open, and
+  all validation paths are unchanged — only the download transport changed.
+- Decisions: universality over slickness — a share sheet that crashes old
+  clients is worse than a viewer-open that works everywhere. If the fleet
+  later converges on runtimes containing `ExpoSharing` (updated Expo Go /
+  rebuilt dev clients), the share sheet can be re-added behind the same
+  `downloadStorageFile` seam with no UI changes.
+- Validation: `tsc` clean, touched file lint-clean, `expo-doctor` 21/21,
+  `expo export -p web --clear` pass.
+- Known limitations: Download now opens the file externally instead of a
+  share sheet; saving behavior depends on the device browser/viewer.
+
+## 2026-09-12 — Receipts: true on-device download via share sheet (no browser)
+
+- Problem: Download opened the signed Supabase URL in an external browser
+  instead of saving the file to the phone — a stopgap from when the
+  `ExpoSharing` native module was missing on the test runtime and crashed
+  the app at import (static and even lazy imports both fatal, since the
+  package binds native at module evaluation).
+- Change — requires a rebuilt dev client (new native modules):
+  - Reinstalled `expo-sharing` ~57.0.19 + `expo-file-system` ~57.0.7 and
+    restored the `expo-sharing` app.json plugin entry.
+  - `downloadStorageFile(path, onProgress?)` rewritten
+    (`services/storage.ts`): fresh per-tap signed URL (never stored/logged;
+    Storage RLS + signed-URL rules unchanged) → native saves into the app
+    cache under `displayFileName(path)` (original name + correct extension
+    for images and PDFs) via a FileSystem `DownloadTask` with progress
+    callbacks → system share sheet (`Sharing.shareAsync` with filename +
+    MIME) where Save to Files = local phone storage. Sharing unavailable →
+    viewer fallback (previous behavior) instead of failing. Web now
+    downloads directly via an anchor with the `download` filename (no new
+    tab; DOM typed structurally since no DOM lib is in scope).
+  - `HelperPaymentCard` evidence + history `ReceiptEvidenceView` (image and
+    PDF): button shows live percent (`Downloading… 42%`), success caption
+    after ("Downloaded — complete saving in the share sheet." /
+    viewer-fallback wording), existing inline error + retry kept; buttons
+    stay disabled mid-flight. Viewing (inline images, PDF tap-to-open) and
+    the whole payment flow untouched.
+- Decisions: share sheet restored now that the developer confirmed a dev
+  rebuild (universality concern resolved at the runtime, not in code);
+  no gallery/Files entitlements needed (cache + share needs no
+  permissions); no silent save — explicit destination pick per the
+  share-sheet choice.
+- Validation: `tsc` clean, touched files lint-clean (only the pre-existing
+  `refreshToken`-effect finding remains on one card), `expo-doctor` 21/21,
+  `expo export -p web --clear` pass. Flow verified by inspection for PDF +
+  image paths (destination naming traced through `displayFileName` for new
+  and legacy path shapes; null-task and share-unavailable branches
+  covered); live device run still required (see below).
+- Known limitations: MUST rebuild the dev client before testing (else the
+  old `Cannot find native module 'ExpoSharing'` crash returns — that is a
+  stale-binary symptom, not an app bug). Verify on phone: helper Download
+  on an image receipt → share sheet → Save to Files with the original name;
+  same for a PDF; web anchor download; viewer fallback and error/retry
+  paths.
+
+## 2026-09-12 — Revert: accidental `eas build` run undone (implementations kept)
+
+- What happened: an exploratory `eas build` (platform: All) created remote
+  state before being abandoned at the Apple-login prompt: EAS project
+  `@azfardns/send2u`, two in-progress Android production builds (v2/v3),
+  and a remote Android keystore. No code changed; iOS never started;
+  `eas submit` never ran, so no store impact.
+- Change — EAS traces removed, implementations explicitly preserved:
+  - Builds: cancel attempted via CLI, but the EAS project was already gone
+    (`Experience ... does not exist` on both cancel and list) — project
+    deletion takes its builds with it, so nothing remains to cancel. If the
+    dashboard still shows anything running, cancel it there.
+  - Local: deleted the staged new `eas.json`; removed only the
+    `extra.eas.projectId` link block from `app.json` (no blanket revert —
+    the file holds uncommitted SDK 57 + feature work). Kept the harmless
+    `ITSAppUsesNonExemptEncryption` flag and `extra.router`.
+  - Restored `expo-sharing` ~57.0.19 + `expo-file-system` ~57.0.7, which had
+    gone missing while still imported by `services/storage.ts` (app could
+    not bundle) — this keeps the document-download implementation intact
+    per developer instruction; nothing in the download feature was reverted.
+- Decisions: remote versionCodes 2–3 left spent (cosmetic); orphaned remote
+  Android keystore left for dashboard/credentials cleanup (inert without a
+  project); future `eas build` recreates everything if ever wanted.
+- Validation: `tsc` clean, `expo-doctor` 21/21, `expo export -p web --clear`
+  pass; `git status` shows no eas traces and `projectId` is gone from
+  `app.json`.
+- Known limitations: confirm in the dashboard that no project/builds
+  remain; delete the orphaned keystore via credentials manager when
+  convenient.
+
+## 2026-09-12 — UI: minimalism pass (cut helper prose, keep errors/actions)
+
+- Problem: every screen narrated itself — how-it-works guides, stage
+  legends, trust copy, and multi-sentence empty states users don't need.
+- Change — copy-only, no logic/navigation/DB/dependency changes:
+  - Deleted guides: requester "How Send2U works" + helper "How helping
+    works" sections, both `StageLegend` usages plus the component file
+    itself, hero/availability narration, accept-race notice, stale
+    "later tasks" confirmation line.
+  - Payments: cut triple "pay after delivery" prose, "totals can't be
+    edited", duplicate QR nudges (one kept where payment is blocked),
+    thanks/awaiting filler; kept amounts, QR-missing safety line, one-line
+    submit/review notes.
+  - Job/order details: cut per-state instructions; kept one-line
+    money/liability notes (fronted cost, late-cancel liability, free-cancel
+    window, dispute/no-refund consequences, confirm caution) and all
+    buttons, badges, errors.
+  - Histories: cut echo/explainer sentences to bare reason labels; kept
+    settlement, money, report/resolution data, withdraw action.
+  - Cart/menu: one-line captions (no-fees, split consequence, retry
+    safety); empty states to one short line everywhere.
+  - Profiles/auth: cut permanence paragraphs, coming-soon rows (helper
+    Payouts now opens the real Earnings screen; requester dead Saved-points
+    row removed), role-marketing lines, sign-in footnote; kept the
+    permanent-role choice itself (irreversible decision) and recovery flows.
+  - Misc: notification/not-found/earnings/dev-switcher text shortened;
+    brand tagline removed (wordmark stays); `OptionCard.description` and
+    `EmptyState.message` now optional to support bare rows; dispute
+    categories lost their redundant subtitles (type updated + call site).
+- Decisions: balanced depth per developer choice — one line survives where
+  money moves or an action is irreversible; errors, buttons, badges,
+  statuses, loading lines, and accessibility labels all untouched.
+- Validation: `tsc` clean, `expo-doctor` 21/21, `expo export -p web --clear`
+  pass. `eslint`: 16 errors vs 17 before (orphaned import + dead styles
+  removed along the way); all remaining are the pre-existing SDK-57-rule
+  findings on fetch effects, none in touched copy.
+- Known limitations: visual review not done here — spot-check trimmed
+  screens on device/web for spacing (removed blocks leave no gaps by
+  construction: whole cards/sections deleted, not emptied).
+
+## 2026-09-12 — Orders: structured breakdown, honest totals, fewer pills
+
+- Diagnosis: the money math itself was sound (server-computed subtotals,
+  hardcoded RM2.00 fee per order, fee added exactly once everywhere), but
+  totals were recomputed inline in 4 places, three screens showed
+  food-only sums next to fee-inclusive ones, the helper's earning line
+  showed the FULL payment amount, and counts/modes wore status pills.
+- Change — accuracy:
+  - New `orderTotalCents(subtotal, fee)` in `lib/orders.ts`: the single
+    definition of the payable total, now used by order/job details,
+    histories (via the breakdown), payment context, confirmation, and
+    list rows. Fee stays a DB snapshot (RM2.00 server-side) — never a
+    client constant, added exactly once.
+  - Fixed the earning mislabel: helper "delivery earning" now reads
+    `deliveryFeeCents` (was `payment.amountCents`, overstating payout by
+    the food cost); corrected the `Payment.amountCents` doc (subtotal+fee).
+  - `PlacedOrderSummary` now carries `deliveryFeeCents` (the RPC always
+    returned it; the parser dropped it).
+  - Confirmation is fee-inclusive: food subtotal + delivery fee
+    (RM2.00 × order count) + total amount, ending the food-only vs
+    payable-total mismatch.
+  - Orders/Deliveries rows (active + history) show the payable total.
+- Change — structured breakdown: new `components/OrderBreakdown.tsx`
+  (item `name × qty`, unit price, line total; food subtotal; delivery fee
+  RM2.00; total; plain rows + dividers, zero pills) adopted in requester
+  order detail, helper job detail (which gains its missing combined
+  total), both history details (helper keeps its fronted-cost row), and
+  the payment card totals. Removed the duplicated inline blocks/styles.
+- Change — pills to plain text (status pills kept): header/list counts,
+  confirmation Pending, cart count + split badges (merged into captions),
+  both read-only-record labels, profile role + QR Set/Not set, menu
+  availability (colored text, still gates the button), per-row Finalized.
+- Validation: `tsc` clean, `expo-doctor` 21/21, `expo export -p web --clear`
+  pass, touched files lint-clean (remaining findings are the pre-existing
+  fetch-effect set). Live calculation E2E on `sqspqwj…` (27/27,
+  `/tmp/calctest.cjs`): 2-vendor × multi-qty cart → per-order subtotal =
+  Σ DB price×qty, fee exactly 200, line totals exact, split correct,
+  full accept→deliver→confirm→evidence→submit flow → amount =
+  subtotal+200, single verified payment, order completed, earning = fee
+  only. All 2 test users, 2 orders, payment, items, files removed;
+  baseline verified (0 test users, 1 order / 1 payment / 6 profiles /
+  13 notifications).
+- Known limitations: on-device visual check of the new breakdown still
+  needed; `Purchased`/`Picked up` static badge casing still drifts from
+  `orderStatusLabel` (cosmetic, untouched by design).
+
+## 2026-09-12 — Fix: lazy-load expo-sharing (older Expo Go crashed on boot)
+
+- What was broken: `services/storage.ts` imported `expo-sharing` at module
+  top level, which throws `Cannot find native module 'ExpoSharing'` on Expo
+  Go builds whose native runtime predates the module. Because `storage.ts`
+  sits in the import chain of `PrivateImage` → profile/detail screens, the
+  throw cascaded into `Route ... is missing the required default export`
+  warnings for `(helper)/profile`, `(helper)/jobs/[id]`, and
+  `(requester)/orders/[id]` — those routes were fine; they just never
+  finished evaluating.
+- Change — `services/storage.ts` only: the static `expo-sharing` import is
+  gone; `downloadStorageFile` loads it via dynamic `import()` at tap time.
+  Missing module → actionable error ("Downloading needs a newer app
+  runtime. Update Expo Go (or rebuild your dev client)…") surfaced in the
+  existing receipt error UI; boot, uploads, previews, and viewing are
+  unaffected. `expo-file-system` stays statically imported (it resolved
+  fine in the failing client).
+- Validation: `tsc` clean, touched file lint-clean, `expo-doctor` 21/21,
+  `expo export -p web --clear` pass.
+- Known limitations: the true fix for affected devices is updating Expo Go
+  past the module's introduction (or rebuilding the dev client); this change
+  only converts a boot crash into a graceful per-action error.

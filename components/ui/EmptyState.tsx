@@ -8,12 +8,12 @@ import { Text } from '@/components/ui/Text';
 interface EmptyStateProps {
   icon: keyof typeof MaterialIcons.glyphMap;
   title: string;
-  message: string;
+  message?: string;
   actionTitle?: string;
   onAction?: () => void;
 }
 
-/** Friendly zero-data state: icon, title, message, optional action. */
+/** Friendly zero-data state: icon, title, optional message and action. */
 export function EmptyState({ icon, title, message, actionTitle, onAction }: EmptyStateProps) {
   return (
     <View style={styles.container} accessibilityRole="summary">
@@ -21,9 +21,11 @@ export function EmptyState({ icon, title, message, actionTitle, onAction }: Empt
         <MaterialIcons name={icon} size={32} color={colors.primary} />
       </View>
       <Text variant="subtitle">{title}</Text>
-      <Text color="secondary" style={styles.message}>
-        {message}
-      </Text>
+      {message ? (
+        <Text color="secondary" style={styles.message}>
+          {message}
+        </Text>
+      ) : null}
       {actionTitle && onAction && (
         <Button title={actionTitle} variant="secondary" onPress={onAction} />
       )}

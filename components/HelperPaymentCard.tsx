@@ -15,7 +15,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
 import { paymentStatusLabel, paymentStatusTone } from '@/lib/orders';
 import { getPaymentContext, type PaymentContext } from '@/services/payments';
-import { signedImageUrl } from '@/services/storage';
+import { displayFileName, downloadStorageFile, signedImageUrl } from '@/services/storage';
 
 interface HelperPaymentCardProps {
   orderId: string;
@@ -84,10 +84,6 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
     return (
       <Card>
         <Badge label="No payment yet" tone="neutral" />
-        <Text color="secondary">
-          Payment opens once this job is accepted — the requester pays you externally using your
-          QR.
-        </Text>
       </Card>
     );
   }
@@ -98,10 +94,6 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
       <Card>
         <Badge label="Awaiting confirmation" tone="success" />
         <Text variant="subtitle">Waiting for the requester</Text>
-        <Text color="secondary">
-          They confirm receipt first, then pay you {formatMYR(context.totalCents)} externally.
-          Make sure your payment QR is set in your profile so they can pay you.
-        </Text>
         <Button title="Refresh" variant="secondary" onPress={() => void load()} />
       </Card>
     );
@@ -112,8 +104,7 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
         <Badge label="Awaiting payment" tone="warning" />
         <Text variant="subtitle">Not paid yet</Text>
         <Text color="secondary">
-          The requester hasn&apos;t submitted a receipt for {formatMYR(context.subtotalCents)}.
-          Make sure your payment QR is set in your profile so they can pay you.
+          Set your payment QR in your profile so they can pay you.
         </Text>
         <Button title="Refresh" variant="secondary" onPress={() => void load()} />
       </Card>
@@ -132,13 +123,10 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
       <EvidenceView path={payment.evidencePath} />
       {payment.status === 'verified' ? (
         <Text color="secondary">
-          Payment recorded. Your {formatMYR(payment.amountCents)} delivery earning is finalized.
+          Payment recorded. Your {formatMYR(context.deliveryFeeCents)} delivery earning is finalized.
         </Text>
       ) : (
         <>
-          <Text color="secondary">
-            Receipt submitted — awaiting settlement.
-          </Text>
           <Button title="Refresh" variant="secondary" onPress={() => void load()} />
         </>
       )}
@@ -162,27 +150,87 @@ const styles = StyleSheet.create({
   fileName: { fontWeight: '600', color: colors.text },
 });
 
-/** Renders evidence inline for images, or an openable file row for documents. */
+/**
+ * Renders evidence with its full filename: inline image for photos,
+ * openable file row for PDFs — plus a download button in both cases so the
+ * helper can save the receipt to their device (share sheet on native).
+ */
 function EvidenceView({ path }: { path: string }) {
   const [opening, setOpening] = useState(false);
-  const [openError, setOpenError] = useState<string | null>(null);
-  if (!path.toLowerCase().endsWith('.pdf')) {
-    return <PrivateImage path={path} accessibilityLabel="Payment receipt from requester" />;
-  }
-  const fileName = path.split('/').pop() ?? 'receipt.pdf';
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileName = displayFileName(path);
   const handleOpen = async () => {
     if (opening) return;
     setOpening(true);
-    setOpenError(null);
+    setFileError(null);
     try {
       const url = await signedImageUrl(path);
       await Linking.openURL(url);
     } catch {
-      setOpenError('Could not open the receipt. Try again.');
+      setFileError('Could not open the receipt. Try again.');
     } finally {
       setOpening(false);
     }
   };
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    setDownloadProgress(0);
+    setDownloadNotice(null);
+    setFileError(null);
+    try {
+      const outcome = await downloadStorageFile(path, setDownloadProgress);
+      setDownloadNotice(
+        outcome === 'shared'
+          ? 'Downloaded — complete saving in the share sheet.'
+          : 'Opened in the viewer — save it from there.',
+      );
+    } catch {
+      setFileError('Could not download the receipt. Try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+  const downloadButton = (
+    <Button
+      title={
+        downloading
+          ? downloadProgress !== null
+            ? `Downloading… ${Math.round(downloadProgress * 100)}%`
+            : 'Downloading…'
+          : 'Download receipt'
+      }
+      variant="secondary"
+      onPress={() => void handleDownload()}
+      disabled={downloading || opening}
+      loading={downloading}
+    />
+  );
+  const downloadNoticeText = downloadNotice ? (
+    <Text variant="caption" color="secondary">
+      {downloadNotice}
+    </Text>
+  ) : null;
+  if (!path.toLowerCase().endsWith('.pdf')) {
+    return (
+      <View style={{ gap: spacing.sm }}>
+        <PrivateImage path={path} accessibilityLabel="Payment receipt from requester" />
+        <Text variant="caption" color="muted">
+          {fileName}
+        </Text>
+        {downloadButton}
+        {downloadNoticeText}
+        {fileError ? (
+          <Text variant="caption" color="error">
+            {fileError}
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
   return (
     <View style={{ gap: spacing.sm }}>
       <Pressable
@@ -201,9 +249,11 @@ function EvidenceView({ path }: { path: string }) {
         </View>
         <MaterialIcons name="open-in-new" size={22} color={colors.primary} />
       </Pressable>
-      {openError ? (
+      {downloadButton}
+      {downloadNoticeText}
+      {fileError ? (
         <Text variant="caption" color="error">
-          {openError}
+          {fileError}
         </Text>
       ) : null}
     </View>

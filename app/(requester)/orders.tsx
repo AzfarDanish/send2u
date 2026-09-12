@@ -11,44 +11,37 @@ import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { StageLegend } from '@/components/ui/StageLegend';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { useMyOrderHistory } from '@/hooks/useMyOrderHistory';
 import { useMyOrders } from '@/hooks/useMyOrders';
 import { formatMYR } from '@/lib/money';
-import { formatOrderDate, orderStatusLabel, orderStatusTone } from '@/lib/orders';
+import { formatOrderDate, orderStatusLabel, orderStatusTone, orderTotalCents } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
 export default function RequesterOrdersScreen() {
   const [tab, setTab] = useState<HistoryTab>('active');
   const active = useMyOrders();
-  const history = useMyOrderHistory();
+  // History loads only when visible — except when Active is empty, where the
+  // count decides the empty-state copy ("No active orders" vs "No orders yet").
+  const history = useMyOrderHistory(tab === 'history' || active.status === 'empty');
 
   const openOrder = useCallback((order: OrderWithDetails) => {
     router.push({ pathname: '/(requester)/orders/[id]', params: { id: order.id } });
   }, []);
 
-  const refreshing = active.refreshing || history.refreshing;
+  const refreshing = active.refreshing || (tab === 'history' && history.refreshing);
   const handleRefresh = useCallback(async () => {
-    await Promise.all([active.refresh(), history.refresh()]);
-  }, [active, history]);
-
-  const badge =
-    tab === 'active'
-      ? active.status === 'ready'
-        ? `${active.orders.length} active`
-        : undefined
-      : history.status === 'ready'
-        ? `${history.orders.length} in history`
-        : undefined;
+    // Refresh the visible list; the hidden one loads (or reloads) on visit.
+    await Promise.all([active.refresh(), tab === 'history' ? history.refresh() : Promise.resolve()]);
+  }, [active, history, tab]);
 
   return (
     <Screen
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
       }>
-      <SectionHeader eyebrow="Orders" title="Track your deliveries" badge={badge} />
+      <SectionHeader eyebrow="Orders" title="Track your deliveries" />
       <ActiveHistoryToggle tab={tab} onChange={setTab} historyCount={history.orders.length} />
       {tab === 'active' ? (
         <>
@@ -73,8 +66,8 @@ export default function RequesterOrdersScreen() {
               title={history.orders.length > 0 ? 'No active orders' : 'No orders yet'}
               message={
                 history.orders.length > 0
-                  ? 'Nothing needs your attention right now. Past orders live in History.'
-                  : "When you request a delivery, you'll follow it here. New orders stay pending until a helper picks them up."
+                  ? 'Past orders live in History.'
+                  : 'New orders appear here.'
               }
               actionTitle="Browse menu"
               onAction={() => router.push('/(requester)')}
@@ -91,7 +84,7 @@ export default function RequesterOrdersScreen() {
                     right={
                       <View style={styles.right}>
                         <Text variant="secondary" style={styles.subtotal}>
-                          {formatMYR(order.subtotalCents)}
+                          {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
                         </Text>
                         <Badge label={orderStatusLabel(order.status)} tone={orderStatusTone(order.status)} />
                       </View>
@@ -122,7 +115,7 @@ export default function RequesterOrdersScreen() {
             <EmptyState
               icon="history"
               title="No history yet"
-              message="Completed, cancelled, and settled orders will appear here as read-only records."
+              message="Completed and cancelled orders appear here."
             />
           ) : null}
           {history.status === 'ready'
@@ -136,7 +129,7 @@ export default function RequesterOrdersScreen() {
                     right={
                       <View style={styles.right}>
                         <Text variant="secondary" style={styles.subtotal}>
-                          {formatMYR(order.subtotalCents)}
+                          {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
                         </Text>
                         <Badge label={orderStatusLabel(order.status)} tone={orderStatusTone(order.status)} />
                       </View>
@@ -147,9 +140,6 @@ export default function RequesterOrdersScreen() {
             : null}
         </>
       )}
-      <Card>
-        <StageLegend caption="Every order moves through these five stages." />
-      </Card>
     </Screen>
   );
 }

@@ -2,7 +2,6 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -10,23 +9,27 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
+import { orderTotalCents } from '@/lib/orders';
 
 /**
  * Post-order confirmation. Stateless summary carried in route params —
  * the cart was already cleared after confirmed database success.
  */
 export default function OrderConfirmationScreen() {
-  const { orderIds, vendorCount, vendorNames, totalCents, locationName } = useLocalSearchParams<{
+  const { orderIds, vendorCount, vendorNames, foodCents, feeCents, locationName } = useLocalSearchParams<{
     orderIds?: string;
     vendorCount?: string;
     vendorNames?: string;
-    totalCents?: string;
+    foodCents?: string;
+    feeCents?: string;
     locationName?: string;
   }>();
 
   const ids = typeof orderIds === 'string' && orderIds.length > 0 ? orderIds.split(',') : [];
   const count = typeof vendorCount === 'string' ? Number.parseInt(vendorCount, 10) : Number.NaN;
-  const total = typeof totalCents === 'string' ? Number.parseInt(totalCents, 10) : Number.NaN;
+  const food = typeof foodCents === 'string' ? Number.parseInt(foodCents, 10) : Number.NaN;
+  const fee = typeof feeCents === 'string' ? Number.parseInt(feeCents, 10) : Number.NaN;
+  const total = Number.isInteger(food) && Number.isInteger(fee) ? orderTotalCents(food, fee) : Number.NaN;
   const valid =
     ids.length > 0 &&
     Number.isInteger(count) &&
@@ -62,7 +65,6 @@ export default function OrderConfirmationScreen() {
         </View>
 
         <View style={styles.heading}>
-          <Badge label="Pending" tone="info" />
           <Text variant="title">
             {count === 1 ? 'Your request is in!' : `${count} requests are in!`}
           </Text>
@@ -75,14 +77,22 @@ export default function OrderConfirmationScreen() {
 
         <Card>
           <View style={styles.totalRow}>
-            <Text variant="subtitle">Total requested</Text>
+            <Text color="secondary">Food subtotal</Text>
+            <Text variant="secondary">{formatMYR(food)}</Text>
+          </View>
+          <View style={styles.totalRow}>
+            <Text color="secondary">Delivery fee (RM2.00 × {count})</Text>
+            <Text variant="secondary">{formatMYR(fee)}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.totalRow}>
+            <Text variant="subtitle">Total amount</Text>
             <Text variant="title" color="primary">
               {formatMYR(total)}
             </Text>
           </View>
           <Text variant="caption" color="muted">
-            No helper assigned yet and nothing to pay — helper assignment and payment instructions
-            arrive in later tasks.
+            No helper assigned yet and nothing to pay.
           </Text>
         </Card>
 
@@ -107,4 +117,5 @@ const styles = StyleSheet.create({
   },
   heading: { gap: spacing.sm },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  divider: { borderTopWidth: 1, borderTopColor: colors.divider },
 });

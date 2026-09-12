@@ -172,12 +172,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toPlacedSummary(value: unknown): PlacedOrderSummary {
   if (!isRecord(value)) throw new Error('Order creation returned an unexpected result.');
-  const { order_id, vendor_id, vendor_name, subtotal_cents, item_count, status, created_at } = value;
+  const { order_id, vendor_id, vendor_name, subtotal_cents, delivery_fee_cents, item_count, status, created_at } = value;
   if (
     typeof order_id !== 'string' ||
     typeof vendor_id !== 'string' ||
     typeof vendor_name !== 'string' ||
     typeof subtotal_cents !== 'number' ||
+    typeof delivery_fee_cents !== 'number' ||
     typeof item_count !== 'number' ||
     typeof status !== 'string' ||
     typeof created_at !== 'string'
@@ -189,6 +190,7 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
     vendorId: vendor_id,
     vendorName: vendor_name,
     subtotalCents: subtotal_cents,
+    deliveryFeeCents: delivery_fee_cents,
     itemCount: item_count,
     status: status as OrderStatus,
     createdAt: created_at,
@@ -257,7 +259,7 @@ export async function listMyOrders(): Promise<OrderWithDetails[]> {
 }
 
 /**
- * Requester's HISTORICAL orders only (completed/cancelled/disputed),
+ * HISTORICAL orders only (completed/cancelled/disputed),
  * newest first. Read-only records — no actions are valid on these.
  * Nothing is deleted or archived elsewhere; same table, status-filtered.
  */

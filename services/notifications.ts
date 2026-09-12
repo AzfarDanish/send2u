@@ -1,3 +1,4 @@
+import { dedupeRequest } from '@/lib/dedupe';
 import { getSupabaseClient } from '@/lib/supabase';
 
 /**
@@ -63,15 +64,21 @@ export async function listMyNotifications(limit = 100): Promise<AppNotification[
   return (data as unknown as NotificationRow[]).map(toNotification);
 }
 
-/** Number of unread own notifications. RLS scopes to the caller. */
+/**
+ * Number of unread own notifications. RLS scopes to the caller.
+ * In-flight deduped: the notification center and the header bell mount
+ * together and ask for the same count at the same moment — one request.
+ */
 export async function countUnreadNotifications(): Promise<number> {
-  const supabase = requireClient();
-  const { count, error } = await supabase
-    .from('send2u_notifications')
-    .select('id', { count: 'exact', head: true })
-    .is('read_at', null);
-  if (error) throw new Error(`Could not count notifications: ${error.message}`);
-  return count ?? 0;
+  return dedupeRequest('send2u:unread-count', async () => {
+    const supabase = requireClient();
+    const { count, error } = await supabase
+      .from('send2u_notifications')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null);
+    if (error) throw new Error(`Could not count notifications: ${error.message}`);
+    return count ?? 0;
+  });
 }
 
 /** Marks one own notification read. RLS rejects other users' rows. */

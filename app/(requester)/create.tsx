@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { QuantityStepper } from '@/components/QuantityStepper';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -76,7 +75,10 @@ export default function CreateRequestScreen() {
         selectedLocation.id,
         lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
       );
-      const total = summaries.reduce((sum, s) => sum + s.subtotalCents, 0);
+      // Payable total: food subtotal + the RM2.00 fee recorded server-side
+      // on every placed order (one fee per vendor order).
+      const foodCents = summaries.reduce((sum, s) => sum + s.subtotalCents, 0);
+      const feeCents = summaries.reduce((sum, s) => sum + s.deliveryFeeCents, 0);
       clear();
       router.push({
         pathname: '/(requester)/orders/confirmation',
@@ -84,7 +86,8 @@ export default function CreateRequestScreen() {
           orderIds: summaries.map((s) => s.orderId).join(','),
           vendorCount: String(summaries.length),
           vendorNames: summaries.map((s) => s.vendorName).join(', '),
-          totalCents: String(total),
+          foodCents: String(foodCents),
+          feeCents: String(feeCents),
           locationName: selectedLocation.name,
         },
       });
@@ -100,14 +103,13 @@ export default function CreateRequestScreen() {
     <Screen>
       <SectionHeader
         eyebrow="New request"
-        title="Your cart"
-        badge={count > 0 ? `${count} item${count === 1 ? '' : 's'}` : undefined}
+        title={count > 0 ? `Your cart · ${count} item${count === 1 ? '' : 's'}` : 'Your cart'}
       />
       {lines.length === 0 ? (
         <EmptyState
           icon="add-shopping-cart"
           title="Your cart is empty"
-          message="Browse today's menu and add something tasty."
+          message="Add something from today's menu."
           actionTitle="Browse menu"
           onAction={() => router.push('/(requester)')}
         />
@@ -128,7 +130,6 @@ export default function CreateRequestScreen() {
                     </Text>
                   )}
                 </View>
-                {multiVendor ? <Badge label="Separate order" tone="info" /> : null}
               </View>
               <Card style={styles.linesCard}>
                 {group.lines.map((line) => (
@@ -163,7 +164,7 @@ export default function CreateRequestScreen() {
               </Text>
             </View>
             <Text variant="caption" color="muted">
-              Simple sum of price × quantity. No delivery, service, or platform fees in this MVP stage.
+              Price × quantity. No fees.
             </Text>
           </Card>
 
@@ -187,7 +188,7 @@ export default function CreateRequestScreen() {
             <EmptyState
               icon="place"
               title="No drop-off points"
-              message="No delivery locations are available right now. Pull down is not needed — try again later."
+              message="None available right now. Try again later."
             />
           ) : null}
           {locations.status === 'ready' ? (
@@ -215,11 +216,9 @@ export default function CreateRequestScreen() {
 
           {multiVendor ? (
             <Card>
-              <Badge label={`${groups.length} vendor orders`} tone="info" />
-              <Text variant="subtitle">Split by vendor</Text>
+              <Text variant="subtitle">Split by vendor ({groups.length} orders)</Text>
               <Text color="secondary">
-                Each vendor fulfils its own request, so this cart places {groups.length} separate
-                orders to the same drop-off point.
+                Each vendor becomes a separate order to the same drop-off point.
               </Text>
             </Card>
           ) : null}
@@ -236,12 +235,11 @@ export default function CreateRequestScreen() {
             />
             {!selectedLocation && lines.length > 0 ? (
               <Text variant="caption" color="muted">
-                Choose a drop-off point above to place your request.
+                Choose a drop-off point to continue.
               </Text>
             ) : null}
             <Text variant="caption" color="muted">
-              Prices are confirmed from the menu when you submit. Your cart stays intact if anything
-              fails.
+              Prices confirmed at submit. Your cart is kept if anything fails.
             </Text>
             <Button title="Clear cart" variant="danger" onPress={clear} disabled={submitting} />
           </Card>

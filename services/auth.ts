@@ -7,10 +7,14 @@ import type { Profile, ProfileRole, UserRole } from '@/types/domain';
  * Authentication + profile service layer.
  * UI must call these (or `useAuth`) instead of touching Supabase directly.
  *
- * Identity comes from Supabase Auth; the Send2U role lives in the
- * `send2u_profiles` row keyed by `auth.uid()`. Nothing here is mocked:
- * every function hits the configured Supabase project and throws the real
- * error when something is unavailable (e.g. anonymous sign-ins disabled).
+ * Production-style email/password accounts. Identity comes from Supabase
+ * Auth; the Send2U role lives in the `send2u_profiles` row keyed by
+ * `auth.uid()` and is written exactly once — at signup, by the
+ * `send2u_handle_new_auth_user` database trigger from the signup metadata.
+ * The role is permanent: no service here updates it, and the
+ * `send2u_profiles_guard_immutable` trigger rejects role changes server-side.
+ * Nothing here is mocked: every function hits the configured Supabase
+ * project and throws the real (friendlified) error on failure.
  */
 
 function requireClient() {
@@ -23,12 +27,17 @@ function requireClient() {
   return supabase;
 }
 
+const PROFILE_SELECT =
+  'id, role, payment_qr_path, is_available, availability_updated_at, is_dev_account, display_name, created_at, updated_at';
+
 function toProfile(row: {
   id: string;
   role: string;
   payment_qr_path: string | null;
   is_available: boolean | null;
   availability_updated_at: string | null;
+  is_dev_account: boolean | null;
+  display_name: string | null;
   created_at: string;
   updated_at: string;
 }): Profile {
@@ -38,6 +47,8 @@ function toProfile(row: {
     paymentQrPath: row.payment_qr_path,
     isAvailable: row.is_available ?? false,
     availabilityUpdatedAt: row.availability_updated_at ?? null,
+    isDevAccount: row.is_dev_account ?? false,
+    displayName: row.display_name ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -66,109 +77,151 @@ export function onAuthStateChange(callback: (session: Session | null) => void): 
   };
 }
 
-/** Real Supabase anonymous sign-in. Throws if the provider is disabled. */
-export async function signInAnonymously(): Promise<ActiveSession> {
-  const supabase = requireClient();
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) throw error;
-  if (!data.session) throw new Error('Anonymous sign-in returned no session.');
-  return { session: data.session, user: data.session.user };
-}
-
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const supabase = requireClient();
   const { data, error } = await supabase
     .from('send2u_profiles')
-    .select('id, role, payment_qr_path, is_available, availability_updated_at, created_at, updated_at')
+    .select(PROFILE_SELECT)
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
   return data ? toProfile(data as any) : null;
 }
 
+/** Email shape check for fast client-side feedback (server validates too). */
+function normalizeEmail(raw: string): string {
+  const email = raw.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Enter a valid email address.');
+  }
+  return email;
+}
+
+function requirePassword(password: string): void {
+  if (password.length < 6) {
+    throw new Error('Use a password with at least 6 characters.');
+  }
+}
+
+/** Maps Supabase auth failures to copy a user can act on. */
+export function friendlyAuthError(message: string): string {
+  if (/user already registered/i.test(message)) {
+    return 'An account with this email already exists. Sign in instead.';
+  }
+  if (/invalid login credentials/i.test(message)) {
+    return 'Incorrect email or password. Check both and try again.';
+  }
+  if (/email not confirmed/i.test(message)) {
+    return 'Check your inbox to confirm your email, then sign in.';
+  }
+  if (/email rate limit|rate limit exceeded|too many requests/i.test(message)) {
+    return 'Too many attempts. Wait a moment and try again.';
+  }
+  if (/network|fetch failed|failed to fetch/i.test(message)) {
+    return 'Network error. Check your connection and try again.';
+  }
+  return message ? `Authentication failed: ${message}` : 'Authentication failed.';
+}
+
+export type SignUpResult =
+  | { status: 'active'; user: User; session: Session; profile: Profile }
+  | { status: 'confirmation-required'; user: User };
+
 /**
- * Sets the profile row's role, creating the row when missing (upsert on the
- * auth.uid() primary key). Covered by the insert + update ownership policies.
+ * Creates a real email/password account with exactly one permanent role.
+ * The profile row is created atomically by the database signup trigger from
+ * the same metadata — the client never writes the role, so it cannot be
+ * forged or duplicated. In this development project email confirmation is
+ * off, so signup returns a session and the caller enters the app immediately.
+ * When confirmation is on (production default), no session is returned and
+ * the caller must confirm via inbox first — this path never bypasses that.
  */
-export async function setProfileRole(userId: string, role: UserRole): Promise<Profile> {
+export async function signUpAccount(
+  rawEmail: string,
+  password: string,
+  role: UserRole,
+): Promise<SignUpResult> {
   const supabase = requireClient();
+  const email = normalizeEmail(rawEmail);
+  requirePassword(password);
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { role } },
+  });
+  if (error) throw new Error(friendlyAuthError(error.message));
+  if (!data.user) throw new Error('Signup came back in an unexpected shape.');
+  if (!data.session) {
+    return { status: 'confirmation-required', user: data.user };
+  }
+  const profile = await fetchProfile(data.user.id);
+  if (!profile) {
+    throw new Error('Your account was created but the profile is not ready yet. Sign in to retry.');
+  }
+  return { status: 'active', user: data.user, session: data.session, profile };
+}
+
+/** Signs an existing account in with email + password. */
+export async function signInWithPassword(
+  rawEmail: string,
+  password: string,
+): Promise<{ user: User; session: Session; profile: Profile | null }> {
+  const supabase = requireClient();
+  const email = normalizeEmail(rawEmail);
+  if (password.length === 0) throw new Error('Enter your password.');
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(friendlyAuthError(error.message));
+  if (!data.session) throw new Error('Sign-in came back in an unexpected shape.');
+  const profile = await fetchProfile(data.session.user.id);
+  return { user: data.session.user, session: data.session, profile };
+}
+
+/**
+ * One-time repair for accounts that predate automatic profile creation and
+ * therefore have NO profile row. INSERT-only: when a row already exists this
+ * throws and never touches it, so an existing (permanent) role can never be
+ * changed through here. New signups never need this — the trigger creates
+ * their row atomically.
+ */
+export async function claimMissingProfile(role: UserRole): Promise<Profile> {
+  const supabase = requireClient();
+  const active = await getActiveSession();
+  if (!active) throw new Error('No active session. Sign in first.');
+  if (active.user.is_anonymous) {
+    throw new Error('Anonymous sessions cannot claim a profile. Sign up instead.');
+  }
+  const existing = await fetchProfile(active.user.id);
+  if (existing) {
+    throw new Error('This account already has a profile and a permanent role.');
+  }
   const { data, error } = await supabase
     .from('send2u_profiles')
-    .upsert({ id: userId, role, updated_at: new Date().toISOString() }, { onConflict: 'id' })
-    .select('id, role, payment_qr_path, is_available, availability_updated_at, created_at, updated_at')
+    .insert({ id: active.user.id, role })
+    .select(PROFILE_SELECT)
     .single();
-  if (error) throw error;
-  return toProfile(data as any);
-}
-
-export interface DevSession {
-  user: User;
-  profile: Profile;
-}
-
-/**
- * Serializes concurrent dev entries: two rapid taps must share one
- * identity lookup instead of minting two anonymous users.
- */
-let continueAsInflight: Promise<DevSession> | null = null;
-
-/**
- * Session lookup with retries. A missing session on the first read can be
- * transient (token refresh/storage race); treating it as signed-out would
- * mint a brand-new anonymous user and orphan the previous identity.
- */
-async function getActiveSessionWithRetry(attempts = 3): Promise<ActiveSession | null> {
-  let last: ActiveSession | null = null;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    last = await getActiveSession();
-    if (last) return last;
-    if (attempt < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+  if (error) {
+    if (/duplicate|already exists|unique/i.test(error.message)) {
+      throw new Error('This account already has a profile and a permanent role.');
     }
+    throw error;
   }
-  return last;
-}
-
-/**
- * Development entry: reuse the existing session when present, otherwise
- * create a real anonymous Supabase session, then ensure the profile row
- * carries the requested role. Never signs in when a session already exists.
- */
-export async function continueAsDev(role: UserRole): Promise<DevSession> {
-  if (continueAsInflight) return continueAsInflight;
-  continueAsInflight = (async () => {
-    try {
-      const active = await getActiveSessionWithRetry();
-      const { user } = active ?? (await signInAnonymously());
-      const profile = await setProfileRole(user.id, role);
-      return { user, profile };
-    } finally {
-      continueAsInflight = null;
-    }
-  })();
-  return continueAsInflight;
-}
-
-/** Development role switch: updates the signed-in user's profile row. */
-export async function switchDevRole(role: UserRole): Promise<Profile> {
-  const active = await getActiveSession();
-  if (!active) throw new Error('No active session. Enter as a role first.');
-  return setProfileRole(active.user.id, role);
+  return toProfile(data as any);
 }
 
 /**
  * Points the signed-in user's profile at their payment QR object
- * (or clears it with null). Own row only — enforced by RLS.
+ * (or clears it with null). Own row only — enforced by RLS. Role and
+ * dev-flag columns are untouched (and trigger-guarded regardless).
  */
 export async function setPaymentQrPath(path: string | null): Promise<Profile> {
   const supabase = requireClient();
   const active = await getActiveSession();
-  if (!active) throw new Error('No active session. Enter as a role first.');
+  if (!active) throw new Error('No active session. Sign in first.');
   const { data, error } = await supabase
     .from('send2u_profiles')
     .update({ payment_qr_path: path, updated_at: new Date().toISOString() })
     .eq('id', active.user.id)
-    .select('id, role, payment_qr_path, is_available, availability_updated_at, created_at, updated_at')
+    .select(PROFILE_SELECT)
     .single();
   if (error) throw error;
   return toProfile(data as any);

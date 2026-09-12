@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
-import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -62,8 +61,8 @@ export default function HelperEarningsScreen() {
           </Text>
           <Text variant="caption" color="muted">
             {completed.length === 0
-              ? 'Finish a delivery and verify its payment to earn your first fee.'
-              : `From ${completed.length} completed deliver${completed.length === 1 ? 'y' : 'ies'}. Food you fronted at stalls is not counted here — only delivery fees.`}
+              ? 'Finish a delivery to earn your first fee.'
+              : `From ${completed.length} completed deliver${completed.length === 1 ? 'y' : 'ies'}. Delivery fees only.`}
           </Text>
         </Card>
       ) : null}
@@ -71,7 +70,7 @@ export default function HelperEarningsScreen() {
         <EmptyState
           icon="account-balance-wallet"
           title="No earnings yet"
-          message="Completed deliveries and payouts will be summarized here once you finish your first trip."
+          message="Finished deliveries appear here."
         />
       ) : null}
       {status === 'ready'
@@ -87,7 +86,6 @@ export default function HelperEarningsScreen() {
                     <Text variant="secondary" style={styles.fee}>
                       +{formatMYR(trip.deliveryFeeCents)}
                     </Text>
-                    <Badge label="Finalized" tone="success" />
                   </View>
                 }
               />

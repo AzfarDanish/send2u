@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { OrderRatingSection } from '@/components/OrderRatingSection';
+import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
@@ -41,7 +42,6 @@ export function RequesterHistoryDetail({
   /** Bump to refetch embedded live sections (e.g. other-party rating). */
   refreshToken?: number;
 }) {
-  const totalCents = order.subtotalCents + order.deliveryFeeCents;
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const canWithdraw =
@@ -67,17 +67,15 @@ export function RequesterHistoryDetail({
   return (
     <View style={styles.container}>
       <Card>
-        <Badge label="History · read-only" tone="neutral" />
+        <Text variant="caption" color="muted">
+          Read-only record
+        </Text>
         {order.status === 'completed' ? (
           <>
             <Badge label="Completed" tone="success" />
             {order.resolvedAt ? (
               <>
                 <Text variant="subtitle">Settled after dispute</Text>
-                <Text color="secondary">
-                  This order was closed through dispute resolution, not the
-                  normal paid flow.
-                </Text>
               </>
             ) : (
               <>
@@ -85,7 +83,6 @@ export function RequesterHistoryDetail({
                 <Text color="secondary">
                   Placed {formatOrderDate(order.createdAt)}
                   {order.deliveredAt ? ` · delivered ${formatOrderDate(order.deliveredAt)}` : ''}.
-                  Thanks for using Send2U — this record is kept for your receipts.
                 </Text>
               </>
             )}
@@ -97,7 +94,7 @@ export function RequesterHistoryDetail({
             <Text variant="subtitle">This order was cancelled</Text>
             <Text color="secondary">
               {order.cancelReason === 'food_unavailable'
-                ? 'The stall had no food, so this order was stopped. You owe nothing.'
+                ? 'The stall had no food. You owe nothing.'
                 : `Cancelled${order.cancelReason ? `: ${order.cancelReason}` : ''}.`}
               {order.cancelledAt ? ` (${formatOrderDate(order.cancelledAt)})` : ''}
             </Text>
@@ -112,20 +109,20 @@ export function RequesterHistoryDetail({
             <Text variant="subtitle">This order needs settling up</Text>
             <Text color="secondary">
               {order.disputeReason === 'late_cancellation'
-                ? `You cancelled after the helper had already paid ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle the food cost with your helper directly — Send2U never moves money itself.`
+                ? `You cancelled after the helper paid ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle with your helper directly.`
                 : order.disputeReason === 'delivery_failed'
-                  ? 'The delivery could not be completed. Settle any food cost with your helper directly.'
+                  ? 'The delivery could not be completed. Settle any food cost directly.'
                   : order.disputeReason === 'helper_unable'
-                    ? `Your helper could not continue after paying ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle the food cost with them directly — Send2U never moves money itself.`
+                    ? `Your helper could not continue after paying ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle with them directly.`
                     : order.disputeReason === 'not_received'
-                      ? 'You reported the food never reached you.'
+                      ? 'Not received.'
                       : order.disputeReason === 'incorrect'
-                        ? 'You reported the food was wrong or incomplete.'
+                        ? 'Incorrect items.'
                         : order.disputeReason === 'damaged'
-                          ? 'You reported the food arrived damaged or spoiled.'
+                          ? 'Damaged.'
                           : order.disputeReason === 'refused'
-                            ? 'You refused the delivery at handover.'
-                            : 'This order is under review.'}
+                            ? 'Refused at handover.'
+                            : 'Under review.'}
               {order.disputedAt ? ` (flagged ${formatOrderDate(order.disputedAt)})` : ''}
               {order.resolvedAt
                 ? ` Settled${order.resolution ? ` as ${order.resolution}` : ''} on ${formatOrderDate(order.resolvedAt)}.`
@@ -153,10 +150,6 @@ export function RequesterHistoryDetail({
                   disabled={withdrawing}
                   loading={withdrawing}
                 />
-                <Text variant="caption" color="muted">
-                  Back to delivered — you can confirm receipt or report again if
-                  needed.
-                </Text>
               </>
             ) : null}
           </>
@@ -190,48 +183,17 @@ export function RequesterHistoryDetail({
         </Text>
       </Card>
 
-      <Card style={styles.itemsCard}>
-        {order.items.map((item) => (
-          <View key={item.id} style={styles.line}>
-            <View style={styles.lineText}>
-              <Text variant="secondary" style={styles.lineName}>
-                {item.quantity} × {item.itemName}
-              </Text>
-              <Text variant="caption" color="secondary">
-                {formatMYR(item.unitPriceCents)} each
-              </Text>
-            </View>
-            <Text variant="secondary" style={styles.lineTotal}>
-              {formatMYR(item.lineTotalCents)}
-            </Text>
-          </View>
-        ))}
-      </Card>
-
       <Card>
-        <View style={styles.moneyRow}>
-          <Text color="secondary">Food subtotal</Text>
-          <Text variant="subtitle">{formatMYR(order.subtotalCents)}</Text>
-        </View>
-        <View style={styles.moneyRow}>
-          <Text color="secondary">Delivery fee</Text>
-          <Text variant="subtitle">{formatMYR(order.deliveryFeeCents)}</Text>
-        </View>
-        <View style={styles.moneyRow}>
-          <Text variant="subtitle">Order total</Text>
-          <Text variant="title" color="primary">
-            {formatMYR(totalCents)}
-          </Text>
-        </View>
+        <OrderBreakdown
+          items={order.items}
+          subtotalCents={order.subtotalCents}
+          deliveryFeeCents={order.deliveryFeeCents}
+        />
         {order.status === 'cancelled' && order.cancelReason === 'food_unavailable' ? (
           <Text variant="caption" color="muted">
-            No payment was due — the order stopped before any money changed hands.
+            No payment was due.
           </Text>
-        ) : (
-          <Text variant="caption" color="muted">
-            Historical total for your records. No payment action is available here.
-          </Text>
-        )}
+        ) : null}
       </Card>
 
       <Card>
@@ -259,9 +221,6 @@ export function RequesterHistoryDetail({
               .
             </Text>
             <ReceiptEvidenceView path={order.payment.evidencePath} />
-            <Text variant="caption" color="muted">
-              Receipt kept for disputes and accounting. Nothing further to do.
-            </Text>
           </>
         ) : (
           <Text color="secondary">
@@ -280,10 +239,5 @@ const styles = StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, fontWeight: '600', color: colors.text },
-  itemsCard: { gap: 0 },
-  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  lineText: { flex: 1, gap: spacing.xs },
-  lineName: { fontWeight: '600', color: colors.text },
-  lineTotal: { fontWeight: '700', color: colors.primary },
   moneyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { listVendorSections } from '@/services/menu';
 import type { VendorMenuSection } from '@/types/domain';
 
@@ -17,7 +18,9 @@ interface UseMenuResult {
 
 /**
  * Requester menu state. Loads once on mount; refresh is explicit
- * (pull-to-refresh / retry) so re-renders never refetch.
+ * (pull-to-refresh / retry) plus silent live reloads when vendors or
+ * items change (a vendor editing their stall updates this menu without
+ * any new notification traffic).
  */
 export function useMenu(): UseMenuResult {
   const [sections, setSections] = useState<VendorMenuSection[]>([]);
@@ -48,6 +51,14 @@ export function useMenu(): UseMenuResult {
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  useRealtimeReload(
+    [
+      { table: 'send2u_vendors', event: '*' },
+      { table: 'send2u_menu_items', event: '*' },
+    ],
+    () => void load(true),
+  );
 
   const retry = useCallback(() => {
     void load(false);

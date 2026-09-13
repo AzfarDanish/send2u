@@ -19,6 +19,7 @@ export default function HelperLayout() {
   if (isLoading) return null;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (role === 'requester') return <Redirect href="/(requester)" />;
+  if (role === 'vendor') return <Redirect href="/(vendor)" />;
 
   return (
     <Tabs

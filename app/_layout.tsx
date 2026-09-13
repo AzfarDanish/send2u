@@ -40,6 +40,7 @@ function AuthedProviders() {
         <Stack.Screen name="select-role" />
         <Stack.Screen name="(requester)" />
         <Stack.Screen name="(helper)" />
+        <Stack.Screen name="(vendor)" />
         <Stack.Screen name="+not-found" />
       </Stack>
     </CartProvider>

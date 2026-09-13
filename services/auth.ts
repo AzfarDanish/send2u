@@ -28,11 +28,12 @@ function requireClient() {
 }
 
 const PROFILE_SELECT =
-  'id, role, payment_qr_path, is_available, availability_updated_at, is_dev_account, display_name, created_at, updated_at';
+  'id, role, vendor_id, payment_qr_path, is_available, availability_updated_at, is_dev_account, display_name, created_at, updated_at';
 
 function toProfile(row: {
   id: string;
   role: string;
+  vendor_id: string | null;
   payment_qr_path: string | null;
   is_available: boolean | null;
   availability_updated_at: string | null;
@@ -44,6 +45,7 @@ function toProfile(row: {
   return {
     id: row.id,
     role: row.role as ProfileRole,
+    vendorId: row.vendor_id,
     paymentQrPath: row.payment_qr_path,
     isAvailable: row.is_available ?? false,
     availabilityUpdatedAt: row.availability_updated_at ?? null,

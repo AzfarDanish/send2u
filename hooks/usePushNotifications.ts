@@ -32,6 +32,10 @@ export function usePushNotifications(): void {
       if (!orderId) return;
       if (roleRef.current === 'helper') {
         router.replace({ pathname: '/(helper)/jobs/[id]', params: { id: orderId } });
+      } else if (roleRef.current === 'vendor') {
+        // Vendors receive no order notifications by design; a stale tap
+        // lands on the vendor home instead of a requester screen.
+        router.replace('/(vendor)');
       } else {
         router.replace({ pathname: '/(requester)/orders/[id]', params: { id: orderId } });
       }

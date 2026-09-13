@@ -7,12 +7,11 @@
  * request → assignment → fulfilment → verification → confirmation → payout
  */
 
-export type UserRole = 'requester' | 'helper';
+export type UserRole = 'requester' | 'helper' | 'vendor';
 
-/**
- * Roles stored in `send2u_profiles.role`. Supabase Auth owns identity;
- * the profile row owns the Send2U role. Extensible to vendor/admin later.
- */
+/** Roles stored in `send2u_profiles.role`. Supabase Auth owns identity;
+ * the profile row owns the Send2U role. `vendor` accounts are provisioned
+ * out-of-band and linked to exactly one stall via `vendor_id`. */
 export type ProfileRole = 'requester' | 'helper' | 'vendor' | 'admin';
 
 export interface Profile {
@@ -24,6 +23,8 @@ export interface Profile {
   /** Helper availability — only meaningful when role is helper. */
   isAvailable: boolean;
   availabilityUpdatedAt: string | null;
+  /** Linked stall for vendor accounts (service-role provisioned); null otherwise. */
+  vendorId: string | null;
   /** Admin-flagged development/test account. Never settable from the app. */
   isDevAccount: boolean;
   /** Optional dev label (seeded out-of-band). Never PII or auth data. */
@@ -72,6 +73,8 @@ export interface Vendor {
   name: string;
   description: string | null;
   locationHint: string | null;
+  /** Free-text operating hours (e.g. "Mon–Fri 9am–5pm"). Display only. */
+  operatingHours: string | null;
   /** Storage path/URL for a future vendor image. Unused in MVP. */
   imageUrl: string | null;
   isActive: boolean;
@@ -98,7 +101,7 @@ export interface MenuItem {
 
 /** Menu item with its vendor joined — what the requester UI renders. */
 export interface MenuItemWithVendor extends MenuItem {
-  vendor: Pick<Vendor, 'id' | 'name' | 'locationHint' | 'isOpen'>;
+  vendor: Pick<Vendor, 'id' | 'name' | 'description' | 'locationHint' | 'operatingHours' | 'isOpen'>;
 }
 
 /** One vendor section on the requester menu. */

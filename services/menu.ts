@@ -23,6 +23,7 @@ interface VendorRow {
   name: string;
   description: string | null;
   location_hint: string | null;
+  operating_hours: string | null;
   image_url: string | null;
   is_active: boolean;
   is_open: boolean;
@@ -45,7 +46,7 @@ interface MenuItemRow {
 }
 
 type MenuItemJoinRow = MenuItemRow & {
-  vendor: Pick<VendorRow, 'id' | 'name' | 'location_hint' | 'is_open'>;
+  vendor: Pick<VendorRow, 'id' | 'name' | 'description' | 'location_hint' | 'operating_hours' | 'is_open'>;
 };
 
 function toVendor(row: VendorRow): Vendor {
@@ -54,6 +55,7 @@ function toVendor(row: VendorRow): Vendor {
     name: row.name,
     description: row.description,
     locationHint: row.location_hint,
+    operatingHours: row.operating_hours,
     imageUrl: row.image_url,
     isActive: row.is_active,
     isOpen: row.is_open,
@@ -86,7 +88,9 @@ function toMenuItem(row: MenuItemRow | MenuItemJoinRow): Omit<MenuItemWithVendor
       vendor: {
         id: row.vendor.id,
         name: row.vendor.name,
+        description: row.vendor.description,
         locationHint: row.vendor.location_hint,
+        operatingHours: row.vendor.operating_hours,
         isOpen: row.vendor.is_open,
       },
     };
@@ -139,7 +143,14 @@ export async function listVendorSections(): Promise<VendorMenuSection[]> {
     if (!vendor) continue;
     const item: MenuItemWithVendor = {
       ...(toMenuItem(row) as Omit<MenuItemWithVendor, 'vendor'>),
-      vendor: { id: vendor.id, name: vendor.name, locationHint: vendor.locationHint, isOpen: vendor.isOpen },
+      vendor: {
+        id: vendor.id,
+        name: vendor.name,
+        description: vendor.description,
+        locationHint: vendor.locationHint,
+        operatingHours: vendor.operatingHours,
+        isOpen: vendor.isOpen,
+      },
     };
     const list = itemsByVendor.get(vendor.id) ?? [];
     list.push(item);
@@ -153,7 +164,7 @@ export async function getMenuItem(id: string): Promise<MenuItemWithVendor | null
   const supabase = requireClient();
   const { data, error } = await supabase
     .from('send2u_menu_items')
-    .select('*, vendor:send2u_vendors(id, name, location_hint, is_open)')
+    .select('*, vendor:send2u_vendors(id, name, description, location_hint, operating_hours, is_open)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw toMenuError(error, 'Could not load menu item');

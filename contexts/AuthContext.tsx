@@ -45,7 +45,12 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function toAppUser(user: User, profile: Profile | null): AppUser {
-  const role = profile?.role === 'requester' || profile?.role === 'helper' ? profile.role : null;
+  // Vendor accounts pass through like requester/helper; admin stays
+  // role-less (no admin UI exists). Role itself remains server-immutable.
+  const role =
+    profile?.role === 'requester' || profile?.role === 'helper' || profile?.role === 'vendor'
+      ? profile.role
+      : null;
   return {
     id: user.id,
     email: user.email ?? null,

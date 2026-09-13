@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "send2u",
+    "name": "Send2U",
     "slug": "send2u",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#DA0A1B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"

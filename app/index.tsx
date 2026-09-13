@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
  * loading → loading state
  * unauthenticated → auth screens
  * authenticated without role → role selection
- * authenticated with role → requester or helper experience
+ * authenticated with role → requester, helper, or vendor experience
  */
 export default function Index() {
   const { user, role, isLoading } = useAuth();
@@ -31,7 +31,9 @@ export default function Index() {
     return <Redirect href="/select-role" />;
   }
 
-  return <Redirect href={role === 'helper' ? '/(helper)' : '/(requester)'} />;
+  return (
+    <Redirect href={role === 'helper' ? '/(helper)' : role === 'vendor' ? '/(vendor)' : '/(requester)'} />
+  );
 }
 
 const styles = StyleSheet.create({

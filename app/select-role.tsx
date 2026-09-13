@@ -78,7 +78,7 @@ export default function SelectRoleScreen() {
         <Card>
           <ErrorState
             title="Unsupported account role"
-            message="This account carries a role this app does not serve. Sign out and use a requester or helper account."
+            message="This account carries a role this app does not serve. Sign out and use a requester, helper, or vendor account."
           />
         </Card>
       ) : (

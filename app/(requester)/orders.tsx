@@ -44,10 +44,11 @@ export default function RequesterOrdersScreen() {
 
   return (
     <Screen
+      underTabs
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
       }>
-      <SectionHeader eyebrow="Orders" title="Your orders" />
+      <SectionHeader eyebrow="Requests" title="Your requests" />
       <ActiveHistoryToggle tab={tab} onChange={setTab} historyCount={history.orders.length} />
       {tab === 'active' ? (
         <>
@@ -85,7 +86,7 @@ export default function RequesterOrdersScreen() {
                   <ListRow
                     icon="receipt-long"
                     title={order.vendor.name}
-                    subtitle={`${orderItemsTitle(order.items)} · ${order.location.name}`}
+                    subtitle={`#${order.id.slice(0, 8)} · ${orderItemsTitle(order.items)} · ${order.location.name}`}
                     onPress={() => openOrder(order)}
                     right={
                       <View style={styles.right}>
@@ -130,7 +131,7 @@ export default function RequesterOrdersScreen() {
                   <ListRow
                     icon="history"
                     title={order.vendor.name}
-                    subtitle={`${formatOrderDate(order.createdAt)} · ${order.location.name}`}
+                    subtitle={`#${order.id.slice(0, 8)} · ${formatOrderDate(order.createdAt)} · ${order.location.name}`}
                     onPress={() => openOrder(order)}
                     right={
                       <View style={styles.right}>

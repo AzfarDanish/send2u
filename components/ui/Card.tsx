@@ -1,8 +1,8 @@
 import { StyleSheet, View, type ViewProps } from 'react-native';
 
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 
-/** Send2U surface card. Subtle border + shadow; content spacing via `gap`. */
+/** Send2U surface card. Subtle border, no shadow; content spacing via `gap`. */
 export function Card({ children, style, ...rest }: ViewProps) {
   return (
     <View style={[styles.card, style]} {...rest}>
@@ -19,6 +19,5 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.divider,
-    ...shadows.card,
   },
 });

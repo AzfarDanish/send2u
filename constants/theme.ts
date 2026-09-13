@@ -1,6 +1,7 @@
 /**
  * Send2U light-only design system — the single source of truth for color,
- * typography, spacing, radii, and elevation.
+ * typography, spacing, and radii. Surfaces separate with borders only;
+ * shadows are intentionally not used anywhere.
  *
  * LIGHT THEME ONLY: there are no dark-mode tokens. Do not branch on the
  * device color scheme; every surface below is used as-is on all devices.
@@ -59,6 +60,10 @@ export const typography = {
   caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   eyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '700', letterSpacing: 0.8 },
   button: { fontSize: 16, lineHeight: 24, fontWeight: '600' },
+  /** Prices and totals. Pair with tabular-nums at usage sites to avoid jitter. */
+  price: { fontSize: 17, lineHeight: 24, fontWeight: '700' },
+  /** Status-pill labels (sentence-case in UI). */
+  status: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
 } as const;
 
 export type TextVariant = keyof typeof typography;
@@ -86,33 +91,6 @@ export const touchTargets = {
   button: 52,
   listRow: 60,
   tabBar: 70,
-} as const;
-
-export const shadows = {
-  /** Subtle lift for cards resting on background. */
-  sm: {
-    shadowColor: '#16232B',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
-  },
-  /** Default card elevation — the standard for Card, ListRow containers. */
-  card: {
-    shadowColor: '#16232B',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  /** Raised element — modals, floating action items, elevated cards. */
-  lg: {
-    shadowColor: '#16232B',
-    shadowOpacity: 0.10,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
 } as const;
 
 /** Shared tab-bar / header styling so both experiences stay consistent. */

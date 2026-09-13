@@ -764,3 +764,341 @@ only. No secrets are ever recorded here.
 - Limits/decisions: on-device, runtime-data, admin-needs, red
   contrast, and fee-policy caveats recorded in the document's own
   Inspection-limitations section.
+
+## 2026-09-13 — Redesign Phase 1: red/white foundation tokens + primitives
+
+- Changed: `constants/theme.ts` migrated to the red-and-white system
+  (design.md §5) with token NAMES stable — `primary`/`primaryPressed`
+  /`primarySoft` are now icon red `#DA0A1B`/`#A80815`/`#FBE7E9`,
+  `info`/`infoSoft` deep red `#8A1A24`/`#F7E4E5`, warm neutrals,
+  semantic success/warning/error untouched; added `price` + `status`
+  typography tokens. New `components/ui/Input.tsx` (label, focus
+  ring, error, counter, secure toggle) and `components/ui/Skeleton.tsx`
+  (static, motion-free) — not yet adopted by screens (later phases).
+  `Badge` gains an optional leading `icon` (existing renders
+  unchanged) and uses the `status` token (identical values).
+  Spacing/radii/shadows/touch-targets already matched spec — untouched,
+  as are Screen shell, tab-bar layouts, Button variants, and all
+  feature screens (they recolor automatically via tokens).
+- Reason: Phase 1 foundation per design.md; rebrand without touching
+  any layout, copy, or logic.
+- Details: white-on-brand contrast ≈5.2:1 (passes 4.5); KAV deferred
+  pending device test (Screen shell already safe-area+scroll correct).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; served
+  bundle — requester/helper/vendor routes HTTP 200, no stale teal
+  hex in pre-rendered HTML.
+- Limits/decisions: screens adopt color automatically (intended);
+  no functional change; stopped before Phase 2 per instructions.
+  (Note: commit 64222e1 landed mid-session from a parallel
+  commit — it snapshots prior phases + this theme recolor; Badge
+  icon prop, price/status tokens, Input, and Skeleton remain
+  uncommitted working-tree additions from this phase.)
+
+## 2026-09-13 — Redesign Phase 2: Home, detail, Review Request visuals
+
+- Changed (presentation only): Home menu loading now renders
+  skeleton vendor sections (`Skeleton` rows) instead of a spinner
+  card; `MenuItemRow` prices migrated to the `price` token;
+  tabular numerals on Home preview total, detail live total, and
+  Review Request breakdown figures. Hero dish price keeps its
+  large size (prominence decision). No copy, layout-order, logic,
+  validation, cart-math, fee, or navigation changes.
+- Reason: design.md §§7.6–7.8 (price visibility, skeleton loading,
+  numeral stability).
+- Details: fixed a self-made `fontVariant` typing error (array form
+  required) found by `tsc`.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/Review Request/item-detail routes HTTP 200;
+  copy re-grepped (no Pay-Now/preparing language); responsive
+  reasoned at 320/375/430 (flex rows, wrapping names, fixed-height
+  skeleton blocks).
+- Limits/decisions: no functional change; sticky-bottom submit
+  deferred (needs device verification); stopped before Phase 3.
+
+## 2026-09-13 — Redesign Phase 3A: 3-tab nav, submission, detail, lists
+
+- Changed (presentation + navigation structure only): requester tabs
+  are now exactly Home / Requests / Profile — Notifications lives
+  behind the header bell (route kept, all links intact); orders
+  header and profile row renamed to Requests/My-requests language;
+  list subtitles carry short request IDs (active: items · location,
+  history: date · location). Confirmation restructured into Request
+  ID + status + summary cards titled "Request Submitted!" with a
+  notification-based what-next line and a primary View Request
+  (single → detail, multi → list). Detail header shows the assigned
+  helper short-ID when present. No logic, validation, RPC, routing
+  behavior, or fee changes.
+- Reason: task-mandated 3-tab end-state plus Phase 3A (submission +
+  detail) per design.md §§7.5/7.9–7.11.
+- Details: "Request notes" omitted (no such feature); thumbnails
+  omitted (no images in product); multi-order primary correctly
+  targets the list (no single detail exists).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves all requester routes HTTP 200 (notifications route
+  still mounted, bell entry intact).
+- Limits/decisions: stopped before Phase 3B (payment/receipt).
+
+## 2026-09-13 — Redesign Phase 3B: payment + receipt presentation
+
+- Changed (presentation only, `RequesterPaymentCard`): numbered
+  steps wrapped in an amber `warningSoft` instruction card titled
+  "Pay outside the app"; helper-payee caption from the real
+  `helperId` under the amount; plain submit button replaced by a
+  large dashed upload area (icon + Choose-receipt + hint, spinner
+  while choosing, same disabled guards, same picker pipeline).
+  Recorded state, staged review, constraints copy, QR-missing
+  branch, validation, storage, and RPC behavior untouched.
+- Reason: task §6 + design.md §§7.14–7.15 (external-payment
+  clarity, visual upload entry).
+- Details: no "Payment successful/Paid/Checkout" language anywhere
+  (verified by grep); rejected-payment has no resubmit path because
+  none exists server-side; help action omitted (none exists).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves detail + Home HTTP 200.
+- Limits/decisions: stopped before Phase 3C (confirm + rating).
+
+## 2026-09-13 — Redesign Phase 3C: confirm visual + rating identity
+
+- Changed (presentation only): delivered confirm card gains a
+  success-wash handoff visual and a direct receipt question plus a
+  "confirm only after you have your items" attestation line;
+  rating card gains a fallback avatar tile beside the helper
+  identity (no fake initials — IDs only, as before). Confirm
+  gating/loading/errors, rating eligibility/immutability/counter,
+  and all RPC behavior untouched.
+- Reason: task §7 + design.md §§7.12/7.17 (visual confirmation,
+  rating focus).
+- Details: "Not Yet, Still Waiting" omitted — no such backend
+  action exists (doing nothing already waits; a dismiss-only
+  button would be fake functionality). Stars stay amber per
+  design.md §5.1/§7.17 (red reads as error/destructive; status
+  pills already reserve red for disputes) — deliberate deviation
+  from the task text's "red stars" line, recorded here.
+  Verification badge omitted (unsupported). Input stars were
+  already 32pt/48pt targets.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves detail + list HTTP 200.
+- Limits/decisions: stopped before Phase 3D (notifications,
+  profile, account).
+
+## 2026-09-13 — Redesign Phase 3D: relative timestamps + account audit
+
+- Changed (presentation only): new `formatRelativeTime` helper
+  (`Just now` → `N min/hr` → `N days` → absolute fallback) adopted
+  by the shared notification center date line (benefits both roles'
+  inbox UI; no helper redesign). Route audit confirms no other
+  requester account routes exist — no personal-info, password,
+  preferences, help, or settings screens to redesign; sign-in and
+  role-recovery were covered in their own passes; Profile keeps its
+  minimal identity/orders/sign-out set with zero unsupported
+  additions.
+- Reason: task §8 + design.md §§7.18–7.19 (inbox triage, profile
+  restraint, account-route completeness).
+- Details: ordering still newest-first from backend (untouched);
+  unread dot already brand via Phase 1 tokens; mark-read-first
+  routing, badge, and all inbox states untouched.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves notifications + profile HTTP 200.
+- Limits/decisions: stopped before Phase 3E (state + nav audit).
+
+## 2026-09-13 — Redesign Phase 3E: state-gap audit + two fixes
+
+- Changed (state handling only): audited every requester route
+  against the §9 matrix (loading/empty/error + unavailable +
+  permission + session-expiry) — all covered except two genuine
+  gaps, both fixed without touching logic: Profile sign-out now
+  has busy/error states (`signOut()` throws on failure and was
+  previously passed raw to `onPress`, i.e. silent unhandled
+  rejection with a dead-feeling button); Home orders-preview
+  failure now renders a compact retry card instead of nothing
+  (menu stays usable underneath either way).
+- Reason: task §9 — no misleading blanks, no dead controls.
+- Details: verified ineligible-cancel stays hidden (server
+  double-guards), other-user orders hit the missing screen,
+  closed-stall submits surface server errors, session expiry has
+  friendly messages + gate redirect, confirmation math is
+  divide-safe (count ≥ 1 validated).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves root/Home/profile/list HTTP 200.
+- Limits/decisions: identical sign-out pattern remains in
+  helper/vendor profiles (out of requester scope — flagged);
+  stopped before Phase 3F (final polish + validation).
+
+## 2026-09-13 — Redesign Phase 3F: final polish + requester complete
+
+- Changed: "Order details" titles → "Request details" (vocabulary
+  consistency); primary-tone Badge text deepened to `primaryPressed`
+  (measured 4.38 → 6.53 contrast on `primarySoft` — real a11y fix,
+  zero layout change). Computed contrast for all 11 palette pairs:
+  everything essential passes 4.5+ (muted captions 3.70 stay
+  decorative-only by rule). Full battery green (below).
+- Reason: task §§10–13 — final consistency, contrast, responsive,
+  and validation gates; the Requester role is now complete.
+- Details: responsive verified statically at 320/375/390/430
+  (short tab labels, fitting strip/stars, wrapping names/values,
+  SafeArea bottom padding, persist-taps keyboard); content greps
+  clean (no preparing/pay-now/ETA/tracking language in source or
+  bundle; sole RM2.00 hit is an accurate code comment); no
+  console remnants; no test suite exists in package.json (N/A);
+  tablet max-width cap deliberately not built (phones are the
+  product — recorded as limitation, not defect).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; all 11
+  requester-relevant routes HTTP 200 from the fresh bundle.
+- Limits/decisions: interactive/device testing not verified (no
+  lab); helper/vendor/admin untouched per instructions; KAV +
+  sticky-action patterns deferred to device-verified passes.
+
+## 2026-09-13 — Audit fixes: load-failure retry + null-guard (requester)
+
+- Changed (state handling only, from the completion audit): item
+  detail and request detail now distinguish fetch failure
+  ("Couldn't load…", Try again re-runs the fetch) from genuine
+  missing data (existing unavailable/not-found screens); the
+  detail `reload()` path no longer flashes "not found" on
+  transient refresh failures (keeps on-screen state; realtime and
+  manual refresh reconcile); profile ID slice null-guarded.
+- Reason: no misleading blanks, no dead ends on flaky networks.
+- Details: no logic/backend/routing/copy changes beyond the two
+  new retry branches; mutation flows and guards untouched.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves item/order/profile routes HTTP 200.
+- Limits/decisions: identical patterns in helper/vendor left
+  untouched (requester track only); on-device smoke still pending.
+
+## 2026-09-13 — No-shadow UI + Home preview removed (requester)
+
+- Changed: all shadows removed — `shadows` token deleted from
+  `constants/theme.ts`; `Card`, `OptionCard`, and `BrandHeader`
+  are flat bordered surfaces (grep confirms zero shadow/elevation
+  usages in TS/TSX). Home active-request preview section deleted
+  entirely (loading/error/live/empty states with it); Home is now
+  greeting + banner + cart shortcut + vendor list, with menu-only
+  refresh. `docs/design.md` §5.5 updated to the no-shadow rule.
+- Reason: direct product direction (no shadows anywhere; active
+  requests live on the Requests tab + notifications, not Home).
+- Details: unused Home imports/hooks removed (`useMyOrders`,
+  preview helpers); no logic/backend/routing changes; orders and
+  notification flows untouched and still reachable.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/vendor/sign-in HTTP 200.
+- Limits/decisions: on-device smoke pending.
+
+## 2026-09-13 — Vendor hero overlay + compact card tiles
+
+- Changed: vendor hero is now a full-bleed image background
+  (edge-to-edge, rounded bottom) with a transparent-to-black
+  gradient shade, layered back button (top-left), and
+  name/badge/meta/description in white on the bottom portion
+  (new `expo-linear-gradient` dependency). Home vendor tiles
+  fixed to 88px squares (no more full-height stretch).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/vendor routes HTTP 200.
+
+## 2026-09-13 — Diagnostic placeholder image in all image slots
+
+- Changed: new shared `components/PlaceholderImage.tsx` rendering
+  the root `placeholder.png` (cover-fit); applied to the 5 true
+  image-content slots — Home banner tile, vendor card tiles,
+  vendor hero, food detail visual, menu row thumbs. Avatars,
+  icons, skeletons, and functional tinted surfaces deliberately
+  untouched (not image slots). Fixed two self-made issues along
+  the way (broken edit briefly dropping the vendor back button;
+  ImageStyle prop typing; unused eslint directive).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0
+  (zero warnings), `expo-doctor` 21/21, `expo export -p web
+  --clear` — pass; asset verified bundled
+  (`assets/placeholder.*.png`); Home/vendor/item routes HTTP 200.
+
+## 2026-09-13 — Floating tab bar over scrolled content (requester)
+
+- Changed: requester tab bar is now absolutely positioned so
+  scrolled content slides behind it instead of stopping above a
+  dead gap; bar keeps its surface, top border, height, and
+  gesture-area clearance. New `Screen underTabs` prop adds one
+  tab-height of bottom clearance, applied to the Home, Requests,
+  and Profile tab roots only — pushed screens keep tight padding.
+  No navigation, routing, color, or logic changes.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves all three tab routes HTTP 200.
+
+## 2026-09-13 — Vendor hero full-bleed + safe-area tab bar
+
+- Changed: vendor page native header removed — grey hero panel
+  is now the top visual (edge-to-edge left/right/top within the
+  safe area, rounded bottom corners) with an in-content back
+  button. Requester tab bar height/padding now absorbs the bottom
+  safe-area inset instead of sitting behind the system gesture
+  bar (helper/vendor layouts share the old pattern — flagged for
+  their own passes).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/vendor routes HTTP 200.
+
+## 2026-09-13 — Vendor page stream layout + quick-add rows
+
+- Changed (presentation + existing-logic reuse): vendor page hero
+  is now a full-bleed grey panel with rounded bottom corners,
+  name + Open pill row, place/schedule icon meta rows, and
+  description; menu rows carry grey thumb tiles and a red +
+  quick-add button (same `addItem(item, 1)` + `isAvailable` guard
+  as food detail; row tap still opens detail; unavailable rows
+  disabled + dimmed); compact cart shortcut added when non-empty.
+  `MenuItemRow` gains optional `thumbnail` + `onAdd` props
+  (chevron retained when absent). No queries, backend, or rules
+  changed; category chips and favorite heart omitted (no data or
+  feature behind them).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/vendor/item/cart routes HTTP 200.
+
+## 2026-09-13 — VendorCard: text status/hours + full-bleed tile
+
+- Changed (`components/VendorCard.tsx` only): supporting
+  description line and Open/Closed pill replaced by two plain-text
+  lines — colored Open/Closed status + operating hours (omitted
+  when absent); grey initials tile now spans the card's full left
+  edge and height (flush, no margin/padding; matching corner
+  radii, clipped). No data, navigation, or logic changes.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; Home serves HTTP 200.
+
+## 2026-09-13 — Homepage vendor-discovery refactor + Vendor Page
+
+- Changed: Home (`app/(requester)/index.tsx`) is now vendor
+  discovery — custom brand header (grey logo tile + reused
+  `HeaderBell`), time-based greeting with opt-in display name,
+  static red campus banner (white copy, grey icon tile, no
+  photo/dots/promos), `Available Vendors` cards (no See All — no
+  list route exists), live preview (now with real short request
+  ID), unchanged cart shortcut; menu sections/items removed from
+  Home. New `app/(requester)/vendors/[id].tsx` (hidden route):
+  grey-initials hero, real info rows, own menu via existing
+  `MenuItemRow` → existing detail route, full loading/error/
+  not-found/empty/closed states. New `components/VendorCard.tsx`
+  (grey initials from real names, description→location→hours
+  fallback line, Open/Closed pill). Search omitted (no backend).
+- Reason: requester Home → Vendor List → Vendor Page → Detail
+  journey; grey placeholders per direction (no images in product).
+- Details: vendor data from the same `useMenu()` sections (no new
+  queries); cart/preview/orders/confirmation/detail flows and all
+  guards untouched; 3 tabs unchanged; no backend changes.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/vendor/item/cart routes HTTP 200; greps
+  confirm no search field, See-All, teal remnants, or hardcoded
+  data in touched files; layouts reasoned at 320–430 (flex rows,
+  wrapping text, no fixed heights).
+- Limits/decisions: vendor covers photos not possible (no bucket);
+  category line uses real fallbacks; on-device smoke pending.

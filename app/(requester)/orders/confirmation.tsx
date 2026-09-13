@@ -46,12 +46,12 @@ export default function OrderConfirmationScreen() {
   if (!valid) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Request created' }} />
+        <Stack.Screen options={{ title: 'Request Submitted' }} />
         <Screen>
           <ErrorState
             title="Nothing to confirm"
-            message="This confirmation link is incomplete. Check My Orders for your requests."
-            retryTitle="View My Orders"
+            message="This confirmation link is incomplete. Check Requests for your orders."
+            retryTitle="View Requests"
             onRetry={() => router.replace('/(requester)/orders')}
           />
         </Screen>
@@ -59,21 +59,40 @@ export default function OrderConfirmationScreen() {
     );
   }
 
+  const singleId = count === 1 ? ids[0] : null;
+
   return (
     <>
-      <Stack.Screen options={{ title: 'Request created' }} />
+      <Stack.Screen options={{ title: 'Request Submitted' }} />
       <Screen>
         <View style={styles.visual}>
           <MaterialIcons name="check-circle" size={48} color={colors.success} />
         </View>
 
         <View style={styles.heading}>
-          <Text variant="title">Request created</Text>
+          <Text variant="title">Request Submitted!</Text>
           <Text color="secondary">Your request has been submitted successfully.</Text>
         </View>
 
         <Card>
+          <Text variant="subtitle">Request ID{count === 1 ? '' : 's'}</Text>
+          {ids.map((id) => (
+            <Text key={id} variant="secondary" color="secondary">
+              #{id.slice(0, 8)}
+            </Text>
+          ))}
+        </Card>
+
+        <Card>
           <Badge label="Waiting for a helper" tone="info" />
+          <Text color="secondary">
+            No helper assigned yet. You will get a notification when a helper accepts your
+            request.
+          </Text>
+        </Card>
+
+        <Card>
+          <Text variant="subtitle">Order summary</Text>
           <View style={styles.totalRow}>
             <Text color="secondary">Vendor{count === 1 ? '' : 's'}</Text>
             <Text variant="secondary" style={styles.value}>
@@ -111,18 +130,18 @@ export default function OrderConfirmationScreen() {
             </Text>
           </View>
           <Text variant="caption" color="muted">
-            No helper assigned yet. Pay externally after your food arrives.
+            Pay externally after your food arrives. Nothing is charged in the app.
           </Text>
         </Card>
 
-        <Button title="View My Orders" onPress={() => router.replace('/(requester)/orders')} />
-        {count === 1 ? (
+        {singleId ? (
           <Button
-            title="View request"
-            variant="secondary"
-            onPress={() => router.replace({ pathname: '/(requester)/orders/[id]', params: { id: ids[0] } })}
+            title="View Request"
+            onPress={() => router.replace({ pathname: '/(requester)/orders/[id]', params: { id: singleId } })}
           />
-        ) : null}
+        ) : (
+          <Button title="View Requests" onPress={() => router.replace('/(requester)/orders')} />
+        )}
         <Button
           title="Back to menu"
           variant="secondary"

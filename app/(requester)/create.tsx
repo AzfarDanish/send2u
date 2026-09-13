@@ -169,18 +169,22 @@ export default function CreateRequestScreen() {
           <Card>
             <View style={styles.subtotalRow}>
               <Text color="secondary">Items subtotal</Text>
-              <Text variant="secondary">{formatMYR(subtotalCents)}</Text>
+              <Text variant="secondary" style={styles.numeric}>
+                {formatMYR(subtotalCents)}
+              </Text>
             </View>
             <View style={styles.subtotalRow}>
               <Text color="secondary">
                 Delivery fee (est. {formatMYR(ESTIMATED_DELIVERY_FEE_CENTS)} × {groups.length})
               </Text>
-              <Text variant="secondary">{formatMYR(feeEstimateCents)}</Text>
+              <Text variant="secondary" style={styles.numeric}>
+                {formatMYR(feeEstimateCents)}
+              </Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.subtotalRow}>
               <Text variant="subtitle">Total (est.)</Text>
-              <Text variant="title" color="primary">
+              <Text variant="title" color="primary" style={styles.numeric}>
                 {formatMYR(totalEstimateCents)}
               </Text>
             </View>
@@ -281,6 +285,7 @@ const styles = StyleSheet.create({
   lineName: { fontWeight: '600', color: colors.text },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   divider: { borderTopWidth: 1, borderTopColor: colors.divider },
+  numeric: { fontVariant: ['tabular-nums'] as const },
   stateCard: { minHeight: 160, justifyContent: 'center' },
   locationsCard: { gap: 0 },
 });

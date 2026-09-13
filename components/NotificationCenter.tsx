@@ -12,7 +12,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useNotifications } from '@/hooks/useNotifications';
-import { formatOrderDate } from '@/lib/orders';
+import { formatRelativeTime } from '@/lib/orders';
 import type { UserRole } from '@/types/domain';
 
 const KIND_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
@@ -114,7 +114,7 @@ export function NotificationCenter({ role }: { role: UserRole }) {
                       {item.body}
                     </Text>
                     <Text variant="caption" color="muted">
-                      {formatOrderDate(item.createdAt)}
+                      {formatRelativeTime(item.createdAt)}
                     </Text>
                   </View>
                 </View>

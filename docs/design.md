@@ -218,7 +218,7 @@ Numeric emphasis: totals in `title`/`price` weight with `fontVariant: ['tabular-
 
 ### 5.5 Shadows and borders
 
-Borders first: 1px `border` on cards and row separators is the default separation on `background`. Shadows reserved for genuinely floating content: `card` (opacity .06/10px/2dp — standard Card), `lg` (modals/sheets/floating actions only). Never both heavy shadow and border on the same surface; never decorative glow. Dark-mode: out of scope (light-only product decision retained).
+Borders only: 1px `border` on cards and row separators is the sole separation mechanism on `background`. **Shadows are not used anywhere** (product decision — the `shadows` token was removed; `Card`, `OptionCard`, and brand tiles are flat bordered surfaces). Never add drop shadows, glows, or elevation for decoration. Dark-mode: out of scope (light-only product decision retained).
 
 ### 5.6 Icons
 

@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View, type PressableProps } from 'react-native';
 
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { Text } from '@/components/ui/Text';
 
 interface OptionCardProps extends Omit<PressableProps, 'style'> {
@@ -54,7 +54,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.divider,
     padding: spacing.lg,
-    ...shadows.card,
   },
   selected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   pressed: { opacity: 0.85 },

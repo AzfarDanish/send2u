@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { QuantityStepper } from '@/components/QuantityStepper';
+import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -27,6 +28,8 @@ export default function MenuItemDetailScreen() {
   const { addItem } = useCart();
   const [item, setItem] = useState<MenuItemWithVendor | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -39,6 +42,7 @@ export default function MenuItemDetailScreen() {
     setSeenId(id);
     setStatus('loading');
     setItem(null);
+    setLoadFailed(false);
     setJustAdded(false);
     setQuantity(1);
   }
@@ -50,16 +54,21 @@ export default function MenuItemDetailScreen() {
         const found = typeof id === 'string' ? await getMenuItem(id) : null;
         if (mounted) {
           setItem(found);
+          setLoadFailed(false);
           setStatus(found ? 'ready' : 'missing');
         }
       } catch {
-        if (mounted) setStatus('missing');
+        if (mounted) {
+          setItem(null);
+          setLoadFailed(true);
+          setStatus('missing');
+        }
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, retryToken]);
 
   const handleAdd = useCallback(() => {
     if (!item || !item.isAvailable) return;
@@ -74,6 +83,17 @@ export default function MenuItemDetailScreen() {
         <Screen>
           {status === 'loading' ? (
             <LoadingState message="Loading item…" />
+          ) : loadFailed ? (
+            <ErrorState
+              title="Couldn't load this item"
+              message="Check your connection and try again."
+              retryTitle="Try again"
+              onRetry={() => {
+                setLoadFailed(false);
+                setStatus('loading');
+                setRetryToken((t) => t + 1);
+              }}
+            />
           ) : (
             <ErrorState
               title="Item unavailable"
@@ -92,7 +112,7 @@ export default function MenuItemDetailScreen() {
       <Stack.Screen options={{ title: item.name }} />
       <Screen>
         <View style={styles.visual}>
-          <MaterialIcons name="restaurant-menu" size={48} color={colors.primary} />
+          <PlaceholderImage style={styles.visualImage} />
         </View>
 
         <View style={styles.heading}>
@@ -158,7 +178,9 @@ export default function MenuItemDetailScreen() {
                 <Text variant="caption" color="secondary">
                   Total
                 </Text>
-                <Text variant="subtitle">{formatMYR(item.priceCents * quantity)}</Text>
+                <Text variant="price" style={styles.totalAmount}>
+                  {formatMYR(item.priceCents * quantity)}
+                </Text>
               </View>
             </View>
             <Button
@@ -178,17 +200,18 @@ export default function MenuItemDetailScreen() {
 
 const styles = StyleSheet.create({
   visual: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primarySoft,
+    height: 200,
     borderRadius: radii.xl,
-    paddingVertical: spacing.xxxl,
+    backgroundColor: colors.surfaceSecondary,
+    overflow: 'hidden',
   },
+  visualImage: { borderRadius: radii.xl },
   heading: { gap: spacing.sm },
   vendorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   vendorText: { flex: 1, gap: spacing.xs },
   vendorName: { fontWeight: '600', color: colors.text },
   orderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   total: { alignItems: 'flex-end', gap: spacing.xs },
+  totalAmount: { fontVariant: ['tabular-nums'] as const },
   confirmRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { RatingInput, RatingStars } from '@/components/RatingStars';
 import { Button } from '@/components/ui/Button';
@@ -98,12 +99,19 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
 
   return (
     <Card>
-      <Text variant="subtitle">Rate your helper</Text>
-      {order.helperId ? (
-        <Text variant="caption" color="secondary">
-          Helper {order.helperId.slice(0, 8)}… · delivered your request
-        </Text>
-      ) : null}
+      <View style={styles.identity}>
+        <View style={styles.avatar}>
+          <MaterialIcons name="person" size={24} color={colors.primary} />
+        </View>
+        <View style={styles.identityText}>
+          <Text variant="subtitle">Rate your helper</Text>
+          {order.helperId ? (
+            <Text variant="caption" color="secondary">
+              Helper {order.helperId.slice(0, 8)}… · delivered your request
+            </Text>
+          ) : null}
+        </View>
+      </View>
       {loadError ? (
         <ErrorState title="Couldn't load ratings" message={loadError} retryTitle="Try again" onRetry={() => void load()} />
       ) : null}
@@ -170,6 +178,16 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
 
 const styles = StyleSheet.create({
   block: { gap: spacing.sm },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: radii.full,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identityText: { flex: 1, gap: spacing.xs },
   commentInput: {
     borderWidth: 1.5,
     borderColor: colors.primary,

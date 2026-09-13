@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StyleSheet, View } from 'react-native';
 
-import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { Text } from '@/components/ui/Text';
 
 interface BrandHeaderProps {
@@ -32,6 +32,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
-    ...shadows.card,
   },
 });

@@ -65,6 +65,8 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const [reason, setReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -82,10 +84,12 @@ export default function OrderDetailScreen() {
     try {
       const found = typeof id === 'string' ? await getOrderDetail(id) : null;
       setOrder(found);
+      setLoadFailed(false);
       setStatus(found ? 'ready' : 'missing');
     } catch {
-      setOrder(null);
-      setStatus('missing');
+      // Transient refresh failure: keep whatever is on screen rather than
+      // flashing a misleading "not found" state. Realtime and manual
+      // refresh paths retry; the next successful load reconciles.
     }
   }, [id]);
 
@@ -122,6 +126,7 @@ export default function OrderDetailScreen() {
     setReportCategory(null);
     setReportDetails('');
     setReportError(null);
+    setLoadFailed(false);
   }
 
   // Mount + id-change fetch. Inlined rather than calling reload(): a
@@ -135,11 +140,13 @@ export default function OrderDetailScreen() {
         const found = typeof id === 'string' ? await getOrderDetail(id) : null;
         if (mounted) {
           setOrder(found);
+          setLoadFailed(false);
           setStatus(found ? 'ready' : 'missing');
         }
       } catch {
         if (mounted) {
           setOrder(null);
+          setLoadFailed(true);
           setStatus('missing');
         }
       }
@@ -147,7 +154,7 @@ export default function OrderDetailScreen() {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, retryToken]);
 
   const handleCancel = useCallback(async () => {
     if (!order || cancelling) return;
@@ -196,10 +203,21 @@ export default function OrderDetailScreen() {
   if (status === 'loading' || !order) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Order details' }} />
+        <Stack.Screen options={{ title: 'Request details' }} />
         <Screen>
           {status === 'loading' ? (
             <LoadingState message="Loading order…" />
+          ) : loadFailed ? (
+            <ErrorState
+              title="Couldn't load the request"
+              message="Check your connection and try again."
+              retryTitle="Try again"
+              onRetry={() => {
+                setLoadFailed(false);
+                setStatus('loading');
+                setRetryToken((t) => t + 1);
+              }}
+            />
           ) : (
             <ErrorState
               title="Order not found"
@@ -256,6 +274,11 @@ export default function OrderDetailScreen() {
         <Text variant="caption" color="secondary">
           Request {order.id.slice(0, 8)}… · Placed {formatOrderDate(order.createdAt)}
         </Text>
+        {order.helperId ? (
+          <Text variant="caption" color="secondary">
+            Helper {order.helperId.slice(0, 8)}… accepted your request
+          </Text>
+        ) : null}
 
         <Card>
           <View style={styles.progress}>
@@ -320,11 +343,14 @@ export default function OrderDetailScreen() {
           <>
             <SectionHeader title="Required action" />
             <Card>
+              <View style={styles.confirmVisual}>
+                <MaterialIcons name="delivery-dining" size={40} color={colors.success} />
+              </View>
               <Badge label="Delivered" tone="success" />
               <Text variant="subtitle">Confirm delivery</Text>
               <Text color="secondary">
                 {order.deliveredAt ? `Delivered ${formatOrderDate(order.deliveredAt)}. ` : ''}
-                The helper marked this request as delivered.
+                The helper marked this request as delivered. Did you receive your items?
               </Text>
               {confirmError ? (
                 <ErrorState title="Could not confirm" message={confirmError} retryTitle="Dismiss" onRetry={() => setConfirmError(null)} />
@@ -336,7 +362,8 @@ export default function OrderDetailScreen() {
                 loading={confirming}
               />
               <Text variant="caption" color="muted">
-                By confirming, you attest that you received the request.
+                By confirming, you attest that you received the request. Confirm only after
+                you have your items.
               </Text>
               <Button
                 title={reportOpen ? 'Hide problem report' : 'Report an issue'}
@@ -464,4 +491,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   reportForm: { gap: spacing.md },
+  confirmVisual: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.xl,
+  },
 });

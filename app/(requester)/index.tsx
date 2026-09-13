@@ -1,179 +1,175 @@
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { MenuItemRow } from '@/components/MenuItemRow';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { HeaderBell } from '@/components/HeaderBell';
+import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { VendorCard } from '@/components/VendorCard';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
-import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
+import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import { useMenu } from '@/hooks/useMenu';
-import { useMyOrders } from '@/hooks/useMyOrders';
 import { formatMYR } from '@/lib/money';
-import {
-  orderItemsTitle,
-  orderStatusTone,
-  orderTotalCents,
-  requesterStatusMessage,
-} from '@/lib/orders';
-import type { MenuItemWithVendor } from '@/types/domain';
+import type { Vendor } from '@/types/domain';
+
+/** Time-based greeting from the device clock; never hardcoded per user. */
+function greetingForHour(hour: number): string {
+  if (hour < 12) return 'Good morning.';
+  if (hour < 18) return 'Good afternoon.';
+  return 'Good evening.';
+}
 
 export default function RequesterHomeScreen() {
-  const { sections, itemCount, status, error, refreshing, retry, refresh } = useMenu();
-  const {
-    orders,
-    status: ordersStatus,
-    refreshing: ordersRefreshing,
-    refresh: refreshOrders,
-  } = useMyOrders();
+  const { sections, status, error, refreshing, retry, refresh } = useMenu();
   const { count, subtotalCents } = useCart();
+  const { profile } = useAuth();
 
-  const openItem = useCallback((item: MenuItemWithVendor) => {
-    router.push({ pathname: '/(requester)/menu/[id]', params: { id: item.id } });
+  const openVendor = useCallback((vendor: Vendor) => {
+    router.push({ pathname: '/(requester)/vendors/[id]', params: { id: vendor.id } });
   }, []);
 
-  const refreshAll = useCallback(async () => {
-    await Promise.all([refresh(), refreshOrders()]);
-  }, [refresh, refreshOrders]);
-
-  // `listMyOrders` returns active orders only, newest first.
-  const preview = orders.length > 0 ? orders[0] : null;
+  const greeting = greetingForHour(new Date().getHours());
+  const greetedName = profile?.displayName ? `, ${profile.displayName}` : '';
 
   return (
-    <Screen
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing || ordersRefreshing}
-          onRefresh={() => void refreshAll()}
-          tintColor={colors.primary}
-        />
-      }>
-      <SectionHeader eyebrow="Today on campus" title="Good food, carried by students" />
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Screen
+        underTabs
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void refresh()}
+            tintColor={colors.primary}
+          />
+        }>
+        <View style={styles.brandRow}>
+          <View style={styles.logoTile}>
+            <MaterialIcons name="send" size={22} color={colors.secondary} />
+          </View>
+          <Text variant="title">Send2U</Text>
+          <View style={styles.brandSpacer} />
+          <HeaderBell role="requester" />
+        </View>
 
-      {ordersStatus === 'loading' ? (
-        <Card style={styles.previewLoading}>
-          <LoadingState message="Checking your requests…" />
-        </Card>
-      ) : null}
-      {/* On orders error the menu below stays fully usable; no preview shown. */}
-      {ordersStatus === 'ready' || ordersStatus === 'empty' ? (
-        preview ? (
-          <Card>
-            <Badge label={requesterStatusMessage(preview.status)} tone={orderStatusTone(preview.status)} />
-            <Text variant="subtitle">{orderItemsTitle(preview.items)}</Text>
-            <Text variant="caption" color="secondary">
-              {preview.vendor.name} · {formatMYR(orderTotalCents(preview.subtotalCents, preview.deliveryFeeCents))}
+        <View style={styles.greeting}>
+          <Text color="secondary">
+            {greeting}
+            {greetedName}
+          </Text>
+          <Text variant="title">What would you like to eat today?</Text>
+        </View>
+
+        <View style={styles.banner}>
+          <View style={styles.bannerText}>
+            <Text variant="title" style={styles.bannerTitle}>
+              Good Food,{'\n'}Brighter Days
             </Text>
-            <Button
-              title="View request"
-              variant="secondary"
-              onPress={() =>
-                router.push({ pathname: '/(requester)/orders/[id]', params: { id: preview.id } })
-              }
-            />
-            {orders.length > 1 ? (
-              <Button
-                title={`View all ${orders.length} active requests`}
-                variant="tertiary"
-                onPress={() => router.push('/(requester)/orders')}
-              />
-            ) : null}
-          </Card>
-        ) : (
+            <Text style={styles.bannerSubtitle}>From our campus vendors to you</Text>
+          </View>
+          <View style={styles.bannerTile}>
+            <PlaceholderImage style={styles.bannerImage} />
+          </View>
+        </View>
+
+        {count > 0 ? (
           <Card>
-            <Badge label="No active requests" tone="neutral" />
-            <Text variant="subtitle">No active requests</Text>
-            <Text color="secondary">Your current requests will appear here.</Text>
             <ListRow
-              icon="add-circle-outline"
-              title="Start a request"
+              icon="shopping-cart"
+              title={`Cart · ${count} item${count === 1 ? '' : 's'}`}
+              subtitle={formatMYR(subtotalCents)}
               onPress={() => router.push('/(requester)/create')}
             />
           </Card>
-        )
-      ) : null}
+        ) : null}
 
-      {count > 0 ? (
-        <Card>
-          <ListRow
-            icon="shopping-cart"
-            title={`Cart · ${count} item${count === 1 ? '' : 's'}`}
-            subtitle={formatMYR(subtotalCents)}
-            onPress={() => router.push('/(requester)/create')}
-          />
-        </Card>
-      ) : null}
-
-      <SectionHeader
-        title="Today's menu"
-        badge={status === 'ready' ? `${itemCount} items` : undefined}
-      />
-      {status === 'loading' ? (
-        <Card style={styles.stateCard}>
-          <LoadingState message="Loading today's menu…" />
-        </Card>
-      ) : null}
-      {status === 'error' ? (
-        <Card style={styles.stateCard}>
-          <ErrorState
-            title="Couldn't load the menu"
-            message={error ?? 'Check your connection and try again.'}
-            retryTitle="Try again"
-            onRetry={retry}
-          />
-        </Card>
-      ) : null}
-      {status === 'empty' ? (
-        <EmptyState
-          icon="storefront"
-          title="No menu today"
-          message="Pull down to check again."
-        />
-      ) : null}
-      {status === 'ready'
-        ? sections.map((section) => (
-            <View key={section.vendor.id} style={styles.vendorSection}>
-              <View style={styles.vendorHeader}>
-                <View style={styles.vendorText}>
-                  <Text variant="subtitle">{section.vendor.name}</Text>
-                  {section.vendor.locationHint ? (
-                    <Text variant="caption" color="secondary">
-                      {section.vendor.locationHint}
-                    </Text>
-                  ) : null}
-                  {section.vendor.operatingHours ? (
-                    <Text variant="caption" color="secondary">
-                      {section.vendor.operatingHours}
-                    </Text>
-                  ) : null}
+        <SectionHeader title="Available Vendors" />
+        {status === 'loading' ? (
+          <View accessibilityRole="progressbar" accessibilityLabel="Loading vendors">
+            {[0, 1, 2].map((row) => (
+              <Card key={row} style={styles.vendorSkeleton}>
+                <Skeleton width={64} height={64} radius={radii.md} />
+                <View style={styles.skeletonText}>
+                  <Skeleton width="60%" height={20} />
+                  <Skeleton width="80%" height={14} />
+                  <Skeleton width="30%" height={22} radius={radii.full} />
                 </View>
-                {!section.vendor.isOpen ? <Badge label="Closed" tone="warning" /> : null}
-              </View>
-              <Card style={styles.itemsCard}>
-                {section.items.map((item) => (
-                  <MenuItemRow key={item.id} item={item} onPress={openItem} />
-                ))}
               </Card>
-            </View>
-          ))
-        : null}
-    </Screen>
+            ))}
+          </View>
+        ) : null}
+        {status === 'error' ? (
+          <Card style={styles.stateCard}>
+            <ErrorState
+              title="Couldn't load vendors"
+              message={error ?? 'Check your connection and try again.'}
+              retryTitle="Try again"
+              onRetry={retry}
+            />
+          </Card>
+        ) : null}
+        {status === 'empty' ? (
+          <EmptyState
+            icon="storefront"
+            title="No vendors today"
+            message="Pull down to check again."
+          />
+        ) : null}
+        {status === 'ready'
+          ? sections.map((section) => (
+              <VendorCard
+                key={section.vendor.id}
+                vendor={section.vendor}
+                onPress={openVendor}
+              />
+            ))
+          : null}
+      </Screen>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   stateCard: { minHeight: 200, justifyContent: 'center' },
-  previewLoading: { minHeight: 120, justifyContent: 'center' },
-  vendorSection: { gap: spacing.md },
-  vendorHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  vendorText: { flex: 1, gap: spacing.xs },
-  itemsCard: { gap: 0 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  logoTile: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandSpacer: { flex: 1 },
+  greeting: { gap: spacing.xs },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+  },
+  bannerText: { flex: 1, gap: spacing.xs },
+  bannerTitle: { color: colors.onPrimary },
+  bannerSubtitle: { color: colors.onPrimary, fontSize: 15, lineHeight: 22 },
+  bannerTile: {
+    width: 88,
+    height: 88,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceSecondary,
+    overflow: 'hidden',
+  },
+  bannerImage: { borderRadius: radii.lg },
+  vendorSkeleton: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  skeletonText: { flex: 1, gap: spacing.xs },
 });

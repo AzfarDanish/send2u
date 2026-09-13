@@ -1,17 +1,18 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { PrivateImage } from '@/components/PrivateImage';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { StagedFileCard } from '@/components/StagedFileCard';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
+import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { formatMYR } from '@/lib/money';
 import { getPaymentContext, submitPaymentEvidence, type PaymentContext } from '@/services/payments';
@@ -233,10 +234,18 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       ) : (
         <>
           <Text variant="subtitle">Amount to pay: {formatMYR(context.totalCents)}</Text>
-          <Text color="secondary">1. Open your banking app.</Text>
-          <Text color="secondary">2. Scan the provided QR code.</Text>
-          <Text color="secondary">3. Complete the payment.</Text>
-          <Text color="secondary">4. Save the payment receipt.</Text>
+          {context.helperId ? (
+            <Text variant="caption" color="secondary">
+              Helper {context.helperId.slice(0, 8)}… will receive this payment directly.
+            </Text>
+          ) : null}
+          <View style={styles.stepsCard}>
+            <Text variant="subtitle">Pay outside the app</Text>
+            <Text color="secondary">1. Open your banking app.</Text>
+            <Text color="secondary">2. Scan the provided QR code.</Text>
+            <Text color="secondary">3. Complete the payment.</Text>
+            <Text color="secondary">4. Save the payment receipt.</Text>
+          </View>
           {context.helperQrPath ? (
             <>
               <PrivateImage path={context.helperQrPath} accessibilityLabel="Helper payment QR code" />
@@ -273,12 +282,33 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
             />
           ) : (
             <>
-              <Button
-                title={busy ? (busyMessage ?? 'Working…') : 'Submit payment receipt'}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose payment receipt"
+                accessibilityState={{ disabled: busy || !context.helperQrPath, busy }}
                 onPress={() => void handleChoose()}
                 disabled={busy || !context.helperQrPath}
-                loading={busy}
-              />
+                style={({ pressed }) => [
+                  styles.uploadArea,
+                  (busy || !context.helperQrPath) && styles.uploadDisabled,
+                  pressed && !(busy || !context.helperQrPath) && styles.pressed,
+                ]}>
+                {busy ? (
+                  <ActivityIndicator size="large" color={colors.primary} />
+                ) : (
+                  <MaterialIcons
+                    name="upload-file"
+                    size={40}
+                    color={!context.helperQrPath ? colors.disabled : colors.primary}
+                  />
+                )}
+                <Text variant="subtitle">
+                  {busy ? (busyMessage ?? 'Working…') : 'Choose receipt'}
+                </Text>
+                <Text variant="caption" color="secondary" style={styles.uploadHint}>
+                  Tap to pick your payment receipt
+                </Text>
+              </Pressable>
               <Text variant="caption" color="muted">
                 PDF or photo (JPG, PNG, WEBP, HEIC), up to 10 MB. Nothing uploads until you confirm.
               </Text>
@@ -293,4 +323,25 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
 const styles = StyleSheet.create({
   stateCard: { minHeight: 160, justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  stepsCard: {
+    gap: spacing.xs,
+    backgroundColor: colors.warningSoft,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+  },
+  uploadArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 148,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
+  },
+  uploadDisabled: { borderColor: colors.disabledBackground, backgroundColor: colors.surfaceSecondary },
+  pressed: { opacity: 0.7 },
+  uploadHint: { textAlign: 'center' },
 });

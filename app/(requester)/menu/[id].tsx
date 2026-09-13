@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { QuantityStepper } from '@/components/QuantityStepper';
+import { CartFab } from '@/components/CartFab';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -99,7 +100,10 @@ export default function MenuItemDetailScreen() {
               title="Item unavailable"
               message="This dish isn't on the menu right now. Pick something else tasty."
               retryTitle="Back to menu"
-              onRetry={() => router.back()}
+              onRetry={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(requester)');
+              }}
             />
           )}
         </Screen>
@@ -194,6 +198,7 @@ export default function MenuItemDetailScreen() {
           </Card>
         )}
       </Screen>
+      <CartFab />
     </>
   );
 }

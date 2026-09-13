@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useReducer, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useReducer, useState, type ReactNode } from 'react';
 
 import type { CartLine, MenuItemWithVendor } from '@/types/domain';
 
@@ -59,6 +59,9 @@ interface CartContextValue {
   setQuantity: (itemId: string, quantity: number) => void;
   removeItem: (itemId: string) => void;
   clear: () => void;
+  /** Selected drop-off point for the current draft request. In-memory only. */
+  locationId: string | null;
+  setLocationId: (locationId: string | null) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -66,10 +69,19 @@ const CartContext = createContext<CartContextValue | null>(null);
 /**
  * Local in-memory cart. Intentionally not persisted: the Create tab submits
  * it through `placeOrders` (one order per vendor) and clears it only after
- * confirmed database success. No fees, checkout, or payment here.
+ * confirmed database success. No fees, checkout, or payment here. The
+ * selected drop-off point rides along as draft state so the Location
+ * picker page and Review Request share one selection; it resets with
+ * the cart.
  */
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { lines: [] });
+  const [locationId, setLocationId] = useState<string | null>(null);
+
+  const clear = useCallback(() => {
+    dispatch({ type: 'clear' });
+    setLocationId(null);
+  }, []);
 
   const value = useMemo<CartContextValue>(() => {
     const count = state.lines.reduce((sum, line) => sum + line.quantity, 0);
@@ -84,9 +96,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem: (item, quantity) => dispatch({ type: 'add', item, quantity }),
       setQuantity: (itemId, quantity) => dispatch({ type: 'setQty', itemId, quantity }),
       removeItem: (itemId) => dispatch({ type: 'remove', itemId }),
-      clear: () => dispatch({ type: 'clear' }),
+      clear,
+      locationId,
+      setLocationId,
     };
-  }, [state]);
+  }, [state, locationId, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

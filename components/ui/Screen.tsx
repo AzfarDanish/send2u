@@ -23,13 +23,15 @@ interface ScreenProps {
    * instead of clipping above it. Leave off for pushed (stack) screens.
    */
   underTabs?: boolean;
+  /** Indices of children to pin while scrolling (e.g. a filter bar). */
+  stickyHeaderIndices?: number[];
 }
 
 /**
  * Send2U screen shell: light background, safe areas, consistent padding.
  * Scrollable by default so content survives small screens.
  */
-export function Screen({ children, scrollable = true, contentStyle, refreshControl, underTabs = false }: ScreenProps) {
+export function Screen({ children, scrollable = true, contentStyle, refreshControl, underTabs = false, stickyHeaderIndices }: ScreenProps) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       {scrollable ? (
@@ -42,6 +44,7 @@ export function Screen({ children, scrollable = true, contentStyle, refreshContr
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={stickyHeaderIndices}
           refreshControl={refreshControl}>
           {children}
         </ScrollView>

@@ -150,7 +150,10 @@ export default function JobDetailScreen() {
               title="Job not available"
               message="This request is no longer open. It may have been taken by another helper."
               retryTitle="Back to jobs"
-              onRetry={() => router.back()}
+              onRetry={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(helper)');
+              }}
             />
           )}
         </Screen>
@@ -231,7 +234,14 @@ export default function JobDetailScreen() {
               <Text variant="subtitle">Job accepted — it&apos;s yours</Text>
             </View>
             <Button title="View My Deliveries" onPress={() => router.replace('/(helper)/deliveries')} />
-            <Button title="Back to jobs" variant="secondary" onPress={() => router.back()} />
+            <Button
+              title="Back to jobs"
+              variant="secondary"
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(helper)');
+              }}
+            />
           </Card>
         ) : pending ? (
           <Card>
@@ -428,7 +438,14 @@ export default function JobDetailScreen() {
             <Text variant="caption" color="muted">
               This job is no longer open.
             </Text>
-            <Button title="Back to jobs" variant="secondary" onPress={() => router.back()} />
+            <Button
+              title="Back to jobs"
+              variant="secondary"
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(helper)');
+              }}
+            />
           </Card>
         )}
 

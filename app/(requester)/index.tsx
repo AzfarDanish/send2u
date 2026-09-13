@@ -5,20 +5,18 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { HeaderBell } from '@/components/HeaderBell';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { CartFab } from '@/components/CartFab';
 import { VendorCard } from '@/components/VendorCard';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
-import { useCart } from '@/contexts/CartContext';
 import { useMenu } from '@/hooks/useMenu';
-import { formatMYR } from '@/lib/money';
 import type { Vendor } from '@/types/domain';
 
 /** Time-based greeting from the device clock; never hardcoded per user. */
@@ -30,7 +28,6 @@ function greetingForHour(hour: number): string {
 
 export default function RequesterHomeScreen() {
   const { sections, status, error, refreshing, retry, refresh } = useMenu();
-  const { count, subtotalCents } = useCart();
   const { profile } = useAuth();
 
   const openVendor = useCallback((vendor: Vendor) => {
@@ -81,17 +78,6 @@ export default function RequesterHomeScreen() {
           </View>
         </View>
 
-        {count > 0 ? (
-          <Card>
-            <ListRow
-              icon="shopping-cart"
-              title={`Cart · ${count} item${count === 1 ? '' : 's'}`}
-              subtitle={formatMYR(subtotalCents)}
-              onPress={() => router.push('/(requester)/create')}
-            />
-          </Card>
-        ) : null}
-
         <SectionHeader title="Available Vendors" />
         {status === 'loading' ? (
           <View accessibilityRole="progressbar" accessibilityLabel="Loading vendors">
@@ -134,6 +120,7 @@ export default function RequesterHomeScreen() {
             ))
           : null}
       </Screen>
+      <CartFab aboveTabs />
     </>
   );
 }

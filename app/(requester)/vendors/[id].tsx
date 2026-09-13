@@ -1,16 +1,16 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { MenuItemRow } from '@/components/MenuItemRow';
+import { CartFab } from '@/components/CartFab';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -18,8 +18,25 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
 import { useMenu } from '@/hooks/useMenu';
-import { formatMYR } from '@/lib/money';
 import type { MenuItemWithVendor } from '@/types/domain';
+
+/**
+ * Client-side faceting only: the backend has no category column, so the
+ * filter bar groups this vendor's real items by drink-name hints
+ * (teh/kopi/milo/juice/…). Items, prices, and availability are untouched —
+ * only which rows render changes. The bar appears only when it can
+ * actually filter (more than one group present).
+ */
+const DRINK_HINTS = [
+  'teh', 'kopi', 'milo', 'nescafe', 'juice', 'jus', 'sirap', 'bandung',
+  'latte', 'cappuccino', 'mocha', 'tea', 'coffee', 'susu', 'soya',
+  'cendol', 'lemon', 'limau', 'cola', 'soda', 'drink', 'minuman',
+];
+
+function menuCategory(item: MenuItemWithVendor): string {
+  const haystack = `${item.name} ${item.description ?? ''}`.toLowerCase();
+  return DRINK_HINTS.some((hint) => haystack.includes(hint)) ? 'Drinks' : 'Food';
+}
 
 /**
  * Requester vendor page: one stall's hero plus its own menu only.
@@ -30,15 +47,17 @@ export default function VendorPageScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { sections, status, error, retry } = useMenu();
   const [seenId, setSeenId] = useState(id);
+  const [category, setCategory] = useState('All');
   if (seenId !== id) {
     setSeenId(id);
+    setCategory('All');
   }
 
   const openItem = useCallback((item: MenuItemWithVendor) => {
     router.push({ pathname: '/(requester)/menu/[id]', params: { id: item.id } });
   }, []);
 
-  const { addItem, count, subtotalCents } = useCart();
+  const { addItem } = useCart();
 
   // Same rule as food detail: quick-add writes one unit to the local cart
   // only when the item is available; unavailable items stay disabled.
@@ -52,6 +71,23 @@ export default function VendorPageScreen() {
 
   const section =
     typeof id === 'string' ? (sections.find((s) => s.vendor.id === id) ?? null) : null;
+
+  // Unconditional (above all early returns): category faceting over
+  // whatever items are currently loaded.
+  const buckets = useMemo(() => {
+    const seen: string[] = [];
+    for (const item of section?.items ?? []) {
+      const bucket = menuCategory(item);
+      if (!seen.includes(bucket)) seen.push(bucket);
+    }
+    return seen;
+  }, [section]);
+  const categories = useMemo(() => ['All', ...buckets], [buckets]);
+  const showBar = buckets.length > 1;
+  const visibleItems = useMemo(() => {
+    const list = section?.items ?? [];
+    return category === 'All' ? list : list.filter((item) => menuCategory(item) === category);
+  }, [section, category]);
 
   if (status === 'loading') {
     return (
@@ -91,7 +127,10 @@ export default function VendorPageScreen() {
             title="Vendor not found"
             message="This stall isn't available right now. Pick another vendor."
             retryTitle="Back to Home"
-            onRetry={() => router.back()}
+            onRetry={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace('/(requester)');
+            }}
           />
         </Screen>
       </>
@@ -103,7 +142,9 @@ export default function VendorPageScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <Screen contentStyle={styles.noTopPad}>
+      <Screen
+        contentStyle={styles.noTopPad}
+        stickyHeaderIndices={showBar ? [1] : undefined}>
         <View style={styles.heroPanel}>
           <PlaceholderImage style={styles.heroBackground} />
           <LinearGradient
@@ -113,7 +154,12 @@ export default function VendorPageScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Back to Home"
-            onPress={() => router.back()}
+            onPress={() => {
+              // Vendor pages open from Home; a history-less entry (deep
+              // link) falls back there explicitly instead of a dead button.
+              if (router.canGoBack()) router.back();
+              else router.replace('/(requester)');
+            }}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
             hitSlop={8}>
             <MaterialIcons name="chevron-left" size={26} color={colors.primary} />
@@ -154,15 +200,36 @@ export default function VendorPageScreen() {
           </View>
         </View>
 
-        {count > 0 ? (
-          <Card>
-            <ListRow
-              icon="shopping-cart"
-              title={`Cart · ${count} item${count === 1 ? '' : 's'}`}
-              subtitle={formatMYR(subtotalCents)}
-              onPress={() => router.push('/(requester)/create')}
-            />
-          </Card>
+        {showBar ? (
+          <View style={styles.stickyBar}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chips}>
+              {categories.map((name) => {
+                const selected = name === category;
+                return (
+                  <Pressable
+                    key={name}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Show ${name}`}
+                    onPress={() => setCategory(name)}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      selected && styles.chipSelected,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text
+                      variant="secondary"
+                      style={selected ? styles.chipLabelSelected : styles.chipLabel}>
+                      {name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
         ) : null}
 
         <SectionHeader
@@ -176,8 +243,8 @@ export default function VendorPageScreen() {
             message="This stall hasn't listed any food. Check back later."
           />
         ) : (
-          <Card style={styles.itemsCard}>
-            {items.map((item) => (
+          <View style={styles.list}>
+            {visibleItems.map((item) => (
               <MenuItemRow
                 key={item.id}
                 item={item}
@@ -186,9 +253,10 @@ export default function VendorPageScreen() {
                 onAdd={quickAdd}
               />
             ))}
-          </Card>
+          </View>
         )}
       </Screen>
+      <CartFab />
     </>
   );
 }
@@ -236,5 +304,24 @@ const styles = StyleSheet.create({
   heroName: { flex: 1, color: colors.onPrimary },
   heroText: { color: colors.onPrimary },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  itemsCard: { gap: 0 },
+  stickyBar: {
+    backgroundColor: colors.background,
+    marginHorizontal: -spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+  },
+  chips: { gap: spacing.sm, paddingRight: spacing.xl },
+  chip: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.full,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
+  chipLabel: { fontWeight: '600', color: colors.secondary },
+  chipLabelSelected: { fontWeight: '600', color: colors.onPrimary },
+  list: { gap: spacing.md },
 });

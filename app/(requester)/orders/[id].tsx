@@ -223,7 +223,10 @@ export default function OrderDetailScreen() {
               title="Order not found"
               message="This order isn't available to you. It may belong to another requester."
               retryTitle="Back to orders"
-              onRetry={() => router.back()}
+              onRetry={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(requester)/orders');
+              }}
             />
           )}
         </Screen>

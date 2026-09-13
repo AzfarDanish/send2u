@@ -993,6 +993,164 @@ only. No secrets are ever recorded here.
   bundle serves Home/vendor/sign-in HTTP 200.
 - Limits/decisions: on-device smoke pending.
 
+## 2026-09-13 — Picker back button + even FAB gaps
+
+- Changed: drop-off picker uses the Review Request header
+  pattern (in-content back chevron + centered title, native
+  header off; `canGoBack` with Review Request fallback). Cart
+  FAB bottom offset now mirrors its 20pt right gap — above the
+  tab bar on Home, above the screen edge elsewhere.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0
+  (zero warnings), `expo-doctor` 21/21, `expo export -p web
+  --clear` — pass; Home/picker/cart routes HTTP 200.
+
+## 2026-09-13 — Origin-aware back navigation everywhere
+
+- Changed: every bare `router.back()` fallback now uses
+  `canGoBack()` with a contextual explicit destination —
+  location select already returned correctly; hardened the
+  Review Request and Vendor Page back buttons, the
+  item/order/vendor/job missing screens, and both helper
+  "Back to jobs" buttons (each falls back to its genuine
+  parent list: Home, Requests, job queue — never a universal
+  Home). No routing-structure, backend, or behavior changes
+  otherwise; terminal replaces and auth Redirects untouched
+  as intentional.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; 11
+  spot-checked routes HTTP 200. Interactive back/gesture
+  testing pending (no devices).
+
+## 2026-09-13 — Manual-return picker + floating cart button
+
+- Changed: location picker is now select-only (tap sets the
+  shared draft value; return is via back, nothing
+  auto-redirects). Cart cards removed from Home and vendor
+  page; new shared `CartFab` (red circle, count badge, bottom-
+  right, clears the floating tab bar on Home) renders on Home,
+  vendor, and item pages whenever the cart is non-empty — never
+  on Profile. No cart math, validation, navigation, or backend
+  changes.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/vendor/item/picker/cart routes HTTP 200.
+
+## 2026-09-13 — Navigation chain hardening (location + draft safety)
+
+- Changed: investigated the reported location→Home redirect
+  against root layout, auth lifecycle, all 53 navigation calls,
+  and provider remount semantics. No code path targets Home in
+  that flow; the credible in-app mechanisms are (a) a transient
+  auth-identity flap remounting the `key={user?.id}` cart
+  provider and wiping the draft (perceived as being thrown out
+  of the flow), and (b) history-less entry where bare `back()`
+  is a no-op. Fixes: cart key now pins the last known account
+  across transient nulls (real account change still remounts
+  fresh); location select and the custom back buttons on Review
+  Request and Vendor Page now use `canGoBack()` with explicit
+  correct-destination fallbacks (Review Request / Home
+  respectively) instead of bare `back()`. No routing-structure,
+  backend, or behavior changes otherwise.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; all
+  16 spot-checked routes HTTP 200. Interactive back/gesture
+  testing remains pending (no devices in this environment).
+
+## 2026-09-13 — Navigation audit: chain integrity + terminal submit
+
+- Changed (one line): request submission now `replace`s (not
+  `push`es) the confirmation screen, so the emptied cart leaves
+  history — back from confirmation/orders returns to the menu,
+  never to a cleared Review Request. Full audit (53 navigation
+  calls inventoried) found everything else correct: the reported
+  location→Home redirect does not exist in code (picker uses
+  `router.back()` to Review Request with shared draft state;
+  cancel preserves the prior value); all list→detail flows push;
+  confirmation/helper-accept replaces are intentional terminal
+  transitions; auth/role Redirects are transition-correct; no
+  BackHandler overrides (platform back matches visible buttons).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; all
+  24 routes (requester/helper/vendor/auth) HTTP 200; no admin
+  routes exist (none invented).
+
+## 2026-09-13 — Tabs-only bar + standalone Location picker page
+
+- Changed: tab bar now renders on Home, Requests, and Profile
+  only — all other requester routes hide it; `underTabs`
+  clearance removed from pushed screens (kept on the 3 tabs).
+  New `app/(requester)/location.tsx` picker (native header back,
+  radio list, select returns automatically); draft `locationId`
+  moved into CartContext (resets with the cart; validation,
+  submit, and fee logic identical). Review Request location
+  section is now a summary row linking to the picker.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves tabs + cart + picker + detail routes HTTP 200.
+
+## 2026-09-13 — Review Request mockup layout (no mockup content)
+
+- Changed (`app/(requester)/create.tsx`, `_layout.tsx`): layout
+  rebuilt to the mockup arrangement with real data only —
+  in-content header (back + centered title, native header off),
+  Order Items with placeholder thumbs + unit prices + steppers,
+  per-vendor name/location rows, collapsible drop-off summary
+  (auto-open until chosen) over the unchanged radio list, plain
+  subtotal/fee/total rows, full-width Submit Request, tab bar
+  hidden on this page. Edit button omitted (no edit mode exists;
+  steppers are always live). Notes field omitted (backend
+  accepts ids + quantities only — a notes box would mislead).
+  Submit/validation/fee/error logic byte-identical.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves cart/Home/vendor routes HTTP 200.
+
+## 2026-09-13 — Profile hub: locations/help/report pages, no stats
+
+- Changed: profile rebuilt to the mockup layout — red initial
+  avatar (real display name/email), Requester pill, 5-row menu
+  (My Requests, Saved Drop-off Locations, Notifications, Help
+  Center, Report an Issue; red icons, chevrons), pale-red Sign
+  out, dev switcher kept. New hidden routes: `locations`
+  (read-only predefined drop-off browser), `help` (static honest
+  flow guides, no invented contacts), `report` (delivered-only
+  order list linking to detail where the real form lives).
+  Stats row skipped per direction; settings gear omitted (no
+  settings backend). Fixed a self-made apostrophe lint error.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; all 4
+  routes HTTP 200.
+
+## 2026-09-13 — Tab-bar clearance on all pushed requester screens
+
+- Changed: root cause of the stuck-behind-the-bar bug — pushed
+  stack screens render under the floating tab bar but never got
+  the `underTabs` bottom clearance (only the 3 tab roots had
+  it), so fully-scrolled end content had nowhere left to go.
+  Added `underTabs` to vendor, item, Review Request, order
+  detail (all 3 branches), and confirmation (both branches).
+  No navigation, color, logic, or backend changes.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves all 5 pushed routes HTTP 200.
+
+## 2026-09-13 — Vendor stream layout: sticky filters + floating cards
+
+- Changed: `MenuItemRow` rebuilt as a floating card (bordered
+  white, soft ambient shadow — explicit approved exception to the
+  shadow-free system; 16:9 visual slot; stacked title + price;
+  bottom-right red + button). Vendor page gains a sticky
+  All/Food/Drinks filter bar under the hero (new `Screen`
+  `stickyHeaderIndices` passthrough; bar appears only when it can
+  filter; menu list is now spaced individual cards). Category
+  buckets are a documented client-side name heuristic (no backend
+  column exists); items, prices, availability, and cart rules
+  untouched. Fixed a self-made hooks-ordering slip during the
+  build (memos above early returns).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; fresh
+  bundle serves Home/vendor/item/cart routes HTTP 200.
+
 ## 2026-09-13 — Vendor hero overlay + compact card tiles
 
 - Changed: vendor hero is now a full-bleed image background
@@ -1102,3 +1260,32 @@ only. No secrets are ever recorded here.
   wrapping text, no fixed heights).
 - Limits/decisions: vendor covers photos not possible (no bucket);
   category line uses real fallbacks; on-device smoke pending.
+
+## 2026-09-13 — Navigation audit close-out (final verification)
+
+- Original reported issue: selecting a drop-off location was said
+  to return/redirect to Home instead of Review Request, with no
+  proper back button on the picker.
+- Finding: the issue is not present in the current code. The
+  picker (`app/(requester)/location.tsx`) selects into shared
+  `CartContext` draft state and returns via `router.back()`; the
+  native header back is always present; cancel preserves the
+  prior value. No fix was needed and none was made for this flow.
+- Verified current chain: Home → Cart → Review Request →
+  Drop-off Location → (select) Review Request with the chosen
+  point displayed; (cancel/back) Review Request with prior state
+  intact. Selection persists only as draft state until submit.
+- Submit-to-confirmation `replace`: kept deliberately — the cart
+  is cleared at submit, so `push` would strand a resubmittable
+  empty cart in history; `replace` keeps back-navigation to the
+  menu while confirmation still links to Requests and the created
+  request detail.
+- Screens/routes audited: all 16 requester routes, 6 helper, 3
+  vendor, auth trio (53 navigation calls); no admin routes exist.
+- Validation: `tsc`, `expo lint`, `expo-doctor` 21/21, web export
+  + all-routes HTTP 200 — all green, re-confirmed unchanged.
+- Device testing: UNAVAILABLE in this environment (no iOS
+  simulator runtimes, no Android emulator/devices attached;
+  `adb` empty) — hardware back, swipe-back, and the interactive
+  location/confirm/submit flows are marked PENDING manual
+  verification and must not be claimed as tested.

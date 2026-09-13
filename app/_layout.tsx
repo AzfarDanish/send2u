@@ -1,6 +1,7 @@
 import { DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import 'react-native-url-polyfill/auto';
 
@@ -31,9 +32,27 @@ function AuthedProviders() {
   // realtime + the notification center remain the baseline when push is
   // unavailable (web, denied permission, no device).
   usePushNotifications();
-  // Keyed by user so the local cart resets whenever the session changes.
+  // Keyed by account so the local cart resets on real account change —
+  // but pinned across transient nulls (e.g. a flaky refresh that briefly
+  // clears identity), which must never wipe an in-progress draft. A
+  // same-account re-login therefore keeps its cart; a different account
+  // still remounts fresh. State sets live in the async continuation only
+  // (repo lint rule: no synchronous set-state-in-effect).
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const id = user.id;
+    (async () => {
+      if (!cancelled) setLastUserId(id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+  const cartKey = user?.id ?? lastUserId ?? 'guest';
   return (
-    <CartProvider key={user?.id ?? 'guest'}>
+    <CartProvider key={cartKey}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />

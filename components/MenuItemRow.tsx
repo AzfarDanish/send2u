@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { Text } from '@/components/ui/Text';
 import { formatMYR } from '@/lib/money';
-import { colors, radii, spacing, touchTargets } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import type { MenuItemWithVendor } from '@/types/domain';
 
 interface MenuItemRowProps {
@@ -18,7 +18,7 @@ interface MenuItemRowProps {
   onAdd?: (item: MenuItemWithVendor) => void;
 }
 
-/** Menu list row: name, price, description, honest availability state. */
+/** Floating food card: landscape visual, stacked name + price, bottom-right action. */
 export function MenuItemRow({ item, showVendor = false, onPress, thumbnail = false, onAdd }: MenuItemRowProps) {
   const dimmed = !item.isAvailable;
   return (
@@ -26,21 +26,19 @@ export function MenuItemRow({ item, showVendor = false, onPress, thumbnail = fal
       accessibilityRole="button"
       accessibilityLabel={`${item.name}, ${formatMYR(item.priceCents)}${item.isAvailable ? '' : ', unavailable'}`}
       onPress={() => onPress(item)}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {thumbnail ? (
-        <View style={styles.thumb}>
-          <PlaceholderImage style={styles.thumbImage} />
+        <View style={styles.imageWrap}>
+          <PlaceholderImage style={styles.image} />
         </View>
       ) : null}
-      <View style={styles.textBlock}>
-        <View style={styles.nameRow}>
-          <Text variant="secondary" style={[styles.name, dimmed && styles.dimmed]}>
-            {item.name}
-          </Text>
-          <Text variant="price" color="primary" style={[styles.price, dimmed && styles.dimmed]}>
-            {formatMYR(item.priceCents)}
-          </Text>
-        </View>
+      <View style={styles.body}>
+        <Text variant="subtitle" style={[dimmed && styles.dimmed]} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <Text variant="price" color="primary" style={[styles.price, dimmed && styles.dimmed]}>
+          {formatMYR(item.priceCents)}
+        </Text>
         {item.description ? (
           <Text variant="caption" color="secondary" numberOfLines={2}>
             {item.description}
@@ -50,56 +48,60 @@ export function MenuItemRow({ item, showVendor = false, onPress, thumbnail = fal
           {showVendor ? <Badge label={item.vendor.name} tone="neutral" /> : null}
           {!item.isAvailable ? <Badge label="Unavailable" tone="warning" /> : null}
         </View>
+        <View style={styles.actionRow}>
+          {onAdd ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${item.name} to cart`}
+              accessibilityState={{ disabled: !item.isAvailable }}
+              onPress={() => onAdd(item)}
+              disabled={!item.isAvailable}
+              hitSlop={4}
+              style={({ pressed: innerPressed }) => [
+                styles.addButton,
+                !item.isAvailable && styles.addDisabled,
+                innerPressed && item.isAvailable && styles.pressed,
+              ]}>
+              <MaterialIcons
+                name="add"
+                size={22}
+                color={item.isAvailable ? colors.onPrimary : colors.disabled}
+              />
+            </Pressable>
+          ) : (
+            <MaterialIcons name="chevron-right" size={24} color={dimmed ? colors.disabled : colors.muted} />
+          )}
+        </View>
       </View>
-      {onAdd ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Add ${item.name} to cart`}
-          accessibilityState={{ disabled: !item.isAvailable }}
-          onPress={() => onAdd(item)}
-          disabled={!item.isAvailable}
-          hitSlop={4}
-          style={({ pressed }) => [
-            styles.addButton,
-            !item.isAvailable && styles.addDisabled,
-            pressed && item.isAvailable && styles.pressed,
-          ]}>
-          <MaterialIcons
-            name="add"
-            size={22}
-            color={item.isAvailable ? colors.onPrimary : colors.disabled}
-          />
-        </Pressable>
-      ) : (
-        <MaterialIcons name="chevron-right" size={24} color={dimmed ? colors.disabled : colors.muted} />
-      )}
     </Pressable>
   );
 }
-
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: touchTargets.listRow,
-    paddingVertical: spacing.md,
+  // Floating food card: bordered white surface with a soft ambient shadow.
+  // Explicit, approved exception to the otherwise shadow-free system.
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   pressed: { opacity: 0.7 },
-  thumb: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.md,
+  imageWrap: {
+    aspectRatio: 16 / 9,
     backgroundColor: colors.surfaceSecondary,
-    overflow: 'hidden',
   },
-  thumbImage: { borderRadius: radii.md },
-  textBlock: { flex: 1, gap: spacing.xs },
-  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
-  name: { flex: 1, fontWeight: '600', color: colors.text },
+  image: { width: '100%', height: '100%' },
+  body: { padding: spacing.lg, gap: spacing.sm },
   price: { fontVariant: ['tabular-nums'] as const },
   dimmed: { color: colors.disabled },
   badges: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+  actionRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   addButton: {
     width: 44,
     height: 44,

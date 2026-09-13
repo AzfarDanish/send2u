@@ -66,16 +66,48 @@ export default function RequesterLayout() {
         name="profile"
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
       />
-      {/* Review Request stays reachable via the cart flow, but is not a
-        permanent tab — the cart shortcut, menu detail, and Home CTA push
-        here directly. Notifications likewise lives behind the header bell
-        (exactly three tabs: Home, Requests, Profile). */}
-      <Tabs.Screen name="create" options={{ href: null, title: 'Review Request' }} />
-      <Tabs.Screen name="notifications" options={{ href: null, title: 'Notifications' }} />
-      <Tabs.Screen name="menu/[id]" options={{ href: null, title: 'Item details' }} />
-      <Tabs.Screen name="vendors/[id]" options={{ href: null, title: 'Vendor' }} />
-      <Tabs.Screen name="orders/[id]" options={{ href: null, title: 'Request details' }} />
-      <Tabs.Screen name="orders/confirmation" options={{ href: null, title: 'Request Submitted' }} />
+      {/* The tab bar lives only on Home, Requests, and Profile. Every
+        other requester route hides it so content owns the full screen. */}
+      <Tabs.Screen
+        name="create"
+        options={{ href: null, title: 'Review Request', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{ href: null, title: 'Notifications', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="menu/[id]"
+        options={{ href: null, title: 'Item details', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="vendors/[id]"
+        options={{ href: null, title: 'Vendor', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="orders/[id]"
+        options={{ href: null, title: 'Request details', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="orders/confirmation"
+        options={{ href: null, title: 'Request Submitted', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="locations"
+        options={{ href: null, title: 'Drop-off Locations', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="help"
+        options={{ href: null, title: 'Help Center', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="report"
+        options={{ href: null, title: 'Report an Issue', tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen
+        name="location"
+        options={{ href: null, title: 'Drop-off Location', tabBarStyle: { display: 'none' } }}
+      />
     </Tabs>
   );
 }

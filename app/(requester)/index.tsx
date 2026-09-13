@@ -4,6 +4,7 @@ import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { MenuItemRow } from '@/components/MenuItemRow';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -13,32 +14,103 @@ import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
+import { useCart } from '@/contexts/CartContext';
 import { useMenu } from '@/hooks/useMenu';
+import { useMyOrders } from '@/hooks/useMyOrders';
+import { formatMYR } from '@/lib/money';
+import {
+  orderItemsTitle,
+  orderStatusTone,
+  orderTotalCents,
+  requesterStatusMessage,
+} from '@/lib/orders';
 import type { MenuItemWithVendor } from '@/types/domain';
 
 export default function RequesterHomeScreen() {
   const { sections, itemCount, status, error, refreshing, retry, refresh } = useMenu();
+  const {
+    orders,
+    status: ordersStatus,
+    refreshing: ordersRefreshing,
+    refresh: refreshOrders,
+  } = useMyOrders();
+  const { count, subtotalCents } = useCart();
 
   const openItem = useCallback((item: MenuItemWithVendor) => {
     router.push({ pathname: '/(requester)/menu/[id]', params: { id: item.id } });
   }, []);
 
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refresh(), refreshOrders()]);
+  }, [refresh, refreshOrders]);
+
+  // `listMyOrders` returns active orders only, newest first.
+  const preview = orders.length > 0 ? orders[0] : null;
+
   return (
     <Screen
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+        <RefreshControl
+          refreshing={refreshing || ordersRefreshing}
+          onRefresh={() => void refreshAll()}
+          tintColor={colors.primary}
+        />
       }>
       <SectionHeader eyebrow="Today on campus" title="Good food, carried by students" />
 
-      <Card>
-        <Badge label="No active order" tone="neutral" />
-        <Text variant="subtitle">Nothing on the way</Text>
-        <ListRow
-          icon="add-circle-outline"
-          title="Start a request"
-          onPress={() => router.push('/(requester)/create')}
-        />
-      </Card>
+      {ordersStatus === 'loading' ? (
+        <Card style={styles.previewLoading}>
+          <LoadingState message="Checking your requests…" />
+        </Card>
+      ) : null}
+      {/* On orders error the menu below stays fully usable; no preview shown. */}
+      {ordersStatus === 'ready' || ordersStatus === 'empty' ? (
+        preview ? (
+          <Card>
+            <Badge label={requesterStatusMessage(preview.status)} tone={orderStatusTone(preview.status)} />
+            <Text variant="subtitle">{orderItemsTitle(preview.items)}</Text>
+            <Text variant="caption" color="secondary">
+              {preview.vendor.name} · {formatMYR(orderTotalCents(preview.subtotalCents, preview.deliveryFeeCents))}
+            </Text>
+            <Button
+              title="View request"
+              variant="secondary"
+              onPress={() =>
+                router.push({ pathname: '/(requester)/orders/[id]', params: { id: preview.id } })
+              }
+            />
+            {orders.length > 1 ? (
+              <Button
+                title={`View all ${orders.length} active requests`}
+                variant="tertiary"
+                onPress={() => router.push('/(requester)/orders')}
+              />
+            ) : null}
+          </Card>
+        ) : (
+          <Card>
+            <Badge label="No active requests" tone="neutral" />
+            <Text variant="subtitle">No active requests</Text>
+            <Text color="secondary">Your current requests will appear here.</Text>
+            <ListRow
+              icon="add-circle-outline"
+              title="Start a request"
+              onPress={() => router.push('/(requester)/create')}
+            />
+          </Card>
+        )
+      ) : null}
+
+      {count > 0 ? (
+        <Card>
+          <ListRow
+            icon="shopping-cart"
+            title={`Cart · ${count} item${count === 1 ? '' : 's'}`}
+            subtitle={formatMYR(subtotalCents)}
+            onPress={() => router.push('/(requester)/create')}
+          />
+        </Card>
+      ) : null}
 
       <SectionHeader
         title="Today's menu"
@@ -77,6 +149,11 @@ export default function RequesterHomeScreen() {
                       {section.vendor.locationHint}
                     </Text>
                   ) : null}
+                  {section.vendor.operatingHours ? (
+                    <Text variant="caption" color="secondary">
+                      {section.vendor.operatingHours}
+                    </Text>
+                  ) : null}
                 </View>
                 {!section.vendor.isOpen ? <Badge label="Closed" tone="warning" /> : null}
               </View>
@@ -94,6 +171,7 @@ export default function RequesterHomeScreen() {
 
 const styles = StyleSheet.create({
   stateCard: { minHeight: 200, justifyContent: 'center' },
+  previewLoading: { minHeight: 120, justifyContent: 'center' },
   vendorSection: { gap: spacing.md },
   vendorHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   vendorText: { flex: 1, gap: spacing.xs },

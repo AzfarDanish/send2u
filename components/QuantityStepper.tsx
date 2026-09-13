@@ -42,8 +42,8 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99 }: Quantity
 const styles = StyleSheet.create({
   container: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   stepper: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: radii.md,
     borderWidth: 1.5,
     borderColor: colors.primary,

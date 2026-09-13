@@ -48,21 +48,24 @@ export default function RequesterLayout() {
         options={{ title: 'Home', tabBarIcon: tabIcon('home') }}
       />
       <Tabs.Screen
-        name="create"
-        options={{ title: 'New Request', tabBarIcon: tabIcon('add-circle-outline') }}
-      />
-      <Tabs.Screen
         name="orders"
         options={{ title: 'My Orders', tabBarIcon: tabIcon('receipt-long') }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{ title: 'Notifications', tabBarIcon: tabIcon('notifications-none') }}
       />
       <Tabs.Screen
         name="profile"
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
       />
+      {/* Review Request stays reachable via the cart flow, but is not a
+        permanent tab — the cart shortcut, menu detail, and Home CTA push
+        here directly. */}
+      <Tabs.Screen name="create" options={{ href: null, title: 'Review Request' }} />
       <Tabs.Screen name="menu/[id]" options={{ href: null, title: 'Item details' }} />
       <Tabs.Screen name="orders/[id]" options={{ href: null, title: 'Order details' }} />
-      <Tabs.Screen name="orders/confirmation" options={{ href: null, title: 'Request placed' }} />
-      <Tabs.Screen name="notifications" options={{ href: null, title: 'Notifications' }} />
+      <Tabs.Screen name="orders/confirmation" options={{ href: null, title: 'Request created' }} />
     </Tabs>
   );
 }

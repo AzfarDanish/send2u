@@ -17,6 +17,7 @@ import { colors, spacing } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
 import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
 import { formatMYR } from '@/lib/money';
+import { ESTIMATED_DELIVERY_FEE_CENTS, orderTotalCents } from '@/lib/orders';
 import { placeOrders } from '@/services/orders';
 import type { CartLine } from '@/types/domain';
 
@@ -29,9 +30,10 @@ interface VendorGroup {
 }
 
 /**
- * New Request tab — cart review, delivery-location selection, and Place
+ * Review Request — cart review, delivery-location selection, and Submit
  * Request. Orders are created server-side via `send2u_place_orders`
  * (one order per vendor); the cart clears only after confirmed success.
+ * Payment happens later through the external QR receipt flow, never here.
  */
 export default function CreateRequestScreen() {
   const { lines, count, subtotalCents, setQuantity, removeItem, clear } = useCart();
@@ -61,6 +63,10 @@ export default function CreateRequestScreen() {
   }, [lines]);
 
   const multiVendor = groups.length > 1;
+  // Pre-submit estimate only: the authoritative fee is recorded server-side
+  // per order at submit time (one fee per vendor order).
+  const feeEstimateCents = groups.length * ESTIMATED_DELIVERY_FEE_CENTS;
+  const totalEstimateCents = orderTotalCents(subtotalCents, feeEstimateCents);
   const selectedLocation =
     locations.status === 'ready' ? (locations.locations.find((l) => l.id === locationId) ?? null) : null;
   const canSubmit =
@@ -79,6 +85,9 @@ export default function CreateRequestScreen() {
       // on every placed order (one fee per vendor order).
       const foodCents = summaries.reduce((sum, s) => sum + s.subtotalCents, 0);
       const feeCents = summaries.reduce((sum, s) => sum + s.deliveryFeeCents, 0);
+      const itemsSummary = lines
+        .map((line) => `${line.quantity} × ${line.item.name}`)
+        .join(', ');
       clear();
       router.push({
         pathname: '/(requester)/orders/confirmation',
@@ -89,6 +98,7 @@ export default function CreateRequestScreen() {
           foodCents: String(foodCents),
           feeCents: String(feeCents),
           locationName: selectedLocation.name,
+          itemsSummary,
         },
       });
     } catch (err) {
@@ -102,8 +112,8 @@ export default function CreateRequestScreen() {
   return (
     <Screen>
       <SectionHeader
-        eyebrow="New request"
-        title={count > 0 ? `Your cart · ${count} item${count === 1 ? '' : 's'}` : 'Your cart'}
+        title="Review Request"
+        badge={count > 0 ? `${count} item${count === 1 ? '' : 's'}` : undefined}
       />
       {lines.length === 0 ? (
         <EmptyState
@@ -158,13 +168,24 @@ export default function CreateRequestScreen() {
 
           <Card>
             <View style={styles.subtotalRow}>
-              <Text variant="subtitle">Subtotal</Text>
+              <Text color="secondary">Items subtotal</Text>
+              <Text variant="secondary">{formatMYR(subtotalCents)}</Text>
+            </View>
+            <View style={styles.subtotalRow}>
+              <Text color="secondary">
+                Delivery fee (est. {formatMYR(ESTIMATED_DELIVERY_FEE_CENTS)} × {groups.length})
+              </Text>
+              <Text variant="secondary">{formatMYR(feeEstimateCents)}</Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.subtotalRow}>
+              <Text variant="subtitle">Total (est.)</Text>
               <Text variant="title" color="primary">
-                {formatMYR(subtotalCents)}
+                {formatMYR(totalEstimateCents)}
               </Text>
             </View>
             <Text variant="caption" color="muted">
-              Price × quantity. No fees.
+              Fee confirmed at submit. Nothing is charged in the app.
             </Text>
           </Card>
 
@@ -218,7 +239,8 @@ export default function CreateRequestScreen() {
             <Card>
               <Text variant="subtitle">Split by vendor ({groups.length} orders)</Text>
               <Text color="secondary">
-                Each vendor becomes a separate order to the same drop-off point.
+                This request will be split into separate orders because the items come from
+                different vendors.
               </Text>
             </Card>
           ) : null}
@@ -228,7 +250,7 @@ export default function CreateRequestScreen() {
               <ErrorState title="Request failed" message={submitError} retryTitle="Try again" onRetry={() => void handlePlaceRequest()} />
             ) : null}
             <Button
-              title={submitting ? 'Placing request…' : `Place request · ${formatMYR(subtotalCents)}`}
+              title={submitting ? 'Submitting…' : `Submit Request · ${formatMYR(totalEstimateCents)}`}
               onPress={() => void handlePlaceRequest()}
               disabled={!canSubmit}
               loading={submitting}
@@ -258,6 +280,7 @@ const styles = StyleSheet.create({
   lineText: { flex: 1, gap: spacing.xs },
   lineName: { fontWeight: '600', color: colors.text },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  divider: { borderTopWidth: 1, borderTopColor: colors.divider },
   stateCard: { minHeight: 160, justifyContent: 'center' },
   locationsCard: { gap: 0 },
 });

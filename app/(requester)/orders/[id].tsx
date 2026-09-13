@@ -13,10 +13,17 @@ import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { Screen } from '@/components/ui/Screen';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
-import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone } from '@/lib/orders';
+import {
+  formatOrderDate,
+  isTerminalOrderStatus,
+  orderItemsTitle,
+  orderStatusTone,
+  requesterStatusMessage,
+} from '@/lib/orders';
 import { cancelOrder, confirmDelivery, getOrderDetail, openDispute } from '@/services/orders';
 import type { OrderStatus, OrderWithDetails } from '@/types/domain';
 import type { RequesterDisputeReason } from '@/services/orders';
@@ -37,41 +44,24 @@ const PROGRESS_STEPS: { key: string; label: string; done: OrderStatus[] }[] = [
   { key: 'paid', label: 'Completed', done: ['completed'] },
 ];
 
+/**
+ * One-line explainer per in-progress status. Titles come from the shared
+ * `requesterStatusMessage` so every surface agrees; no GPS, maps, distance,
+ * or arrival estimates — the backend tracks none of those.
+ */
+const TRANSIT_DETAILS: Partial<Record<OrderStatus, string>> = {
+  assigned: 'A helper accepted your request.',
+  going_to_vendor: 'A helper has accepted your request and is going to collect the items.',
+  at_vendor: 'Your helper is at the stall now.',
+  food_available: 'The stall confirmed your items are available.',
+  food_purchased: 'Your helper paid for the food at the stall.',
+  picked_up: 'The helper has collected your requested items.',
+  out_for_delivery: 'Your helper is bringing the request to your drop-off point.',
+  delivering: 'Your helper is bringing the request to your drop-off point.',
+};
+
 /** Requester order detail: progress, totals, cancel, and post-delivery payment. */
 export default function OrderDetailScreen() {
-  const getStatusMessage = (status: OrderStatus): string => {
-    switch (status) {
-      case 'pending':
-        return 'Finding a helper';
-      case 'assigned':
-        return 'Helper assigned';
-      case 'going_to_vendor':
-        return 'Helper is going to the cafe';
-      case 'at_vendor':
-        return 'Helper is at the cafe';
-      case 'food_available':
-        return 'Food confirmed available';
-      case 'food_purchased':
-        return 'Food purchased';
-      case 'picked_up':
-        return 'Food picked up';
-      case 'out_for_delivery':
-      case 'delivering':
-        return 'Out for delivery';
-      case 'delivered':
-        return 'Delivered — confirm receipt';
-      case 'confirmed':
-        return 'Confirmed — payment required';
-      case 'completed':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      case 'disputed':
-        return 'Needs settlement';
-      default:
-        return orderStatusLabel(status);
-    }
-  };
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
@@ -250,6 +240,9 @@ export default function OrderDetailScreen() {
   const lateCancellable =
     !cancelled &&
     (order.status === 'food_purchased' || order.status === 'picked_up' || order.status === 'out_for_delivery' || order.status === 'delivering');
+  const showCancel = cancellable || lateCancellable;
+  const transitDetail = TRANSIT_DETAILS[order.status] ?? null;
+  const isDelivered = order.status === 'delivered';
 
   return (
     <>
@@ -257,10 +250,11 @@ export default function OrderDetailScreen() {
       <Screen>
         <View style={styles.heading}>
           <Text variant="title">{order.vendor.name}</Text>
-          <Badge label={getStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
         </View>
+        <Text variant="subtitle">{orderItemsTitle(order.items)}</Text>
+        <Badge label={requesterStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
         <Text variant="caption" color="secondary">
-          Placed {formatOrderDate(order.createdAt)}
+          Request {order.id.slice(0, 8)}… · Placed {formatOrderDate(order.createdAt)}
         </Text>
 
         <Card>
@@ -306,68 +300,50 @@ export default function OrderDetailScreen() {
           </Text>
         </Card>
 
-        {cancellable || lateCancellable ? (
+        {order.status === 'pending' ? (
           <Card>
-            <Text variant="subtitle">Cancel this order</Text>
-            {lateCancellable ? (
-              <Text color="secondary">
-                The helper already paid for your food. Cancelling now may make
-                you responsible for the food cost — settle it with them directly.
-              </Text>
-            ) : (
-              <Text color="secondary">
-                Free of charge before the food is purchased.
-              </Text>
-            )}
-            {cancelError ? (
-              <ErrorState title="Could not cancel" message={cancelError} retryTitle="Dismiss" onRetry={() => setCancelError(null)} />
-            ) : null}
-            <TextInput
-              value={reason}
-              onChangeText={setReason}
-              placeholder="Reason for cancelling"
-              placeholderTextColor={colors.muted}
-              maxLength={500}
-              editable={!cancelling}
-              style={styles.reasonInput}
-              accessibilityLabel="Cancellation reason"
-            />
-            <Button
-              title={cancelling ? 'Cancelling…' : 'Cancel order'}
-              variant="danger"
-              onPress={() => void handleCancel()}
-              disabled={cancelling || reason.trim().length === 0}
-              loading={cancelling}
-            />
+            <Badge label={requesterStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
+            <Text variant="subtitle">Waiting for a helper</Text>
+            <Text color="secondary">No action required — you will be notified when a helper accepts.</Text>
           </Card>
         ) : null}
 
-        {order.status === 'delivered' ? (
+        {transitDetail ? (
           <Card>
-            <Badge label="Delivery arrived" tone="success" />
-            <Text variant="subtitle">Confirm you got the food</Text>
-            <Text color="secondary">
-              {order.deliveredAt ? `Delivered ${formatOrderDate(order.deliveredAt)}. ` : ''}
-              Confirm below — payment opens after confirmation.
-            </Text>
-            {confirmError ? (
-              <ErrorState title="Could not confirm" message={confirmError} retryTitle="Dismiss" onRetry={() => setConfirmError(null)} />
-            ) : null}
-            <Button
-              title={confirming ? 'Confirming…' : 'Confirm receipt'}
-              onPress={() => void handleConfirm()}
-              disabled={confirming}
-              loading={confirming}
-            />
-            <Text variant="caption" color="muted">
-              Only confirm food you received.
-            </Text>
-            <Button
-              title={reportOpen ? 'Hide problem report' : 'Report a problem'}
-              variant="secondary"
-              onPress={() => setReportOpen((open) => !open)}
-              disabled={confirming}
-            />
+            <Badge label={requesterStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
+            <Text variant="subtitle">{requesterStatusMessage(order.status)}</Text>
+            <Text color="secondary">{transitDetail}</Text>
+          </Card>
+        ) : null}
+
+        {isDelivered ? (
+          <>
+            <SectionHeader title="Required action" />
+            <Card>
+              <Badge label="Delivered" tone="success" />
+              <Text variant="subtitle">Confirm delivery</Text>
+              <Text color="secondary">
+                {order.deliveredAt ? `Delivered ${formatOrderDate(order.deliveredAt)}. ` : ''}
+                The helper marked this request as delivered.
+              </Text>
+              {confirmError ? (
+                <ErrorState title="Could not confirm" message={confirmError} retryTitle="Dismiss" onRetry={() => setConfirmError(null)} />
+              ) : null}
+              <Button
+                title={confirming ? 'Confirming…' : 'Yes, confirm delivery'}
+                onPress={() => void handleConfirm()}
+                disabled={confirming}
+                loading={confirming}
+              />
+              <Text variant="caption" color="muted">
+                By confirming, you attest that you received the request.
+              </Text>
+              <Button
+                title={reportOpen ? 'Hide problem report' : 'Report an issue'}
+                variant="secondary"
+                onPress={() => setReportOpen((open) => !open)}
+                disabled={confirming}
+              />
             {reportOpen ? (
               <View style={styles.reportForm}>
                 <Text color="secondary">What went wrong?</Text>
@@ -413,10 +389,50 @@ export default function OrderDetailScreen() {
                 </Text>
               </View>
             ) : null}
-          </Card>
+            </Card>
+          </>
         ) : null}
 
         <RequesterPaymentCard orderId={order.id} refreshToken={paymentTick} />
+
+        {showCancel ? (
+          <>
+            <SectionHeader title="Other options" />
+            <Card>
+              <Text variant="subtitle">Cancel this order</Text>
+              {lateCancellable ? (
+                <Text color="secondary">
+                  The helper already paid for your food. Cancelling now may make
+                  you responsible for the food cost — settle it with them directly.
+                </Text>
+              ) : (
+                <Text color="secondary">
+                  Free of charge before the food is purchased.
+                </Text>
+              )}
+              {cancelError ? (
+                <ErrorState title="Could not cancel" message={cancelError} retryTitle="Dismiss" onRetry={() => setCancelError(null)} />
+              ) : null}
+              <TextInput
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Reason for cancelling"
+                placeholderTextColor={colors.muted}
+                maxLength={500}
+                editable={!cancelling}
+                style={styles.reasonInput}
+                accessibilityLabel="Cancellation reason"
+              />
+              <Button
+                title={cancelling ? 'Cancelling…' : 'Cancel order'}
+                variant="danger"
+                onPress={() => void handleCancel()}
+                disabled={cancelling || reason.trim().length === 0}
+                loading={cancelling}
+              />
+            </Card>
+          </>
+        ) : null}
       </Screen>
     </>
   );
@@ -431,7 +447,7 @@ const styles = StyleSheet.create({
   dot: {
     width: 30,
     height: 30,
-    borderRadius: 15,
+    borderRadius: radii.full,
     backgroundColor: colors.disabledBackground,
     alignItems: 'center',
     justifyContent: 'center',

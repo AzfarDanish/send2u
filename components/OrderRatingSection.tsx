@@ -98,7 +98,12 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
 
   return (
     <Card>
-      <Text variant="subtitle">Ratings</Text>
+      <Text variant="subtitle">Rate your helper</Text>
+      {order.helperId ? (
+        <Text variant="caption" color="secondary">
+          Helper {order.helperId.slice(0, 8)}… · delivered your request
+        </Text>
+      ) : null}
       {loadError ? (
         <ErrorState title="Couldn't load ratings" message={loadError} retryTitle="Try again" onRetry={() => void load()} />
       ) : null}
@@ -129,6 +134,9 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
             style={styles.commentInput}
             accessibilityLabel="Rating feedback"
           />
+          <Text variant="caption" color="muted">
+            {comment.length}/500
+          </Text>
           {submitError ? (
             <ErrorState title="Could not submit" message={submitError} retryTitle="Dismiss" onRetry={() => setSubmitError(null)} />
           ) : null}
@@ -153,7 +161,7 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
         </View>
       ) : (
         <Text variant="caption" color="muted">
-          Waiting for the {otherLabel === 'Helper' ? 'helper' : 'requester'}&apos;s rating.
+          Waiting for the {otherLabel === 'Helper' ? 'helper' : 'requester'} rating.
         </Text>
       )}
     </Card>

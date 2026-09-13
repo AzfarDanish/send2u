@@ -4,30 +4,35 @@
  *
  * LIGHT THEME ONLY: there are no dark-mode tokens. Do not branch on the
  * device color scheme; every surface below is used as-is on all devices.
+ *
+ * BRAND: red and white (design.md §5). `primary` is the Send2U icon red;
+ * semantic success/warning/error keep their own non-red hues so status is
+ * never confused with branding. Token NAMES are stable — screens adopt the
+ * rebrand automatically with no layout, copy, or logic changes.
  */
 
 export const colors = {
-  /** Brand primary (trust/speed). White text passes contrast on this. */
-  primary: '#0A6E94',
-  primaryPressed: '#085B7A',
+  /** Brand primary (Send2U red). White text passes contrast on this. */
+  primary: '#DA0A1B',
+  primaryPressed: '#A80815',
   onPrimary: '#FFFFFF',
   /** Tinted surfaces for highlights, icon chips, selected states. */
-  primarySoft: '#E2F1F7',
+  primarySoft: '#FBE7E9',
 
-  background: '#F5F7F9',
+  background: '#F6F4F2',
   surface: '#FFFFFF',
   /** Slightly elevated surface for cards/tips/tooltips — subtle lift over background. */
-  surfaceElevated: '#FAFBFC',
+  surfaceElevated: '#FDFCFC',
   /** Secondary surface for muted containers (e.g. quantity stepper bg, empty state bg). */
-  surfaceSecondary: '#F0F3F5',
+  surfaceSecondary: '#F1ECEA',
   /** Thin separator lines between rows or sections. */
-  divider: '#E8ECF0',
+  divider: '#E9E2E0',
 
-  text: '#17242C',
-  secondary: '#4E5D66',
-  muted: '#8A959E',
+  text: '#22191B',
+  secondary: '#5A4E52',
+  muted: '#8D8287',
 
-  border: '#E1E7EB',
+  border: '#E7DFDC',
 
   success: '#1D7A4C',
   successSoft: '#E4F3EB',
@@ -35,10 +40,11 @@ export const colors = {
   warningSoft: '#F9EEDB',
   error: '#BC3A2A',
   errorSoft: '#FAE7E3',
-  info: '#0A6E94',
-  infoSoft: '#E2F1F7',
+  /** Informational deep red (brand family, never teal). In-transit statuses only. */
+  info: '#8A1A24',
+  infoSoft: '#F7E4E5',
 
-  disabled: '#98A3AB',
+  disabled: '#9AA3AB',
   disabledBackground: '#E9EDF0',
 } as const;
 

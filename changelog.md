@@ -577,3 +577,190 @@ only. No secrets are ever recorded here.
   vendor "edit menu / Maximum update depth exceeded" crash reported
   earlier still does not reproduce on web or on the connected Android
   dev build and remains under investigation pending repro details.
+
+## 2026-09-13 — Requester: discovery-to-request UI (Phase 2)
+
+- Changed: Home static "No active order" card replaced with a live preview
+  from `useMyOrders` (active-only, newest first): status `Badge`
+  (`requesterStatusMessage` + `orderStatusTone`), item title, vendor name,
+  payable total, and View request; compact "No active requests" empty
+  state otherwise; cart shortcut card when the cart holds items;
+  pull-to-refresh now covers menu + orders. New `lib/orders.ts` helpers:
+  `requesterStatusMessage` (accurate wording, "Preparing" never
+  surfaced), `orderItemsTitle`, and display-only
+  `ESTIMATED_DELIVERY_FEE_CENTS`. `create.tsx` is now Review Request
+  (title + count badge, items-subtotal / est. fee / est. total breakdown,
+  `Submit Request · RMxx` button, spec multi-vendor split copy,
+  `itemsSummary` confirmation param; location radio unchanged).
+  `menu/[id]` availability is now a `Badge`, stale checkout comment
+  fixed, cart copy points at Review Request. Confirmation reads
+  "Request created / submitted successfully" with a "Waiting for a
+  helper" badge plus vendor/items/drop-off rows and the server-recorded
+  fee breakdown; `router.replace` nav preserved. Tab titles renamed
+  (`Review Request`, `Request created`); tab visibility unchanged.
+- Reason: dynamic Home with no misleading static order content; cart
+  framed as a review flow (payment stays external QR); accurate status
+  wording end to end.
+- Details: no schema/RPC/service changes — `placeOrders`,
+  `send2u_place_orders` split-per-vendor, location list, and fee
+  (RM2.00 server-side per order) untouched; estimates always labeled
+  "est." with fee confirmed at submit. Expo v57 docs index checked;
+  no new Expo APIs (existing router + UI kit patterns only).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass (all
+  requester routes bundled).
+- Limits/decisions: browsing rows stay navigation-only (no quick-add —
+  avoids accidental orders); order-tracking lifecycle (`orders/[id]`,
+  timelines, payment cards), helper/vendor, and bottom-tab visibility
+  untouched — Phase 1 hide-`create`/show-notifications still pending;
+  no search/GPS/chat/payments/ratings/estimates/images added.
+
+## 2026-09-13 — Requester: lifecycle, payment, confirmation, dispute, rating UI (Phase 3)
+
+- Changed: Orders list rows now show the item title (`orderItemsTitle`)
+  with vendor/location, status `Badge` above the total (shared
+  `requesterStatusMessage` wording), and compact History rows (date ·
+  location, final status). Request Detail is now state-driven: header
+  (vendor + item title + status badge + short request ID/placed date),
+  progress dots, location, `OrderBreakdown`, then pending-waiting /
+  transit-info / delivered `Required action` cards and cancel under
+  `Other options`; local status copy deleted in favor of the one shared
+  helper (Home, lists, detail, and confirmation agree). Delivered card
+  leads with `Yes, confirm delivery` plus the received-attestation line
+  and the unchanged report form. `RequesterPaymentCard` leads with
+  `Payment required`, amount-to-pay, numbered external-QR steps,
+  supported-types caption, and a recorded state with the receipt
+  viewer/download; submit/validation logic untouched. Disputed history
+  reads `Under review` / `Issue under review` with category + withdraw
+  kept. Rating card shows the helper short-ID and a `n/500` counter;
+  eligibility and immutability untouched. Micro-fix: progress dot uses
+  `radii.full`.
+- Reason: Request Detail as the single central transaction screen with
+  accurate wording and actions that appear only at the correct stage.
+- Details: UI-only — no RPC/service/hook/RLS changes. `cancelOrder`
+  (reason-gated), `confirmDelivery`, `openDispute` (4 backend
+  categories only), `withdrawDispute`, receipt pipeline (PDF/photo up
+  to 10 MB, confirm-first, orphan cleanup), and rating rules
+  (completed + verified payment, 1–5, ≤500, immutable) preserved
+  exactly. Fixed one self-made fragment-close syntax error found by
+  `tsc`.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass (all
+  requester routes bundled).
+- Limits/decisions: no GPS/maps/ETA/photo-proof/refunds/gateways;
+  submitted-receipt file size is shown pre-submit only (size is not
+  stored server-side — filename + viewer/download shown after);
+  `OrderTimeline` event labels and helper `Payment`/`Delivery` UIs
+  untouched.
+
+## 2026-09-13 — Requester: final polish + consistency QA (Phase 4)
+
+- Changed: full requester audit (auth → Home → menu → detail → cart →
+  confirmation → orders → payment → dispute → rating → notifications →
+  profile, all loading/empty/error/cancelled states) with micro-fixes
+  only. Fixed `&apos;` entities rendering literally on native
+  (confirmation + rating reworded apostrophe-free — lint-clean and
+  native-correct). Last hardcoded radii → `radii.full` (both
+  notification dots). Orders title "Track your deliveries" → "Your
+  orders" (no tracking exists). Confirmation fee label derived from
+  server data instead of hardcoded "RM2.00". `QuantityStepper` 44 →
+  48pt (repo ≥48pt rule; requester-only component). Home shows
+  "View all N active requests" when several exist. Confirmation gains
+  a single-order "View request" deep link (`replace`, cart stays
+  cleared).
+- Reason: one coherent product — no misleading copy, no fake
+  formatting, no contradictory actions, accessibility labels and
+  touch targets consistent.
+- Details: verified — no "Preparing"/ETA/ratings/GPS/refund/chat/
+  photo-proof copy anywhere; all money via `formatMYR` +
+  `orderTotalCents`; dates via `formatOrderDate`; state matrix
+  (empty/multi-active/history/cancel/dispute/staged/submitted/
+  upload-failure/order-failure) shows exactly one correct primary
+  action per stage; all 16 navigation paths use existing push/replace
+  routes; long names wrap (`flex:1`, filename line limits);
+  SafeArea + scroll + `keyboardShouldPersistTaps` on every screen.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass.
+- Limits/decisions: no new features; helper/vendor untouched —
+  identical `&apos;` literals remain in 4 helper/select-role strings,
+  flagged for a helper pass; no on-device run (all checks static +
+  bundle). Phase 1 tab-visibility change still pending by design.
+
+## 2026-09-13 — Requester: remaining screens + integration (Additional Phase)
+
+- Changed: mockup audit finds zero unsupported elements in requester
+  surfaces (no search/GPS/ratings/wallet/promo/favorites/image-URL
+  copy; `useLocalSearchParams` was the only "search" hit). Profile
+  identity now shows the real `profile.displayName` with the
+  "Campus requester" fallback; dev switcher stays env-gated
+  (verified: `EXPO_PUBLIC_SEND2U_DEV_AUTH` empty in `.env.example`,
+  so production builds never render it). Home vendor headers show
+  real `operatingHours`, matching item detail. Everything else from
+  the scope (discovery, browsing, detail, cart, location,
+  confirmation, orders/history, all loading/empty/error states)
+  verified consistent from prior phases — no further edits needed.
+- Reason: close the remaining gaps (identity accuracy, hours
+  visibility, prod-gate proof) without redesigning working flows.
+- Details: full journey retraced (Home → menu → detail → cart →
+  Review Request → location → submit → confirmation → Orders →
+  detail, plus notification deep-links, back/tab nav, logout);
+  backend behavior untouched (queries, validation, split-per-vendor,
+  replace-nav, realtime).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass.
+- Limits/decisions: no new features; helper/vendor untouched; no
+  on-device run; Phase 1 tab-visibility change still pending.
+
+## 2026-09-13 — QA: requester frontend completion audit + nav end-state
+
+- Changed: `app/(requester)/_layout.tsx` reaches the approved end-state —
+  tabs are now Home / My Orders / Notifications / Profile; `create`
+  stays mounted as `href:null` "Review Request" (cart shortcut, menu
+  detail, and Home CTA push there directly), so request creation
+  remains fully accessible without a permanent tab. Header bell kept
+  as a duplicate shortcut per standing decision. Nothing else needed
+  code changes: the audit verified status labels/actions against the
+  RPC contracts (confirm/dispute delivered-only + owner-only + atomic;
+  withdraw own-unresolved-only; cancel reason-gated; submit
+  confirmed-gated + server-derived amounts; rating one-per-party 1–5
+  ≤500 immutable), no TODO/console/dead-button/mock remnants, no
+  client-trusted totals or fees, realtime channels cleaned up,
+  5-star input confirmed, all money/date formatting centralized.
+- Reason: QA required New Request out of permanent navigation with
+  creation via cart flow; every other check passed as-built.
+- Details: `assigned`/`out_for_delivery` wording is legitimate — both
+  are real backend statuses, never invented. `FeaturePreview` is an
+  unused shared-library component (tree-shaken, kept deliberately).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass; served
+  the bundle locally — all 8 requester routes HTTP 200 (incl. hidden
+  `create`); bundle grep finds no preparing/pay-now/ETA copy.
+- Limits/decisions: interactive/device testing not verified (no
+  device lab); helper `&apos;` literals still pending a helper pass.
+
+## 2026-09-13 — Docs: implementation-ready redesign spec (docs/design.md)
+
+- Changed: new `docs/design.md` (17 sections + appendix, ~570 lines):
+  inventory of all ~25 screens across requester/helper/vendor
+  (admin/lecturer explicitly marked Not implemented), navigation
+  architecture, Apple-inspired principles, red-and-white token system
+  anchored on icon red `#DA0A1B`, ~25-component library spec,
+  per-screen requester redesign sheets (§7.1–7.19) each with a
+  must-remain-unchanged contract, helper/vendor/admin-future
+  sections, responsive/a11y/motion specs, centralized status
+  vocabulary (~18 backend values), prioritized issue list, phased
+  build strategy, and acceptance checklist. Written in 6 staged
+  batches from direct source inspection (3 delegated inventory
+  audits: helper, vendor/admin-existence, overlays/inputs); no app,
+  schema, or backend code touched.
+- Reason: single primary reference for a future frontend redesign
+  that preserves all backend contracts.
+- Details: semantic colors stay non-red; stars stay amber;
+  confirmation reuses CostBreakdown; admin section is greenfield
+  proposal only.
+- Validation: section/coverage grep verified (17/17 sections,
+  19/19 §7 sheets, 8/8 §5 tokens); `tsc --noEmit` clean (docs-only
+  change).
+- Limits/decisions: on-device, runtime-data, admin-needs, red
+  contrast, and fee-policy caveats recorded in the document's own
+  Inspection-limitations section.

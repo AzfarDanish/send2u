@@ -71,6 +71,15 @@ export function orderStatusLabel(status: OrderStatus): string {
 }
 
 /**
+ * Display-only estimate of the per-order delivery fee in MYR cents,
+ * used for pre-submit totals on the Review Request screen.
+ * The authoritative fee is recorded server-side per order
+ * (`delivery_fee_cents`); this constant must never be treated as the
+ * charged amount — estimates are always labeled as such.
+ */
+export const ESTIMATED_DELIVERY_FEE_CENTS = 200;
+
+/**
  * Payable total for one order: food subtotal + delivery fee. Both inputs
  * are database snapshots (the fee is fixed at RM2.00 server-side per
  * order) — the fee is never a client constant and is added exactly once,
@@ -103,4 +112,62 @@ export function paymentStatusLabel(status: PaymentStatus): string {
     case 'rejected':
       return 'Payment rejected';
   }
+}
+
+/**
+ * Accurate user-facing status wording for requesters. Describes only the
+ * actual backend state — never claims preparation, payment completion, or
+ * arrival times. Legacy values map to their closest honest equivalent
+ * (`preparing` is never surfaced as "Preparing").
+ */
+export function requesterStatusMessage(status: OrderStatus): string {
+  switch (status) {
+    case 'pending':
+    case 'preparing':
+      return 'Waiting for a helper';
+    case 'assigned':
+    case 'accepted':
+      return 'Helper assigned';
+    case 'going_to_vendor':
+      return 'Helper is going to the vendor';
+    case 'at_vendor':
+      return 'Helper is at the vendor';
+    case 'food_available':
+      return 'Food is available';
+    case 'food_purchased':
+      return 'Food purchased';
+    case 'picked_up':
+    case 'ready_for_pickup':
+      return 'Request picked up';
+    case 'out_for_delivery':
+    case 'delivering':
+      return 'On the way';
+    case 'delivered':
+      return 'Delivered';
+    case 'confirmed':
+    case 'awaiting_requester_payment':
+      return 'Payment required';
+    case 'completed':
+      return 'Completed';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'disputed':
+      return 'Under review';
+    default:
+      return orderStatusLabel(status);
+  }
+}
+
+/**
+ * Concise request title from item snapshots, e.g. "Nasi Ayam + Teh Ais"
+ * or "Nasi Ayam + 2 more". Pure display helper — no backend meaning.
+ */
+export function orderItemsTitle(items: { itemName: string; quantity: number }[]): string {
+  if (items.length === 0) return 'Your request';
+  if (items.length === 1) {
+    const only = items[0];
+    return only.quantity > 1 ? `${only.quantity} × ${only.itemName}` : only.itemName;
+  }
+  if (items.length === 2) return `${items[0].itemName} + ${items[1].itemName}`;
+  return `${items[0].itemName} + ${items.length - 1} more`;
 }

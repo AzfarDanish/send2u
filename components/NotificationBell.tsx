@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { colors, radii } from '@/constants/theme';
 
 interface NotificationBellProps {
   unreadCount: number;
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: radii.full,
     backgroundColor: colors.error,
   },
 });

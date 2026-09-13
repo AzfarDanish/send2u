@@ -3,6 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
@@ -16,14 +17,16 @@ import { orderTotalCents } from '@/lib/orders';
  * the cart was already cleared after confirmed database success.
  */
 export default function OrderConfirmationScreen() {
-  const { orderIds, vendorCount, vendorNames, foodCents, feeCents, locationName } = useLocalSearchParams<{
-    orderIds?: string;
-    vendorCount?: string;
-    vendorNames?: string;
-    foodCents?: string;
-    feeCents?: string;
-    locationName?: string;
-  }>();
+  const { orderIds, vendorCount, vendorNames, foodCents, feeCents, locationName, itemsSummary } =
+    useLocalSearchParams<{
+      orderIds?: string;
+      vendorCount?: string;
+      vendorNames?: string;
+      foodCents?: string;
+      feeCents?: string;
+      locationName?: string;
+      itemsSummary?: string;
+    }>();
 
   const ids = typeof orderIds === 'string' && orderIds.length > 0 ? orderIds.split(',') : [];
   const count = typeof vendorCount === 'string' ? Number.parseInt(vendorCount, 10) : Number.NaN;
@@ -43,7 +46,7 @@ export default function OrderConfirmationScreen() {
   if (!valid) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Request placed' }} />
+        <Stack.Screen options={{ title: 'Request created' }} />
         <Screen>
           <ErrorState
             title="Nothing to confirm"
@@ -58,30 +61,46 @@ export default function OrderConfirmationScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Request placed' }} />
+      <Stack.Screen options={{ title: 'Request created' }} />
       <Screen>
         <View style={styles.visual}>
           <MaterialIcons name="check-circle" size={48} color={colors.success} />
         </View>
 
         <View style={styles.heading}>
-          <Text variant="title">
-            {count === 1 ? 'Your request is in!' : `${count} requests are in!`}
-          </Text>
-          <Text color="secondary">
-            {count === 1
-              ? `${vendorNames} is preparing your request for ${locationName}.`
-              : `${vendorNames} are each preparing a request for ${locationName}.`}
-          </Text>
+          <Text variant="title">Request created</Text>
+          <Text color="secondary">Your request has been submitted successfully.</Text>
         </View>
 
         <Card>
+          <Badge label="Waiting for a helper" tone="info" />
+          <View style={styles.totalRow}>
+            <Text color="secondary">Vendor{count === 1 ? '' : 's'}</Text>
+            <Text variant="secondary" style={styles.value}>
+              {vendorNames}
+            </Text>
+          </View>
+          {typeof itemsSummary === 'string' && itemsSummary.length > 0 ? (
+            <View style={styles.totalRow}>
+              <Text color="secondary">Items</Text>
+              <Text variant="secondary" style={styles.value}>
+                {itemsSummary}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.totalRow}>
+            <Text color="secondary">Drop-off</Text>
+            <Text variant="secondary" style={styles.value}>
+              {locationName}
+            </Text>
+          </View>
+          <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text color="secondary">Food subtotal</Text>
             <Text variant="secondary">{formatMYR(food)}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text color="secondary">Delivery fee (RM2.00 × {count})</Text>
+            <Text color="secondary">Delivery fee ({formatMYR(Math.round(fee / count))} × {count})</Text>
             <Text variant="secondary">{formatMYR(fee)}</Text>
           </View>
           <View style={styles.divider} />
@@ -92,11 +111,18 @@ export default function OrderConfirmationScreen() {
             </Text>
           </View>
           <Text variant="caption" color="muted">
-            No helper assigned yet and nothing to pay.
+            No helper assigned yet. Pay externally after your food arrives.
           </Text>
         </Card>
 
         <Button title="View My Orders" onPress={() => router.replace('/(requester)/orders')} />
+        {count === 1 ? (
+          <Button
+            title="View request"
+            variant="secondary"
+            onPress={() => router.replace({ pathname: '/(requester)/orders/[id]', params: { id: ids[0] } })}
+          />
+        ) : null}
         <Button
           title="Back to menu"
           variant="secondary"
@@ -116,6 +142,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   heading: { gap: spacing.sm },
-  totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  value: { flex: 1, textAlign: 'right' },
   divider: { borderTopWidth: 1, borderTopColor: colors.divider },
 });

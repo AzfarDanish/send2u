@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { PrivateImage } from '@/components/PrivateImage';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
+import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { StagedFileCard } from '@/components/StagedFileCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -175,10 +176,10 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
   if (context.orderStatus === 'delivered') {
     return (
       <Card>
-        <Badge label="Confirm receipt first" tone="success" />
+        <Badge label="Confirm delivery first" tone="success" />
         <Text variant="subtitle">No payment yet</Text>
         <Text color="secondary">
-          Confirm receipt above to open payment.
+          Confirm delivery above to open payment.
         </Text>
       </Card>
     );
@@ -207,7 +208,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
   return (
     <Card>
       <View style={styles.header}>
-        <Text variant="subtitle">Payment</Text>
+        <Text variant="subtitle">{payment ? 'Payment' : 'Payment required'}</Text>
         {payment ? (
           <Badge label="Recorded" tone="success" />
         ) : (
@@ -224,16 +225,24 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
           <Text color="secondary">
             Payment of {formatMYR(payment.amountCents)} recorded.
           </Text>
-          <Button title="Refresh" variant="secondary" onPress={() => void load()} />
+          <ReceiptEvidenceView path={payment.evidencePath} />
+          <Text variant="caption" color="muted">
+            Nothing left to do — your request is complete.
+          </Text>
         </>
       ) : (
         <>
+          <Text variant="subtitle">Amount to pay: {formatMYR(context.totalCents)}</Text>
+          <Text color="secondary">1. Open your banking app.</Text>
+          <Text color="secondary">2. Scan the provided QR code.</Text>
+          <Text color="secondary">3. Complete the payment.</Text>
+          <Text color="secondary">4. Save the payment receipt.</Text>
           {context.helperQrPath ? (
             <>
               <PrivateImage path={context.helperQrPath} accessibilityLabel="Helper payment QR code" />
               <Text color="secondary">
                 Pay {formatMYR(context.totalCents)} externally using this QR, then attach your
-                receipt below (PDF or image, up to 10 MB).
+                receipt below.
               </Text>
             </>
           ) : (
@@ -263,12 +272,17 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
               onCancel={() => setStaged(null)}
             />
           ) : (
-            <Button
-              title={busy ? (busyMessage ?? 'Working…') : 'Submit payment receipt'}
-              onPress={() => void handleChoose()}
-              disabled={busy || !context.helperQrPath}
-              loading={busy}
-            />
+            <>
+              <Button
+                title={busy ? (busyMessage ?? 'Working…') : 'Submit payment receipt'}
+                onPress={() => void handleChoose()}
+                disabled={busy || !context.helperQrPath}
+                loading={busy}
+              />
+              <Text variant="caption" color="muted">
+                PDF or photo (JPG, PNG, WEBP, HEIC), up to 10 MB. Nothing uploads until you confirm.
+              </Text>
+            </>
           )}
         </>
       )}

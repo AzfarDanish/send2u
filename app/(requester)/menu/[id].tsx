@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { QuantityStepper } from '@/components/QuantityStepper';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -18,7 +19,8 @@ import type { MenuItemWithVendor } from '@/types/domain';
 
 /**
  * Menu item detail. Quantity + Add to Cart write to the local in-memory cart
- * only — no order is created here. Checkout arrives in a later task.
+ * only — no order is created here. Review and submit in Review Request
+ * (`app/(requester)/create.tsx`).
  */
 export default function MenuItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -125,13 +127,9 @@ export default function MenuItemDetailScreen() {
               ) : null}
             </View>
             {item.isAvailable ? (
-              <Text variant="secondary" style={{ color: colors.success }}>
-                Available
-              </Text>
+              <Badge label="Available" tone="success" />
             ) : (
-              <Text variant="secondary" style={{ color: colors.warning }}>
-                Unavailable
-              </Text>
+              <Badge label="Unavailable" tone="warning" />
             )}
           </View>
           {!item.vendor.isOpen ? (
@@ -169,7 +167,7 @@ export default function MenuItemDetailScreen() {
               disabled={!item.isAvailable}
             />
             <Text variant="caption" color="muted">
-              Adds to cart only.
+              Adds to your cart. Review and submit in Review Request.
             </Text>
           </Card>
         )}

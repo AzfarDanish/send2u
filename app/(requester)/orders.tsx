@@ -16,7 +16,13 @@ import { colors, spacing } from '@/constants/theme';
 import { useMyOrderHistory } from '@/hooks/useMyOrderHistory';
 import { useMyOrders } from '@/hooks/useMyOrders';
 import { formatMYR } from '@/lib/money';
-import { formatOrderDate, orderStatusLabel, orderStatusTone, orderTotalCents } from '@/lib/orders';
+import {
+  formatOrderDate,
+  orderItemsTitle,
+  orderStatusTone,
+  orderTotalCents,
+  requesterStatusMessage,
+} from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
 export default function RequesterOrdersScreen() {
@@ -41,7 +47,7 @@ export default function RequesterOrdersScreen() {
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
       }>
-      <SectionHeader eyebrow="Orders" title="Track your deliveries" />
+      <SectionHeader eyebrow="Orders" title="Your orders" />
       <ActiveHistoryToggle tab={tab} onChange={setTab} historyCount={history.orders.length} />
       {tab === 'active' ? (
         <>
@@ -79,14 +85,14 @@ export default function RequesterOrdersScreen() {
                   <ListRow
                     icon="receipt-long"
                     title={order.vendor.name}
-                    subtitle={`${formatOrderDate(order.createdAt)} · ${order.location.name} · ${order.items.reduce((sum, item) => sum + item.quantity, 0)} items`}
+                    subtitle={`${orderItemsTitle(order.items)} · ${order.location.name}`}
                     onPress={() => openOrder(order)}
                     right={
                       <View style={styles.right}>
+                        <Badge label={requesterStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
                         <Text variant="secondary" style={styles.subtotal}>
                           {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
                         </Text>
-                        <Badge label={orderStatusLabel(order.status)} tone={orderStatusTone(order.status)} />
                       </View>
                     }
                   />
@@ -124,14 +130,14 @@ export default function RequesterOrdersScreen() {
                   <ListRow
                     icon="history"
                     title={order.vendor.name}
-                    subtitle={`${formatOrderDate(order.createdAt)} · ${order.location.name} · ${order.items.reduce((sum, item) => sum + item.quantity, 0)} items`}
+                    subtitle={`${formatOrderDate(order.createdAt)} · ${order.location.name}`}
                     onPress={() => openOrder(order)}
                     right={
                       <View style={styles.right}>
+                        <Badge label={requesterStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
                         <Text variant="secondary" style={styles.subtotal}>
                           {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
                         </Text>
-                        <Badge label={orderStatusLabel(order.status)} tone={orderStatusTone(order.status)} />
                       </View>
                     }
                   />

@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   unreadDot: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: radii.full,
     backgroundColor: colors.primary,
   },
 });

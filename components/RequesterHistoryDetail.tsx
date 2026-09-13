@@ -103,10 +103,10 @@ export function RequesterHistoryDetail({
         ) : (
           <>
             <Badge
-              label={order.resolvedAt ? `Settled · ${order.resolution ?? 'resolved'}` : 'Needs settlement'}
+              label={order.resolvedAt ? `Settled · ${order.resolution ?? 'resolved'}` : 'Under review'}
               tone="error"
             />
-            <Text variant="subtitle">This order needs settling up</Text>
+            <Text variant="subtitle">Issue under review</Text>
             <Text color="secondary">
               {order.disputeReason === 'late_cancellation'
                 ? `You cancelled after the helper paid ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle with your helper directly.`

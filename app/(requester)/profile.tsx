@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
 
 export default function RequesterProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
 
   return (
     <Screen>
@@ -25,7 +25,7 @@ export default function RequesterProfileScreen() {
             <MaterialIcons name="person" size={28} color={colors.primary} />
           </View>
           <View style={styles.identityText}>
-            <Text variant="subtitle">Campus requester</Text>
+            <Text variant="subtitle">{profile?.displayName ?? 'Campus requester'}</Text>
             <Text variant="caption" color="secondary">
               {user?.email ?? 'Signed in'} · ID {user?.id.slice(0, 8)}…
             </Text>

@@ -56,8 +56,23 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
   }, [order.id]);
 
   useEffect(() => {
-    if (eligible) void load();
-  }, [eligible, load, refreshToken]);
+    if (!eligible) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listOrderRatings(order.id);
+        if (!cancelled) setRatings(rows);
+      } catch (err) {
+        if (!cancelled) {
+          setRatings(null);
+          setLoadError(err instanceof Error ? err.message : 'Could not load ratings.');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [eligible, order.id, refreshToken]);
 
   const handleSubmit = useCallback(async () => {
     if (score === null || submitting) return;

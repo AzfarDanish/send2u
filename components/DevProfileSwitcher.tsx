@@ -31,8 +31,11 @@ let sessionProfileCache: DevProfile[] | null = null;
  */
 export function DevProfileSwitcher() {
   const { user, profile, devAuthEnabled } = useAuth();
-  const [profiles, setProfiles] = useState<DevProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The session roster changes only via out-of-band seeding, so mounts
+  // serve it straight from the cache via initial state (no setState in an
+  // effect); only a mount that finds the cache empty fetches below.
+  const [profiles, setProfiles] = useState<DevProfile[]>(() => sessionProfileCache ?? []);
+  const [loading, setLoading] = useState(() => sessionProfileCache === null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   // Explicit tab choice; null follows the current account's role so the
@@ -64,21 +67,45 @@ export function DevProfileSwitcher() {
   }, []);
 
   useEffect(() => {
-    if (devAuthEnabled) {
-      void load();
-    }
-  }, [devAuthEnabled, load]);
+    if (!devAuthEnabled || sessionProfileCache) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await listDevProfiles();
+        sessionProfileCache = next;
+        if (!cancelled) {
+          setProfiles(next);
+          setLoadError(null);
+          setLoading(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setProfiles([]);
+          setLoadError(error instanceof Error ? error.message : 'Could not load test accounts.');
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [devAuthEnabled]);
 
-  // Follow account switches: reset an explicit tab choice so the new
-  // current account's tab (and its Current marker) shows immediately.
-  useEffect(() => {
+  // Follow account switches: reset an explicit tab choice during render so
+  // the new current account's tab (and its Current marker) shows
+  // immediately (the React-endorsed alternative to setState-in-effect).
+  const [seenUserId, setSeenUserId] = useState(user?.id);
+  if (seenUserId !== user?.id) {
+    setSeenUserId(user?.id);
     setRoleTab(null);
-  }, [user?.id]);
+  }
 
-  const activeTab: UserRole = roleTab ?? (profile?.role === 'helper' ? 'helper' : 'requester');
+  const activeTab: UserRole =
+    roleTab ?? (profile?.role === 'helper' ? 'helper' : profile?.role === 'vendor' ? 'vendor' : 'requester');
   const requesters = profiles.filter((item) => item.role === 'requester');
   const helpers = profiles.filter((item) => item.role === 'helper');
-  const visible = activeTab === 'helper' ? helpers : requesters;
+  const vendors = profiles.filter((item) => item.role === 'vendor');
+  const visible = activeTab === 'helper' ? helpers : activeTab === 'vendor' ? vendors : requesters;
 
   const handleSwitch = useCallback(
     async (target: DevProfile) => {
@@ -103,7 +130,7 @@ export function DevProfileSwitcher() {
   if (!devAuthEnabled) return null;
 
   const roleLabel = (role: DevProfile['role']) =>
-    role === 'requester' ? 'Requester' : role === 'helper' ? 'Helper' : role;
+    role === 'requester' ? 'Requester' : role === 'helper' ? 'Helper' : role === 'vendor' ? 'Vendor' : role;
 
   return (
     <Card style={styles.devCard}>
@@ -143,6 +170,9 @@ export function DevProfileSwitcher() {
               [
                 { key: 'requester', label: `Requesters · ${requesters.length}` },
                 { key: 'helper', label: `Helpers · ${helpers.length}` },
+                ...(vendors.length > 0
+                  ? [{ key: 'vendor', label: `Vendors · ${vendors.length}` } as const]
+                  : []),
               ] as const
             ).map((tab) => {
               const selected = activeTab === tab.key;
@@ -187,11 +217,17 @@ export function DevProfileSwitcher() {
                   pressed && !disabled && !isCurrent && styles.rowPressed,
                 ]}>
                 <View style={[styles.iconWrap, isCurrent && styles.iconWrapCurrent]}>
-                  <MaterialIcons
-                    name={item.role === 'helper' ? 'delivery-dining' : 'shopping-bag'}
-                    size={22}
-                    color={isCurrent ? colors.onPrimary : colors.error}
-                  />
+                    <MaterialIcons
+                      name={
+                        item.role === 'helper'
+                          ? 'delivery-dining'
+                          : item.role === 'vendor'
+                            ? 'storefront'
+                            : 'shopping-bag'
+                      }
+                      size={22}
+                      color={isCurrent ? colors.onPrimary : colors.error}
+                    />
                 </View>
                 <View style={styles.rowText}>
                   <Text variant="secondary" style={styles.rowTitle}>
@@ -208,7 +244,7 @@ export function DevProfileSwitcher() {
                   <View style={styles.badges}>
                     <Badge
                       label={roleLabel(item.role)}
-                      tone={item.role === 'helper' ? 'success' : 'primary'}
+                      tone={item.role === 'helper' ? 'success' : item.role === 'vendor' ? 'warning' : 'primary'}
                     />
                     {isCurrent ? (
                       <Badge label="Current" tone="error" />

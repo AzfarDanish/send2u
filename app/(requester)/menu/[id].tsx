@@ -28,12 +28,21 @@ export default function MenuItemDetailScreen() {
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
+  // Reset per-item state during render when the route id changes (the
+  // React-endorsed alternative to setState-in-effect); the effect below
+  // then only performs the async fetch. Inert on mount: the initial
+  // values already match the reset values.
+  const [seenId, setSeenId] = useState(id);
+  if (seenId !== id) {
+    setSeenId(id);
     setStatus('loading');
     setItem(null);
     setJustAdded(false);
     setQuantity(1);
+  }
+
+  useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const found = typeof id === 'string' ? await getMenuItem(id) : null;
@@ -102,6 +111,16 @@ export default function MenuItemDetailScreen() {
               {item.vendor.locationHint ? (
                 <Text variant="caption" color="secondary">
                   {item.vendor.locationHint}
+                </Text>
+              ) : null}
+              {item.vendor.operatingHours ? (
+                <Text variant="caption" color="secondary">
+                  {item.vendor.operatingHours}
+                </Text>
+              ) : null}
+              {item.vendor.description ? (
+                <Text variant="caption" color="muted">
+                  {item.vendor.description}
                 </Text>
               ) : null}
             </View>

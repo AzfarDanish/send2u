@@ -22,10 +22,18 @@ export function PrivateImage({ path, accessibilityLabel, style }: PrivateImagePr
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
+  // Reset during render when the path changes (the React-endorsed
+  // alternative to setState-in-effect); the effect below then only signs
+  // the new URL. Inert on mount: the initial values already match.
+  const [seenPath, setSeenPath] = useState(path);
+  if (seenPath !== path) {
+    setSeenPath(path);
     setUrl(null);
     setFailed(false);
+  }
+
+  useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const signed = await signedImageUrl(path);

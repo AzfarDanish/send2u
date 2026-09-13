@@ -89,13 +89,8 @@ export default function OrderDetailScreen() {
   const [reportError, setReportError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (typeof id !== 'string') {
-      setOrder(null);
-      setStatus('missing');
-      return;
-    }
     try {
-      const found = await getOrderDetail(id);
+      const found = typeof id === 'string' ? await getOrderDetail(id) : null;
       setOrder(found);
       setStatus(found ? 'ready' : 'missing');
     } catch {
@@ -119,7 +114,13 @@ export default function OrderDetailScreen() {
     },
   );
 
-  useEffect(() => {
+  // Reset per-order state during render when the route id changes (the
+  // React-endorsed alternative to setState-in-effect); the effect below
+  // then only refetches. Inert on mount: the initial values already match
+  // the reset values.
+  const [seenId, setSeenId] = useState(id);
+  if (seenId !== id) {
+    setSeenId(id);
     setStatus('loading');
     setOrder(null);
     setCancelError(null);
@@ -131,8 +132,32 @@ export default function OrderDetailScreen() {
     setReportCategory(null);
     setReportDetails('');
     setReportError(null);
-    void reload();
-  }, [id, reload]);
+  }
+
+  // Mount + id-change fetch. Inlined rather than calling reload(): a
+  // useEffect body may not call a state-setting callback
+  // (react-hooks/set-state-in-effect) — state sets here live only in the
+  // async continuation. reload() stays for realtime/handlers.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const found = typeof id === 'string' ? await getOrderDetail(id) : null;
+        if (mounted) {
+          setOrder(found);
+          setStatus(found ? 'ready' : 'missing');
+        }
+      } catch {
+        if (mounted) {
+          setOrder(null);
+          setStatus('missing');
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   const handleCancel = useCallback(async () => {
     if (!order || cancelling) return;

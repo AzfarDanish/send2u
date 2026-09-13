@@ -59,9 +59,40 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
     }, [load]),
   );
 
+  // Refresh-token bumps (e.g. right after confirming receipt on this
+  // screen) reset to loading during render (the React-endorsed alternative
+  // to setState-in-effect); the effect below then refetches with state
+  // sets only in its async continuation.
+  const [seenToken, setSeenToken] = useState(refreshToken);
+  if (seenToken !== refreshToken) {
+    setSeenToken(refreshToken);
+    if (refreshToken > 0) {
+      setStatus('loading');
+      setError(null);
+    }
+  }
+
   useEffect(() => {
-    if (refreshToken > 0) void load();
-  }, [load, refreshToken]);
+    if (refreshToken <= 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await getPaymentContext(orderId);
+        if (!cancelled) {
+          setContext(next);
+          setStatus('ready');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load payment details.');
+          setStatus('error');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, refreshToken]);
 
   const handleChoose = useCallback(async () => {
     if (!user || busy) return;

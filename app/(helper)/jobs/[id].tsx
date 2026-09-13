@@ -38,13 +38,8 @@ export default function JobDetailScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (typeof id !== 'string') {
-      setJob(null);
-      setStatus('missing');
-      return;
-    }
     try {
-      const found = await getJobDetail(id);
+      const found = typeof id === 'string' ? await getJobDetail(id) : null;
       setJob(found);
       setStatus(found ? 'ready' : 'missing');
     } catch {
@@ -53,15 +48,45 @@ export default function JobDetailScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
+  // Reset per-job state during render when the route id changes (the
+  // React-endorsed alternative to setState-in-effect); the effect below
+  // then only refetches. Inert on mount: the initial values already match
+  // the reset values.
+  const [seenId, setSeenId] = useState(id);
+  if (seenId !== id) {
+    setSeenId(id);
     setStatus('loading');
     setJob(null);
     setAcceptError(null);
     setAccepted(false);
     setPaymentTick(0);
     setActionError(null);
-    void reload();
-  }, [id, reload]);
+  }
+
+  // Mount + id-change fetch. Inlined rather than calling reload(): a
+  // useEffect body may not call a state-setting callback
+  // (react-hooks/set-state-in-effect) — state sets here live only in the
+  // async continuation. reload() stays for realtime/handlers.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const found = typeof id === 'string' ? await getJobDetail(id) : null;
+        if (mounted) {
+          setJob(found);
+          setStatus(found ? 'ready' : 'missing');
+        }
+      } catch {
+        if (mounted) {
+          setJob(null);
+          setStatus('missing');
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   // Live updates (requester confirms, pays, cancels, reports, rates…).
   // RLS-scoped to this job; failures fall back to the focus/manual paths.

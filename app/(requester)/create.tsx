@@ -84,42 +84,19 @@ export default function CreateRequestScreen() {
         selectedLocation.id,
         lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
       );
-      // Payable total: food subtotal + the RM2.00 fee recorded server-side
-      // on every placed order (one fee per vendor order).
-      const foodCents = summaries.reduce((sum, s) => sum + s.subtotalCents, 0);
-      const feeCents = summaries.reduce((sum, s) => sum + s.deliveryFeeCents, 0);
-      const itemsSummary = lines
-        .map((line) => `${line.quantity} × ${line.item.name}`)
-        .join(', ');
       clear();
       // Terminal transition: the emptied cart must leave history, so step
-      // back to the menu first, then open the next screen on top — back
-      // from detail/confirmation returns to the menu, never to a cleared
-      // Review Request that invites resubmit. (`router.replace` cannot do
-      // this: expo-router downgrades every action to JUMP_TO on tab
-      // navigators, so a replace would append and strand the empty cart
-      // underneath.) A single-vendor submit opens that request's detail
-      // page directly; multi-vendor submits keep the confirmation summary
-      // (one screen cannot represent several requests).
+      // back to the menu first, then open the confirmation on top — back
+      // from confirmation returns to the menu, never to a cleared Review
+      // Request that invites resubmit. (`router.replace` cannot do this:
+      // expo-router downgrades every action to JUMP_TO on tab navigators,
+      // so a replace would append and strand the empty cart underneath.)
+      // The confirmation screen fetches the real just-created orders by ID;
+      // "View Request" then pushes the full detail for the chosen request.
       if (router.canGoBack()) router.back();
-      if (summaries.length === 1) {
-        router.push({
-          pathname: '/(requester)/orders/[id]',
-          params: { id: summaries[0].orderId },
-        });
-        return;
-      }
       router.push({
         pathname: '/(requester)/orders/confirmation',
-        params: {
-          orderIds: summaries.map((s) => s.orderId).join(','),
-          vendorCount: String(summaries.length),
-          vendorNames: summaries.map((s) => s.vendorName).join(', '),
-          foodCents: String(foodCents),
-          feeCents: String(feeCents),
-          locationName: selectedLocation.name,
-          itemsSummary,
-        },
+        params: { orderIds: summaries.map((s) => s.orderId).join(',') },
       });
     } catch (err) {
       // Cart and location stay intact so the requester can retry.

@@ -1,167 +1,318 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ListRow } from '@/components/ui/ListRow';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
-import { orderTotalCents } from '@/lib/orders';
+import {
+  orderItemsTitle,
+  orderStatusTone,
+  orderTotalCents,
+  requesterStatusMessage,
+} from '@/lib/orders';
+import { getOrderDetail } from '@/services/orders';
+import type { OrderWithDetails } from '@/types/domain';
 
 /**
- * Post-order confirmation. Stateless summary carried in route params —
- * the cart was already cleared after confirmed database success.
+ * Request Submitted confirmation. Opens immediately after a successful
+ * submit with the real just-created orders (fetched by ID — never
+ * params-carried snapshots), so the ID, status, summary, and drop-off
+ * shown here always match the backend. "View Request" pushes the full
+ * Request Detail, preserving back-to-confirmation history.
  */
 export default function OrderConfirmationScreen() {
-  const { orderIds, vendorCount, vendorNames, foodCents, feeCents, locationName, itemsSummary } =
-    useLocalSearchParams<{
-      orderIds?: string;
-      vendorCount?: string;
-      vendorNames?: string;
-      foodCents?: string;
-      feeCents?: string;
-      locationName?: string;
-      itemsSummary?: string;
-    }>();
+  const { orderIds } = useLocalSearchParams<{ orderIds?: string }>();
+  const ids =
+    typeof orderIds === 'string' && orderIds.length > 0
+      ? [...new Set(orderIds.split(',').filter((id) => id.length > 0))]
+      : [];
 
-  const ids = typeof orderIds === 'string' && orderIds.length > 0 ? orderIds.split(',') : [];
-  const count = typeof vendorCount === 'string' ? Number.parseInt(vendorCount, 10) : Number.NaN;
-  const food = typeof foodCents === 'string' ? Number.parseInt(foodCents, 10) : Number.NaN;
-  const fee = typeof feeCents === 'string' ? Number.parseInt(feeCents, 10) : Number.NaN;
-  const total = Number.isInteger(food) && Number.isInteger(fee) ? orderTotalCents(food, fee) : Number.NaN;
-  const valid =
-    ids.length > 0 &&
-    Number.isInteger(count) &&
-    count === ids.length &&
-    Number.isInteger(total) &&
-    typeof vendorNames === 'string' &&
-    vendorNames.length > 0 &&
-    typeof locationName === 'string' &&
-    locationName.length > 0;
+  const [orders, setOrders] = useState<OrderWithDetails[] | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
-  if (!valid) {
+  const reload = useCallback(async () => {
+    try {
+      const found = (
+        await Promise.all(ids.map((id) => getOrderDetail(id).catch(() => null)))
+      ).filter((order): order is OrderWithDetails => order !== null);
+      setOrders(found);
+      setLoadFailed(false);
+      setStatus(found.length > 0 ? 'ready' : 'missing');
+    } catch {
+      // Transient failure: keep the last good render; retry paths reconcile.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIds, retryToken]);
+
+  // Stay accurate if a helper accepts while this screen is mounted.
+  useRealtimeReload(
+    ids.flatMap((id) => [
+      { table: 'send2u_orders', filter: `id=eq.${id}` },
+      { table: 'send2u_ratings', filter: `order_id=eq.${id}` },
+    ]),
+    () => {
+      void reload();
+    },
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const found = (
+          await Promise.all(ids.map((id) => getOrderDetail(id).catch(() => null)))
+        ).filter((order): order is OrderWithDetails => order !== null);
+        if (mounted) {
+          setOrders(found);
+          setLoadFailed(false);
+          setStatus(found.length > 0 ? 'ready' : 'missing');
+        }
+      } catch {
+        if (mounted) {
+          setOrders(null);
+          setLoadFailed(true);
+          setStatus('missing');
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIds, retryToken]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reload]);
+
+  if (status === 'loading' || !orders) {
     return (
       <>
         <Stack.Screen options={{ title: 'Request Submitted' }} />
         <Screen>
-          <ErrorState
-            title="Nothing to confirm"
-            message="This confirmation link is incomplete. Check Requests for your orders."
-            retryTitle="View Requests"
-            onRetry={() => router.replace('/(requester)/orders')}
-          />
+          {status === 'loading' ? (
+            <LoadingState message="Confirming your request…" />
+          ) : loadFailed ? (
+            <ErrorState
+              title="Couldn't load the confirmation"
+              message="Check your connection and try again."
+              retryTitle="Try again"
+              onRetry={() => {
+                setLoadFailed(false);
+                setStatus('loading');
+                setRetryToken((t) => t + 1);
+              }}
+            />
+          ) : (
+            <ErrorState
+              title="Nothing to confirm"
+              message="These requests aren't available to you. Check Requests for your orders."
+              retryTitle="View Requests"
+              onRetry={() => router.push('/(requester)/orders')}
+            />
+          )}
         </Screen>
       </>
     );
   }
 
-  const singleId = count === 1 ? ids[0] : null;
+  const single = orders.length === 1 ? orders[0] : null;
+  const locationName = orders[0]?.location.name ?? null;
+  const allPending = orders.every((order) => order.status === 'pending');
+  const anyAssigned = orders.some(
+    (order) => order.status === 'assigned' || order.status === 'accepted',
+  );
 
   return (
     <>
       <Stack.Screen options={{ title: 'Request Submitted' }} />
-      <Screen>
-        <View style={styles.visual}>
-          <MaterialIcons name="check-circle" size={48} color={colors.success} />
+      <Screen
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
+        }>
+        <View style={styles.hero}>
+          <View style={styles.heroCircle}>
+            <MaterialIcons name="send" size={44} color={colors.primary} accessibilityLabel="Request sent" />
+          </View>
+          <Text variant="title" style={styles.heroTitle}>
+            Request Submitted!
+          </Text>
+          <Text color="secondary" style={styles.heroSubtitle}>
+            Your request has been sent to available helpers. We&rsquo;ll notify you once a helper
+            accepts it.
+          </Text>
         </View>
 
-        <View style={styles.heading}>
-          <Text variant="title">Request Submitted!</Text>
-          <Text color="secondary">Your request has been submitted successfully.</Text>
-        </View>
-
-        <Card>
-          <Text variant="subtitle">Request ID{count === 1 ? '' : 's'}</Text>
-          {ids.map((id) => (
-            <Text key={id} variant="secondary" color="secondary">
-              #{id.slice(0, 8)}
+        <View style={styles.idCard}>
+          <Text variant="caption" color="secondary">
+            Request ID{orders.length === 1 ? '' : 's'}
+          </Text>
+          {orders.map((order) => (
+            <Text key={order.id} variant="subtitle" numberOfLines={1} ellipsizeMode="tail">
+              #{order.id.slice(0, 8)}
             </Text>
           ))}
-        </Card>
+        </View>
 
-        <Card>
-          <Badge label="Waiting for a helper" tone="info" />
-          <Text color="secondary">
-            No helper assigned yet. You will get a notification when a helper accepts your
-            request.
-          </Text>
-        </Card>
-
-        <Card>
-          <Text variant="subtitle">Order summary</Text>
-          <View style={styles.totalRow}>
-            <Text color="secondary">Vendor{count === 1 ? '' : 's'}</Text>
-            <Text variant="secondary" style={styles.value}>
-              {vendorNames}
-            </Text>
+        <View style={styles.statusCard}>
+          <MaterialIcons
+            name={anyAssigned ? 'person-outline' : 'schedule'}
+            size={28}
+            color={allPending || anyAssigned ? colors.info : colors.warning}
+          />
+          <View style={styles.statusText}>
+            {allPending ? (
+              <>
+                <Text variant="subtitle" style={{ color: colors.info }}>
+                  Waiting for Helper
+                </Text>
+                <Text color="secondary">We&rsquo;re finding a helper for you.</Text>
+              </>
+            ) : anyAssigned ? (
+              <>
+                <Text variant="subtitle" style={{ color: colors.info }}>
+                  Helper assigned
+                </Text>
+                <Text color="secondary">
+                  A helper accepted your request. Open it to follow along.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Badge
+                  label={requesterStatusMessage(orders[0].status)}
+                  tone={orderStatusTone(orders[0].status)}
+                />
+                <Text color="secondary">Your request is already on its way.</Text>
+              </>
+            )}
           </View>
-          {typeof itemsSummary === 'string' && itemsSummary.length > 0 ? (
-            <View style={styles.totalRow}>
-              <Text color="secondary">Items</Text>
-              <Text variant="secondary" style={styles.value}>
-                {itemsSummary}
+        </View>
+
+        <Text variant="subtitle">Order Summary</Text>
+        {single ? (
+          <Card>
+            <View style={styles.row}>
+              <MaterialIcons name="storefront" size={20} color={colors.primary} />
+              <View style={styles.rowText}>
+                <Text variant="secondary" style={styles.vendorName} numberOfLines={2}>
+                  {single.vendor.name}
+                </Text>
+                {single.vendor.locationHint ? (
+                  <Text variant="caption" color="secondary" numberOfLines={2}>
+                    {single.vendor.locationHint}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Text color="secondary" numberOfLines={2}>
+              {orderItemsTitle(single.items)}
+            </Text>
+            <View style={styles.summaryRow}>
+              <Text color="secondary">Total</Text>
+              <Text variant="price" style={styles.summaryTotal}>
+                {formatMYR(orderTotalCents(single.subtotalCents, single.deliveryFeeCents))}
               </Text>
             </View>
-          ) : null}
-          <View style={styles.totalRow}>
-            <Text color="secondary">Drop-off</Text>
-            <Text variant="secondary" style={styles.value}>
-              {locationName}
+          </Card>
+        ) : (
+          <Card style={styles.listCard}>
+            {orders.map((order) => (
+              <ListRow
+                key={order.id}
+                icon="receipt-long"
+                title={order.vendor.name}
+                subtitle={`#${order.id.slice(0, 8)} · ${orderItemsTitle(order.items)}`}
+                onPress={() =>
+                  router.push({ pathname: '/(requester)/orders/[id]', params: { id: order.id } })
+                }
+                right={
+                  <Text variant="secondary" style={styles.rowTotal}>
+                    {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
+                  </Text>
+                }
+              />
+            ))}
+          </Card>
+        )}
+
+        <Text variant="subtitle">Drop-off Location</Text>
+        <Card>
+          <View style={styles.row}>
+            <MaterialIcons name="place" size={20} color={colors.error} />
+            <Text variant="secondary" style={styles.rowText} numberOfLines={2}>
+              {locationName ?? 'Drop-off location not set'}
             </Text>
           </View>
-          <View style={styles.divider} />
-          <View style={styles.totalRow}>
-            <Text color="secondary">Food subtotal</Text>
-            <Text variant="secondary">{formatMYR(food)}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text color="secondary">Delivery fee ({formatMYR(Math.round(fee / count))} × {count})</Text>
-            <Text variant="secondary">{formatMYR(fee)}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.totalRow}>
-            <Text variant="subtitle">Total amount</Text>
-            <Text variant="title" color="primary">
-              {formatMYR(total)}
-            </Text>
-          </View>
-          <Text variant="caption" color="muted">
-            Pay externally after your food arrives. Nothing is charged in the app.
-          </Text>
         </Card>
 
-        {singleId ? (
+        {single ? (
           <Button
             title="View Request"
-            onPress={() => router.replace({ pathname: '/(requester)/orders/[id]', params: { id: singleId } })}
+            onPress={() =>
+              router.push({ pathname: '/(requester)/orders/[id]', params: { id: single.id } })
+            }
           />
         ) : (
-          <Button title="View Requests" onPress={() => router.replace('/(requester)/orders')} />
+          <Button title="View Requests" onPress={() => router.push('/(requester)/orders')} />
         )}
-        <Button
-          title="Back to menu"
-          variant="secondary"
-          onPress={() => router.replace('/(requester)')}
-        />
       </Screen>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  visual: {
+  hero: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.md },
+  heroCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.successSoft,
-    borderRadius: radii.xl,
-    paddingVertical: spacing.xxxl,
+    marginBottom: spacing.xs,
   },
-  heading: { gap: spacing.sm },
-  totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  value: { flex: 1, textAlign: 'right' },
-  divider: { borderTopWidth: 1, borderTopColor: colors.divider },
+  heroTitle: { textAlign: 'center' },
+  heroSubtitle: { textAlign: 'center' },
+  idCard: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  statusCard: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'flex-start',
+    backgroundColor: colors.infoSoft,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+  },
+  statusText: { flex: 1, gap: spacing.xs },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowText: { flex: 1, fontWeight: '600', color: colors.text },
+  vendorName: { fontWeight: '600', color: colors.text },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  summaryTotal: { fontVariant: ['tabular-nums'] as const },
+  rowTotal: { fontWeight: '700', color: colors.primary },
+  listCard: { gap: 0 },
 });

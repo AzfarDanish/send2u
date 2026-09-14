@@ -1406,3 +1406,100 @@ only. No secrets are ever recorded here.
   single Playwright context (no parallel sessions); real-time
   subscription re-render after helper advances is refreshed via
   `reload()` but not asserted on screen content.
+
+## 2026-09-14 — Request Submitted confirmation screen (real data)
+
+- Change: rewrote `app/(requester)/orders/confirmation.tsx` from a
+  params-carried stateless summary into a data-driven confirmation
+  screen matching the reference layout: centered `send` paper-plane
+  hero in a `primarySoft` circle, "Request Submitted!" heading with
+  helper-workflow copy, gray Request ID card (`#` + 8-char convention),
+  pink waiting-status card (live status: Waiting for Helper / Helper
+  assigned / in-progress badge), compact Order Summary (vendor +
+  `orderItemsTitle` compact items + labeled order total from real DB
+  snapshots), Drop-off Location row, and a primary View Request button.
+  Multi-order submits render one tappable row per request plus View
+  Requests. Orders are fetched by ID via `getOrderDetail` with the
+  existing `useRealtimeReload` channel + pull-to-refresh, so the
+  status stays accurate if a helper accepts while mounted; loading /
+  error / missing states included.
+- Navigation: submit (any vendor count) now back-steps off the emptied
+  cart then pushes confirmation with `orderIds` only (params blob
+  removed); View Request / per-order rows `push` (never replace) the
+  Request Detail so back returns confirmation → menu. Verified chain:
+  submit → confirmation → detail → confirmation → menu item.
+- Reason: the old screen showed params snapshots that could drift from
+  the backend, used `replace` navigation that stranded history, and
+  single-vendor submits skipped confirmation entirely.
+- Removed from scope per product rules: copy-ID icon (no clipboard
+  dependency installed — omitted rather than faked), food images
+  (`imageUrl` unused in MVP — omitted), payment/fee estimates (totals
+  are recorded snapshots; no payment implied), tab-bar changes (hidden
+  on sub-screens per app convention).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` pass. Playwright
+  (20 checks, all pass): single + multi-item submits land on
+  confirmation with real ID/status/summary/location, View Request
+  opens the exact new detail, back chain returns to the menu item,
+  deep-link renders, no overflow at 390/360pt. A temporary
+  `[nav-hist]` tracer used during debugging was fully removed
+  (`grep` confirms none remains).
+- Known issues (pre-existing, untouched): the vendor detail page
+  emits a web-only nested-`<button>` React warning that surfaces as
+  a dev error toast; it can cover buttons in dev but is absent from
+  production builds.
+
+## 2026-09-14 — Requester Requests tab redesign (reference layout)
+
+- Change: rewrote `app/(requester)/orders.tsx` to the reference design
+  via a new `components/RequestCard.tsx`: in-page header (title
+  "Requests", subtitle, live `HeaderBell` — tab header hidden like
+  Home, so no duplicate bell), Active/Past segmented control reusing
+  `ActiveHistoryToggle` (`historyLabel="Past"` + live count), and
+  compact tappable cards (thumbnail chip, `#id`, relative time via
+  existing `formatRelativeTime`, vendor, `orderItemsTitle` summary,
+  status `Badge`, chevron, recorded total). Cards for
+  `delivered` / payment-pending statuses show an action hint
+  ("Tap to confirm receipt" / "Tap to complete payment") matching
+  the real detail-page actions. Loading now uses `Skeleton` rows
+  (Home precedent); empty/error/refresh logic and `router.push`
+  detail navigation unchanged.
+- Data split unchanged and already correct: Active = every
+  non-terminal status (delivered/unconfirmed stay Active until
+  confirmed), Past = completed/cancelled/disputed via the existing
+  service queries; realtime updates and filter-state-on-back come
+  from the pre-existing hooks and mounted-screen state.
+- Deliberately out of scope: food imagery (no image fields in the
+  model — tinted icon chip instead of the diagnostic
+  `PlaceholderImage`), count-badge bell (kept the app-wide dot-only
+  `NotificationBell`; no hardcoded counts anywhere), "Past" tab
+  showing Delivered (unconfirmed deliveries are genuinely active).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` pass. Playwright
+  (25 checks, all pass, real backend data): Active/Past content with
+  real ids/times/statuses/totals, card → exact detail → back to
+  Requests (filter preserved both ways), bell → notifications,
+  no overflow at 390/360pt, plus a live helper round-trip
+  (accept → going_to_vendor → … → delivered) proving in-transit
+  badges and the confirm-receipt hint render on the card.
+- Known limits: empty-state copy and error/retry paths verified by
+  code inspection (existing components/hooks, rendering reshuffle
+  only) — live data always had orders; transient long badges
+  (e.g. "Helper is going to the vendor") squeeze card text to
+  ellipsis without overlap, full info one tap away on detail.
+
+## 2026-09-14 — Docs: high-quality README.md (replaces Expo boilerplate)
+
+- Change: rewrote `README.md` (was the untouched `create-expo-app`
+  template) into a GitHub-ready project readme: product summary with
+  role-lifecycle diagram, per-role features, tech-stack table, project
+  structure, env-var table + setup/run instructions, validation loop,
+  backend overview (tables, RPCs, realtime, RLS), contributor
+  conventions, and honest status/limitations. All paths, commands,
+  versions, and links verified against the repo (SDK 57, RN 0.86,
+  repo URL, scripts); no screenshots section (no image assets ship).
+- Reason: the repo had no usable entry point for new developers or
+  GitHub visitors.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0; every
+  referenced path checked present, code fences balanced, no secrets
+  included.

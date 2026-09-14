@@ -10,9 +10,16 @@ interface UseMyVendorResult {
   status: MyVendorStatus;
   error: string | null;
   saving: boolean;
+  refreshing: boolean;
   retry: () => void;
   refresh: () => Promise<void>;
   save: (input: VendorProfileInput) => Promise<void>;
+  /**
+   * Optimistic local patch (e.g. open/closed flip): merges into the
+   * visible vendor immediately; callers roll back with the previous
+   * value when the write fails. No fetching involved.
+   */
+  patchVendor: (patch: Partial<Vendor>) => void;
 }
 
 /**
@@ -25,9 +32,14 @@ export function useMyVendor(): UseMyVendorResult {
   const [status, setStatus] = useState<MyVendorStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setStatus('loading');
+  const load = useCallback(async (isRefresh: boolean) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setStatus('loading');
+    }
     setError(null);
     try {
       setVendor(await getMyVendor());
@@ -35,11 +47,13 @@ export function useMyVendor(): UseMyVendorResult {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load your stall.');
       setStatus('error');
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
 
   const save = useCallback(async (input: VendorProfileInput) => {
@@ -53,13 +67,21 @@ export function useMyVendor(): UseMyVendorResult {
     }
   }, []);
 
+  const patchVendor = useCallback((patch: Partial<Vendor>) => {
+    setVendor((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
   return {
     vendor,
     status,
     error,
     saving,
-    retry: () => void load(),
-    refresh: load,
+    refreshing,
+    retry: () => void load(false),
+    refresh: async () => {
+      await load(true);
+    },
     save,
+    patchVendor,
   };
 }

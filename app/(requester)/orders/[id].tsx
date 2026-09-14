@@ -22,6 +22,7 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
+import { emitOrderChanged } from '@/lib/orderEvents';
 import {
   formatOrderDate,
   isTerminalOrderStatus,
@@ -330,63 +331,90 @@ export default function OrderDetailScreen() {
     }
   }, [reload]);
 
+  // Status-changing handlers patch the visible order from the RPC's
+  // authoritative `{status}` instead of refetching the whole record, then
+  // broadcast it so mounted lists update the same card in place. Other
+  // fields (timestamps, payment) reconcile via the realtime echo / manual
+  // refresh. Failures restore the previous order — the UI never shows a
+  // state the backend rejected.
   const handleCancel = useCallback(async () => {
     if (!order || cancelling) return;
+    const previous = order;
     setCancelling(true);
     setCancelError(null);
     try {
-      await cancelOrder(order.id, reason);
+      const result = await cancelOrder(order.id, reason);
+      const patched = { ...previous, status: result.status };
+      setOrder(patched);
+      emitOrderChanged(patched);
       setCancelled(true);
-      await reload();
     } catch (err) {
+      setOrder(previous);
       setCancelError(err instanceof Error ? err.message : 'Could not cancel the order.');
     } finally {
       setCancelling(false);
     }
-  }, [order, cancelling, reason, reload]);
+  }, [order, cancelling, reason]);
 
   const handleConfirm = useCallback(async () => {
     if (!order || confirming) return;
+    const previous = order;
     setConfirming(true);
     setConfirmError(null);
     try {
-      await confirmDelivery(order.id);
-      await reload();
+      const result = await confirmDelivery(order.id);
+      const patched = { ...previous, status: result.status };
+      setOrder(patched);
+      emitOrderChanged(patched);
       setPaymentTick((t) => t + 1);
     } catch (err) {
+      setOrder(previous);
       setConfirmError(err instanceof Error ? err.message : 'Could not confirm delivery.');
     } finally {
       setConfirming(false);
     }
-  }, [order, confirming, reload]);
+  }, [order, confirming]);
 
   const handleReport = useCallback(async () => {
     if (!order || reporting || !reportCategory) return;
+    const previous = order;
     setReporting(true);
     setReportError(null);
     try {
-      await openDispute(order.id, reportCategory, reportDetails.trim().length > 0 ? reportDetails : null);
-      await reload();
+      const result = await openDispute(order.id, reportCategory, reportDetails.trim().length > 0 ? reportDetails : null);
+      const patched = { ...previous, status: result.status };
+      setOrder(patched);
+      emitOrderChanged(patched);
+      // Close the form on success: the order left the delivered state, so
+      // the report UI unmounts anyway — don't leave stale inputs behind.
+      setReportOpen(false);
+      setReportCategory(null);
+      setReportDetails('');
     } catch (err) {
+      setOrder(previous);
       setReportError(err instanceof Error ? err.message : 'Could not report the problem.');
     } finally {
       setReporting(false);
     }
-  }, [order, reporting, reportCategory, reportDetails, reload]);
+  }, [order, reporting, reportCategory, reportDetails]);
 
   const handleWithdraw = useCallback(async () => {
     if (!order || withdrawing) return;
+    const previous = order;
     setWithdrawing(true);
     setWithdrawError(null);
     try {
-      await withdrawDispute(order.id);
-      await reload();
+      const result = await withdrawDispute(order.id);
+      const patched = { ...previous, status: result.status };
+      setOrder(patched);
+      emitOrderChanged(patched);
     } catch (err) {
+      setOrder(previous);
       setWithdrawError(err instanceof Error ? err.message : 'Could not withdraw the report.');
     } finally {
       setWithdrawing(false);
     }
-  }, [order, withdrawing, reload]);
+  }, [order, withdrawing]);
 
   if (status === 'loading' || !order) {
     return (

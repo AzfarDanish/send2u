@@ -80,16 +80,19 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await submitRating(order.id, score, comment.trim().length > 0 ? comment : null);
+      // The RPC returns the full immutable row — append it directly instead
+      // of refetching the list. The form flips to its read-only state with
+      // no flash; failure keeps the form (nothing to roll back) with error.
+      const created = await submitRating(order.id, score, comment.trim().length > 0 ? comment : null);
+      setRatings((prev) => (prev ? [...prev, created] : [created]));
       setScore(null);
       setComment('');
-      await load();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Could not submit the rating.');
     } finally {
       setSubmitting(false);
     }
-  }, [score, submitting, order.id, comment, load]);
+  }, [score, submitting, order.id, comment]);
 
   if (!eligible || viewerId === null) return null;
 

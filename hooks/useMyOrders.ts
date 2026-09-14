@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
+import { isTerminalOrderStatus } from '@/lib/orders';
 import { listMyOrders } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -64,6 +66,33 @@ export function useMyOrders(): UseMyOrdersResult {
   useRealtimeReload([{ table: 'send2u_orders', event: '*' }], () => {
     void silentReload();
   });
+
+  // Latest list for the emitter callback below (synced in an effect —
+  // refs must not be written during render). Lets the subscription stay
+  // stable across renders instead of resubscribing per list change.
+  const ordersRef = useRef<OrderWithDetails[]>([]);
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
+  // Local mutations (detail cancel/confirm/dispute…) patch the affected
+  // card in place: rows that left for history are dropped, rows that stay
+  // are patched, and only a newly-entered row triggers the preserving
+  // silent refetch (membership can't be derived from one record).
+  useEffect(() => {
+    return subscribeOrderChanges((order) => {
+      const { next, needsRefetch } = applyOrderChange(
+        ordersRef.current,
+        order,
+        !isTerminalOrderStatus(order.status),
+      );
+      if (needsRefetch) {
+        void silentReload();
+        return;
+      }
+      setOrders(next);
+    });
+  }, [silentReload]);
 
   const retry = useCallback(() => {
     void load(false);

@@ -1,3 +1,4 @@
+import { dedupeRequest } from '@/lib/dedupe';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { DeliveryLocation } from '@/types/domain';
 
@@ -40,11 +41,14 @@ function toDeliveryLocation(row: DeliveryLocationRow): DeliveryLocation {
 /** Active campus drop-off points, in display order. */
 export async function listDeliveryLocations(): Promise<DeliveryLocation[]> {
   const supabase = requireClient();
-  const { data, error } = await supabase
-    .from('send2u_delivery_locations')
-    .select('id, name, description, sort_order, created_at, updated_at')
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
-  if (error) throw new Error(`Could not load delivery locations: ${error.message}`);
-  return (data as DeliveryLocationRow[]).map(toDeliveryLocation);
+  // In-flight deduped: review, picker, and browser can mount together.
+  return dedupeRequest('send2u:delivery-locations', async () => {
+    const { data, error } = await supabase
+      .from('send2u_delivery_locations')
+      .select('id, name, description, sort_order, created_at, updated_at')
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) throw new Error(`Could not load delivery locations: ${error.message}`);
+    return (data as DeliveryLocationRow[]).map(toDeliveryLocation);
+  });
 }

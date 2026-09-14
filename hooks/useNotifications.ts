@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import {
@@ -26,8 +26,9 @@ interface UseNotificationsResult {
 /**
  * Own notifications, newest first, with a live unread count. New rows arrive
  * through a realtime subscription (RLS-scoped, so only own rows ever arrive);
- * marking read refetches so the count stays truthful. Screens keep working
- * when realtime is down — refresh/retry always reload from the server.
+ * marking read patches the row and count optimistically with server-recount
+ * rollback on failure. Screens keep working when realtime is down —
+ * refresh/retry always reload from the server.
  */
 export function useNotifications(): UseNotificationsResult {
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -83,18 +84,63 @@ export function useNotifications(): UseNotificationsResult {
     await load(true);
   }, [load]);
 
-  const markRead = useCallback(
-    async (id: string) => {
+  // Latest items for optimistic patches (synced in an effect — refs
+  // must not be written during render). Lets mark-read capture the
+  // previous row for rollback without churning callback identity.
+  const itemsRef = useRef<AppNotification[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const markRead = useCallback(async (id: string) => {
+    const target = itemsRef.current.find((item) => item.id === id);
+    // Already read (or gone): no-op. This also guards rapid double-taps —
+    // the second tap sees the optimistic flag and does nothing.
+    if (!target || target.readAt) return;
+    const stamped = new Date().toISOString();
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, readAt: stamped } : item)));
+    setUnreadCount((count) => Math.max(0, count - 1));
+    try {
       await markNotificationRead(id);
-      await load(true);
-    },
-    [load],
-  );
+    } catch (err) {
+      // Roll back the row; recount from the server so races with
+      // realtime arrivals can't corrupt the badge.
+      setItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, readAt: target.readAt } : item)),
+      );
+      try {
+        setUnreadCount(await countUnreadNotifications());
+      } catch {
+        // Keep the optimistic count; realtime/refresh reconciles.
+      }
+      throw err;
+    }
+  }, []);
 
   const markAllRead = useCallback(async () => {
-    await markAllNotificationsRead();
-    await load(true);
-  }, [load]);
+    const unreadIds = new Set(
+      itemsRef.current.filter((item) => !item.readAt).map((item) => item.id),
+    );
+    if (unreadIds.size === 0) return;
+    const stamped = new Date().toISOString();
+    setItems((prev) =>
+      prev.map((item) => (unreadIds.has(item.id) ? { ...item, readAt: stamped } : item)),
+    );
+    setUnreadCount(0);
+    try {
+      await markAllNotificationsRead();
+    } catch (err) {
+      setItems((prev) =>
+        prev.map((item) => (unreadIds.has(item.id) ? { ...item, readAt: null } : item)),
+      );
+      try {
+        setUnreadCount(await countUnreadNotifications());
+      } catch {
+        // Keep the optimistic count; realtime/refresh reconciles.
+      }
+      throw err;
+    }
+  }, []);
 
   return { items, unreadCount, status, error, refreshing, retry, refresh, markRead, markAllRead };
 }

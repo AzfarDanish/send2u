@@ -1,8 +1,8 @@
 import { useFocusEffect } from 'expo-router';
 import * as Linking from 'expo-linking';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { PrivateImage } from '@/components/PrivateImage';
 import { Badge } from '@/components/ui/Badge';
@@ -33,50 +33,66 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
   const [context, setContext] = useState<PaymentContext | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
+  // Background refresh in flight while content is visible: keep the stale
+  // card with an inline spinner instead of flashing the loading card.
+  const [reloading, setReloading] = useState(false);
+  const hasContext = useRef(false);
 
-  const load = useCallback(async () => {
-    setStatus('loading');
-    setError(null);
-    try {
-      setContext(await getPaymentContext(orderId));
-      setStatus('ready');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load payment details.');
-      setStatus('error');
-    }
-  }, [orderId]);
+  const load = useCallback(
+    async (opts?: { background?: boolean }) => {
+      const background = opts?.background ?? false;
+      if (background && hasContext.current) {
+        setReloading(true);
+      } else {
+        setStatus('loading');
+        setError(null);
+      }
+      try {
+        const next = await getPaymentContext(orderId);
+        setContext(next);
+        hasContext.current = true;
+        setStatus('ready');
+      } catch (err) {
+        // Background failures keep the stale card; foreground failures
+        // (first mount, explicit retry) show the error card.
+        if (!background || !hasContext.current) {
+          setError(err instanceof Error ? err.message : 'Could not load payment details.');
+          setStatus('error');
+        }
+      } finally {
+        setReloading(false);
+      }
+    },
+    [orderId],
+  );
+
+  // Timestamp of the last token-driven refetch. The focus effect below
+  // skips its own refetch within a short window after one — the token
+  // effect already covers it, so returning to the screen doesn't fetch
+  // twice for the same update.
+  const tokenBumpAt = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
-      void load();
+      if (Date.now() - tokenBumpAt.current < 1500) return;
+      void load({ background: true });
     }, [load]),
   );
 
-  // Refresh-token bumps (e.g. right after accepting on this screen) reset
-  // to loading during render (the React-endorsed alternative to
-  // setState-in-effect); the effect below then refetches with state sets
-  // only in its async continuation.
-  const [seenToken, setSeenToken] = useState(refreshToken);
-  if (seenToken !== refreshToken) {
-    setSeenToken(refreshToken);
-    if (refreshToken > 0) {
-      setStatus('loading');
-      setError(null);
-    }
-  }
-
   useEffect(() => {
     if (refreshToken <= 0) return;
+    tokenBumpAt.current = Date.now();
     let cancelled = false;
     (async () => {
       try {
         const next = await getPaymentContext(orderId);
         if (!cancelled) {
           setContext(next);
+          hasContext.current = true;
           setStatus('ready');
         }
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && !hasContext.current) {
           setError(err instanceof Error ? err.message : 'Could not load payment details.');
           setStatus('error');
         }
@@ -125,7 +141,13 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
       <Card>
         <Badge label="Awaiting confirmation" tone="success" />
         <Text variant="subtitle">Waiting for the requester</Text>
-        <Button title="Refresh" variant="secondary" onPress={() => void load()} />
+        <Button
+          title="Refresh"
+          variant="secondary"
+          onPress={() => void load({ background: true })}
+          loading={reloading}
+          disabled={reloading}
+        />
       </Card>
     );
   }
@@ -137,7 +159,13 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
         <Text color="secondary">
           Set your payment QR in your profile so they can pay you.
         </Text>
-        <Button title="Refresh" variant="secondary" onPress={() => void load()} />
+        <Button
+          title="Refresh"
+          variant="secondary"
+          onPress={() => void load({ background: true })}
+          loading={reloading}
+          disabled={reloading}
+        />
       </Card>
     );
   }
@@ -146,7 +174,15 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
     <Card>
       <View style={styles.header}>
         <Text variant="subtitle">Payment</Text>
-        <Badge label={paymentStatusLabel(payment.status)} tone={paymentStatusTone(payment.status)} />
+        {reloading ? (
+          <ActivityIndicator
+            size="small"
+            color={colors.primary}
+            accessibilityLabel="Updating payment…"
+          />
+        ) : (
+          <Badge label={paymentStatusLabel(payment.status)} tone={paymentStatusTone(payment.status)} />
+        )}
       </View>
       <Text color="secondary">
         {formatMYR(payment.amountCents)} receipt from the requester:
@@ -158,7 +194,13 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
         </Text>
       ) : (
         <>
-          <Button title="Refresh" variant="secondary" onPress={() => void load()} />
+          <Button
+            title="Refresh"
+            variant="secondary"
+            onPress={() => void load({ background: true })}
+            loading={reloading}
+            disabled={reloading}
+          />
         </>
       )}
     </Card>

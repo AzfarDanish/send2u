@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
+import { isTerminalOrderStatus } from '@/lib/orders';
 import { listMyOrderHistory } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -29,6 +31,10 @@ export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // True once any load succeeded: later tab revisits refresh silently
+  // instead of flashing the skeleton over visible history.
+  const hasLoaded = useRef(false);
+
   const load = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) {
       setRefreshing(true);
@@ -40,6 +46,7 @@ export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
       const next = await listMyOrderHistory();
       setOrders(next);
       setStatus(next.length === 0 ? 'empty' : 'ready');
+      hasLoaded.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load your order history.');
       setStatus('error');
@@ -48,9 +55,54 @@ export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
     }
   }, []);
 
+  // Preserving background refetch for membership changes (a cancelled
+  // order newly belongs here) and realtime-less reconciliation. Never
+  // blanks; failures keep stale rows.
+  const silentReload = useCallback(async () => {
+    try {
+      const next = await listMyOrderHistory();
+      setOrders(next);
+      setStatus(next.length === 0 ? 'empty' : 'ready');
+      hasLoaded.current = true;
+    } catch {
+      // Keep stale data.
+    }
+  }, []);
+
   useEffect(() => {
-    if (enabled) void load(false);
-  }, [enabled, load]);
+    if (!enabled) return;
+    if (hasLoaded.current) void silentReload();
+    else void load(false);
+  }, [enabled, load, silentReload]);
+
+  // Latest list + enabled flag for the emitter callback (synced in an
+  // effect — refs must not be written during render).
+  const ordersRef = useRef<OrderWithDetails[]>([]);
+  const enabledRef = useRef(enabled);
+  useEffect(() => {
+    ordersRef.current = orders;
+    enabledRef.current = enabled;
+  }, [orders, enabled]);
+
+  // A locally-mutated order that just turned terminal (detail cancel /
+  // dispute) appears here without waiting for a tab revisit; rows that
+  // somehow left the bucket are dropped. Membership entries refetch
+  // silently since one record can't determine list ordering — skipped
+  // while hidden (the enabled-flip load covers the next visit).
+  useEffect(() => {
+    return subscribeOrderChanges((order) => {
+      const { next, needsRefetch } = applyOrderChange(
+        ordersRef.current,
+        order,
+        isTerminalOrderStatus(order.status),
+      );
+      if (needsRefetch) {
+        if (enabledRef.current) void silentReload();
+        return;
+      }
+      setOrders(next);
+    });
+  }, [silentReload]);
 
   const retry = useCallback(() => {
     void load(false);

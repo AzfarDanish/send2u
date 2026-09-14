@@ -21,7 +21,7 @@ import type { Vendor } from '@/types/domain';
  * `is_open` (day-to-day) and the editable details.
  */
 export default function VendorStallScreen() {
-  const { vendor, status, error, saving, retry, refresh, save } = useMyVendor();
+  const { vendor, status, error, saving, refreshing, retry, refresh, save, patchVendor } = useMyVendor();
   const [editing, setEditing] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -30,6 +30,10 @@ export default function VendorStallScreen() {
 
   const handleToggleOpen = async (next: boolean) => {
     if (!vendor || busy) return;
+    const previous = vendor.isOpen;
+    // Optimistic flip: the switch reflects the tap instantly; the write
+    // reconciles afterwards and rolls back here on failure.
+    patchVendor({ isOpen: next });
     setToggling(true);
     setActionError(null);
     try {
@@ -41,6 +45,7 @@ export default function VendorStallScreen() {
         isOpen: next,
       });
     } catch (err) {
+      patchVendor({ isOpen: previous });
       setActionError(err instanceof Error ? err.message : 'Could not update the open status.');
     } finally {
       setToggling(false);
@@ -50,7 +55,7 @@ export default function VendorStallScreen() {
   return (
     <Screen
       refreshControl={
-        <RefreshControl refreshing={false} onRefresh={() => void refresh()} tintColor={colors.primary} />
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
       }>
       <SectionHeader eyebrow="Stall" title="Your stall" />
       {status === 'loading' ? (

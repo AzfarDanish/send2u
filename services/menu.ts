@@ -1,3 +1,4 @@
+import { dedupeRequest } from '@/lib/dedupe';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { MenuItemWithVendor, Vendor, VendorMenuSection } from '@/types/domain';
 
@@ -117,46 +118,50 @@ export async function listVendors(): Promise<Vendor[]> {
 /** Full requester menu: active vendors with their items, in display order. */
 export async function listVendorSections(): Promise<VendorMenuSection[]> {
   const supabase = requireClient();
-  // Independent queries — one roundtrip instead of two serial ones.
-  const [vendorRes, itemRes] = await Promise.all([
-    supabase
-      .from('send2u_vendors')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true }),
-    supabase
-      .from('send2u_menu_items')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true }),
-  ]);
-  if (vendorRes.error) throw toMenuError(vendorRes.error, 'Could not load vendors');
-  if (itemRes.error) throw toMenuError(itemRes.error, 'Could not load menu items');
+  // In-flight deduped: Home mounts under Vendor detail and both ask for the
+  // same menu at once — one roundtrip pair instead of two.
+  return dedupeRequest('send2u:vendor-sections', async () => {
+    // Independent queries — one roundtrip instead of two serial ones.
+    const [vendorRes, itemRes] = await Promise.all([
+      supabase
+        .from('send2u_vendors')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true }),
+      supabase
+        .from('send2u_menu_items')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true }),
+    ]);
+    if (vendorRes.error) throw toMenuError(vendorRes.error, 'Could not load vendors');
+    if (itemRes.error) throw toMenuError(itemRes.error, 'Could not load menu items');
 
-  const vendorRows = vendorRes.data;
-  const itemRows = itemRes.data;
+    const vendorRows = vendorRes.data;
+    const itemRows = itemRes.data;
 
-  const vendors = (vendorRows as VendorRow[]).map(toVendor);
-  const itemsByVendor = new Map<string, MenuItemWithVendor[]>();
-  for (const row of itemRows as MenuItemRow[]) {
-    const vendor = vendors.find((v) => v.id === row.vendor_id);
-    if (!vendor) continue;
-    const item: MenuItemWithVendor = {
-      ...(toMenuItem(row) as Omit<MenuItemWithVendor, 'vendor'>),
-      vendor: {
-        id: vendor.id,
-        name: vendor.name,
-        description: vendor.description,
-        locationHint: vendor.locationHint,
-        operatingHours: vendor.operatingHours,
-        isOpen: vendor.isOpen,
-      },
-    };
-    const list = itemsByVendor.get(vendor.id) ?? [];
-    list.push(item);
-    itemsByVendor.set(vendor.id, list);
-  }
-  return vendors.map((vendor) => ({ vendor, items: itemsByVendor.get(vendor.id) ?? [] }));
+    const vendors = (vendorRows as VendorRow[]).map(toVendor);
+    const itemsByVendor = new Map<string, MenuItemWithVendor[]>();
+    for (const row of itemRows as MenuItemRow[]) {
+      const vendor = vendors.find((v) => v.id === row.vendor_id);
+      if (!vendor) continue;
+      const item: MenuItemWithVendor = {
+        ...(toMenuItem(row) as Omit<MenuItemWithVendor, 'vendor'>),
+        vendor: {
+          id: vendor.id,
+          name: vendor.name,
+          description: vendor.description,
+          locationHint: vendor.locationHint,
+          operatingHours: vendor.operatingHours,
+          isOpen: vendor.isOpen,
+        },
+      };
+      const list = itemsByVendor.get(vendor.id) ?? [];
+      list.push(item);
+      itemsByVendor.set(vendor.id, list);
+    }
+    return vendors.map((vendor) => ({ vendor, items: itemsByVendor.get(vendor.id) ?? [] }));
+  });
 }
 
 /** Single item with its vendor. Returns null when not visible to the caller. */

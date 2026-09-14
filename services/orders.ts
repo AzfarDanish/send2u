@@ -1,3 +1,4 @@
+import { dedupeRequest } from '@/lib/dedupe';
 import { getSupabaseClient } from '@/lib/supabase';
 import type {
   AcceptedOrderSummary,
@@ -248,14 +249,18 @@ export async function placeOrders(
 export async function listMyOrders(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
   const userId = await requireUserId();
-  const { data, error } = await supabase
-    .from('send2u_orders')
-    .select(ORDER_SELECT)
-    .eq('requester_id', userId)
-    .not('status', 'in', '(completed,cancelled,disputed)')
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(`Could not load your orders: ${error.message}`);
-  return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  // In-flight deduped (keyed by user: dev-profile switches share the
+  // runtime): mounted lists + realtime echoes ask together, one request.
+  return dedupeRequest(`send2u:my-orders:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('send2u_orders')
+      .select(ORDER_SELECT)
+      .eq('requester_id', userId)
+      .not('status', 'in', '(completed,cancelled,disputed)')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Could not load your orders: ${error.message}`);
+    return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  });
 }
 
 /**
@@ -266,53 +271,64 @@ export async function listMyOrders(): Promise<OrderWithDetails[]> {
 export async function listMyOrderHistory(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
   const userId = await requireUserId();
-  const { data, error } = await supabase
-    .from('send2u_orders')
-    .select(ORDER_SELECT)
-    .eq('requester_id', userId)
-    .in('status', ['completed', 'cancelled', 'disputed'])
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(`Could not load your order history: ${error.message}`);
-  return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  return dedupeRequest(`send2u:my-order-history:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('send2u_orders')
+      .select(ORDER_SELECT)
+      .eq('requester_id', userId)
+      .in('status', ['completed', 'cancelled', 'disputed'])
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Could not load your order history: ${error.message}`);
+    return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  });
 }
 
 /** Single own order with snapshots. Null when not visible to the caller. */
 export async function getOrderDetail(orderId: string): Promise<OrderWithDetails | null> {
   const supabase = requireClient();
-  const { data, error } = await supabase
-    .from('send2u_orders')
-    .select(ORDER_SELECT)
-    .eq('id', orderId)
-    .maybeSingle();
-  if (error) throw new Error(`Could not load the order: ${error.message}`);
-  if (!data) return null;
-  return toOrderWithDetails(data as unknown as OrderRow);
+  const userId = await requireUserId();
+  return dedupeRequest(`send2u:order-detail:${userId}:${orderId}`, async () => {
+    const { data, error } = await supabase
+      .from('send2u_orders')
+      .select(ORDER_SELECT)
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) throw new Error(`Could not load the order: ${error.message}`);
+    if (!data) return null;
+    return toOrderWithDetails(data as unknown as OrderRow);
+  });
 }
 
 /** Open job queue: pending unassigned orders, oldest first. RLS is authoritative. */
 export async function listAvailableJobs(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
-  const { data, error } = await supabase
-    .from('send2u_orders')
-    .select(ORDER_SELECT)
-    .eq('status', 'pending')
-    .is('helper_id', null)
-    .order('created_at', { ascending: true });
-  if (error) throw new Error(`Could not load open jobs: ${error.message}`);
-  return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  const userId = await requireUserId();
+  return dedupeRequest(`send2u:available-jobs:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('send2u_orders')
+      .select(ORDER_SELECT)
+      .eq('status', 'pending')
+      .is('helper_id', null)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`Could not load open jobs: ${error.message}`);
+    return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  });
 }
 
 /** Single job as visible to the caller (queue or own delivery). Null otherwise. */
 export async function getJobDetail(orderId: string): Promise<OrderWithDetails | null> {
   const supabase = requireClient();
-  const { data, error } = await supabase
-    .from('send2u_orders')
-    .select(ORDER_SELECT)
-    .eq('id', orderId)
-    .maybeSingle();
-  if (error) throw new Error(`Could not load the job: ${error.message}`);
-  if (!data) return null;
-  return toOrderWithDetails(data as unknown as OrderRow);
+  const userId = await requireUserId();
+  return dedupeRequest(`send2u:job-detail:${userId}:${orderId}`, async () => {
+    const { data, error } = await supabase
+      .from('send2u_orders')
+      .select(ORDER_SELECT)
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) throw new Error(`Could not load the job: ${error.message}`);
+    if (!data) return null;
+    return toOrderWithDetails(data as unknown as OrderRow);
+  });
 }
 
 /**
@@ -324,15 +340,17 @@ export async function getJobDetail(orderId: string): Promise<OrderWithDetails | 
 export async function listMyDeliveries(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
   const userId = await requireUserId();
-  const { data, error } = await supabase
-    .from('send2u_orders')
-    .select(ORDER_SELECT)
-    .eq('helper_id', userId)
-    .not('status', 'in', '(completed,cancelled,disputed)')
-    .order('accepted_at', { ascending: false })
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(`Could not load your deliveries: ${error.message}`);
-  return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  return dedupeRequest(`send2u:my-deliveries:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('send2u_orders')
+      .select(ORDER_SELECT)
+      .eq('helper_id', userId)
+      .not('status', 'in', '(completed,cancelled,disputed)')
+      .order('accepted_at', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Could not load your deliveries: ${error.message}`);
+    return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  });
 }
 
 /**
@@ -343,15 +361,17 @@ export async function listMyDeliveries(): Promise<OrderWithDetails[]> {
 export async function listMyDeliveryHistory(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
   const userId = await requireUserId();
-  const { data, error } = await supabase
-    .from('send2u_orders')
-    .select(ORDER_SELECT)
-    .eq('helper_id', userId)
-    .in('status', ['completed', 'cancelled', 'disputed'])
-    .order('accepted_at', { ascending: false })
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(`Could not load your delivery history: ${error.message}`);
-  return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  return dedupeRequest(`send2u:my-delivery-history:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('send2u_orders')
+      .select(ORDER_SELECT)
+      .eq('helper_id', userId)
+      .in('status', ['completed', 'cancelled', 'disputed'])
+      .order('accepted_at', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Could not load your delivery history: ${error.message}`);
+    return (data as unknown as OrderRow[]).map(toOrderWithDetails);
+  });
 }
 
 function toAcceptedSummary(value: unknown): AcceptedOrderSummary {

@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
+import { emitOrderChanged } from '@/lib/orderEvents';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone, orderTotalCents } from '@/lib/orders';
 import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
@@ -103,39 +104,52 @@ export default function JobDetailScreen() {
     },
   );
 
+  // Status mutations patch the visible job from the RPC's authoritative
+  // `{status}` instead of refetching, then broadcast it so mounted lists
+  // update the same card in place. Timestamps/counters reconcile via the
+  // realtime echo. Failures restore the previous job — the UI never shows
+  // a state the backend rejected.
   const handleAccept = useCallback(async () => {
     if (!job || accepting) return;
+    const previous = job;
     setAccepting(true);
     setAcceptError(null);
     try {
-      await acceptOrder(job.id);
+      const result = await acceptOrder(job.id);
+      const patched = { ...previous, status: result.status };
+      setJob(patched);
+      emitOrderChanged(patched);
       setAccepted(true);
-      await reload();
       setPaymentTick((t) => t + 1);
     } catch (err) {
       // Job stays on screen so the helper can pick another one.
+      setJob(previous);
       setAcceptError(err instanceof Error ? err.message : 'Could not accept the job.');
     } finally {
       setAccepting(false);
     }
-  }, [job, accepting, reload]);
+  }, [job, accepting]);
 
   const handleAdvance = useCallback(
     async (action: FulfilmentAction) => {
       if (!job || acting) return;
+      const previous = job;
       setActing(action);
       setActionError(null);
       try {
-        await advanceFulfilment(job.id, action);
-        await reload();
+        const result = await advanceFulfilment(job.id, action);
+        const patched = { ...previous, status: result.status };
+        setJob(patched);
+        emitOrderChanged(patched);
         setPaymentTick((t) => t + 1);
       } catch (err) {
+        setJob(previous);
         setActionError(err instanceof Error ? err.message : 'Could not update the order.');
       } finally {
         setActing(null);
       }
     },
-    [job, acting, reload],
+    [job, acting],
   );
 
   if (status === 'loading' || !job) {

@@ -1503,3 +1503,79 @@ only. No secrets are ever recorded here.
 - Validation: `tsc --noEmit` clean, `npm run lint` exit 0; every
   referenced path checked present, code fences balanced, no secrets
   included.
+
+## 2026-09-14 — Audit: Instagram-style targeted updates (plan agreed)
+
+- Audit: full read-only audit of data-fetching, mutations, navigation,
+  and mounting across requester/helper/vendor flows. No refresh-hack
+  navigation exists (`push`/`back` + `HeaderBack` + tab history are
+  correct); all mutations already use button-level pending states.
+- Ranked culprits: (1) focus-refetch blanks helper lists + payment
+  cards on every return; (2) single-record mutations (vendor menu,
+  mark-read, detail cancel/confirm/dispute, helper advance, payment,
+  rating) trigger full-list/full-detail refetches despite RPCs
+  returning authoritative data; (3) N mounted hooks = N realtime
+  channels + N refetches per DB event, `lib/dedupe.ts` wired into
+  only 2 of ~10 reads; (4) history lists lack realtime so
+  Active→terminal moves stay invisible until tab revisit;
+  (5) helper-home mount + availability-toggle double fetch;
+  (6) payment-card focus/token double-fire with blanking;
+  (7) detail id-change clears rendered record (correct, keep).
+- Agreed plan: safe-only optimism; keep-but-preserve focus refetch;
+  tiny `lib/orderEvents.ts` pub/sub for cross-screen sync; shared
+  hooks first, then requester → helper → vendor; offline-mode
+  Playwright rollback tests. No new frameworks.
+
+## 2026-09-14 — Targeted updates Ph1: shared primitives + preserve-on-focus
+
+- Change: new `lib/orderEvents.ts` pub/sub (`subscribeOrderChanges`,
+  `emitOrderChanged`, pure `applyOrderChange` list op: patch in place,
+  drop on bucket-leave, silent-refetch signal on bucket-enter — keys
+  stable so only the affected card re-renders). Extended existing
+  in-flight `dedupeRequest` (no post-settlement cache, zero staleness
+  risk) to `listMyOrders`, `listMyOrderHistory`, `getOrderDetail`,
+  `listAvailableJobs`, `getJobDetail`, `listMyDeliveries`,
+  `listMyDeliveryHistory` (user-scoped keys: dev-profile switches
+  share the runtime), `listVendorSections`, `listDeliveryLocations`.
+- Change: focus/background refetches preserve visible UI —
+  `useAvailableJobs`, `useMyDeliveries`, `useMyDeliveryHistory` (new
+  `silentReload`) refresh silently when data ever loaded, skeleton
+  only on true first mount/failure; `useMyVendor` gains a real
+  `refreshing` state wired to its `RefreshControl`; both payment
+  cards keep stale content with an inline spinner (`reloading`) and
+  skip the focus refetch within 1.5s of a token bump; helper home
+  mount double-fetch removed (first-run guard on the availability
+  effect); vendor open-switch is now optimistic via
+  `patchVendor` with rollback on failure.
+- Validation: `tsc --noEmit` clean (lint/doctor/export in final pass).
+
+## 2026-09-14 — Targeted updates Ph2-4: optimistic-safe mutations per role
+
+- Change (requester): detail cancel/confirm/dispute/withdraw patch the
+  visible order from the RPC's authoritative `{status}` and broadcast
+  via `emitOrderChanged` (rollback restores the previous order on
+  failure; report form now clears on success); `useMyOrders` /
+  `useMyOrderHistory` subscribe (patch in place, drop on bucket-leave,
+  preserving silent refetch only on bucket-enter; history skips fetch
+  while hidden); `useNotifications` mark-read/mark-all-read go
+  optimistic with server-recount rollback; rating appends the returned
+  row; receipt submit reconciles via background reload (RPC returns
+  partial data, never fabricated).
+- Change (helper): job accept/advance patch status + emit with rollback;
+  queue drops claimed jobs instantly; deliveries/history subscribe
+  (patch, drop-on-terminal, silent refetch on entry).
+- Change (vendor): menu availability flips optimistically with
+  authoritative reconcile + rollback, save reconciles the returned
+  row (append on create), delete confirms-then-filters, realtime
+  echoes go silent (no spinner flash); working row shows an inline
+  spinner; stall open-switch optimistic via `patchVendor`; stall
+  pull-to-refresh uses a real `refreshing` state.
+- Validation: `tsc`, `lint`, `expo-doctor` 21/21, `expo export -p web`
+  pass. Playwright 17/17 on real backend: cancel drops the card with
+  filter kept (row gone 700ms post-back, pre-realtime-window), Past
+  gains it, cart stepper/location intact, helper back shows rows in
+  <1s with zero skeleton flash (screenshot), vendor toggle flips
+  instantly / reconciles / rolls back offline with error, no overflow
+  at 360pt. Debugging notes: tab history keeps detail screens
+  mounted, so Playwright assertions must scope to list cards —
+  whole-body text matches hidden screens; all temp probes removed.

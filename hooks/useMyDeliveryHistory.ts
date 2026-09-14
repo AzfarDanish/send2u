@@ -1,6 +1,8 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
+import { isTerminalOrderStatus } from '@/lib/orders';
 import { listMyDeliveryHistory } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -30,6 +32,9 @@ export function useMyDeliveryHistory(enabled = true): UseMyDeliveryHistoryResult
   const [status, setStatus] = useState<DeliveryHistoryStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // True once any load succeeded: later focus/tab visits then refresh
+  // silently instead of flashing the skeleton over visible history.
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) {
@@ -42,6 +47,7 @@ export function useMyDeliveryHistory(enabled = true): UseMyDeliveryHistoryResult
       const next = await listMyDeliveryHistory();
       setDeliveries(next);
       setStatus(next.length === 0 ? 'empty' : 'ready');
+      hasLoaded.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load your delivery history.');
       setStatus('error');
@@ -50,23 +56,64 @@ export function useMyDeliveryHistory(enabled = true): UseMyDeliveryHistoryResult
     }
   }, []);
 
+  // Silent background refetch: preserves visible rows (no skeleton) and
+  // keeps stale data on failure. Used for focus/tab revisits.
+  const silentReload = useCallback(async () => {
+    try {
+      const next = await listMyDeliveryHistory();
+      setDeliveries(next);
+      setStatus(next.length === 0 ? 'empty' : 'ready');
+      hasLoaded.current = true;
+    } catch {
+      // Keep stale data.
+    }
+  }, []);
+
   // Latest `enabled` for the focus callback (synced in an effect — refs
   // must not be written during render), plus the previous value so a
   // hidden→visible flip (tab switch, no focus event) triggers one load.
+  // The list mirror serves the emitter subscription below.
   const enabledRef = useRef(enabled);
   const wasEnabled = useRef(enabled);
+  const deliveriesRef = useRef<OrderWithDetails[]>([]);
+  useEffect(() => {
+    deliveriesRef.current = deliveries;
+  }, [deliveries]);
 
   useFocusEffect(
     useCallback(() => {
-      if (enabledRef.current) void load(false);
-    }, [load]),
+      if (!enabledRef.current) return;
+      if (hasLoaded.current) void silentReload();
+      else void load(false);
+    }, [load, silentReload]),
   );
 
   useEffect(() => {
     enabledRef.current = enabled;
-    if (enabled && !wasEnabled.current) void load(false);
+    if (enabled && !wasEnabled.current) {
+      if (hasLoaded.current) void silentReload();
+      else void load(false);
+    }
     wasEnabled.current = enabled;
-  }, [enabled, load]);
+  }, [enabled, load, silentReload]);
+
+  // A locally-closed job (terminal now) appears here without waiting for
+  // a tab revisit — skipped while hidden (the flip-load above covers the
+  // next visit).
+  useEffect(() => {
+    return subscribeOrderChanges((order) => {
+      const { next, needsRefetch } = applyOrderChange(
+        deliveriesRef.current,
+        order,
+        isTerminalOrderStatus(order.status),
+      );
+      if (needsRefetch) {
+        if (enabledRef.current) void silentReload();
+        return;
+      }
+      setDeliveries(next);
+    });
+  }, [silentReload]);
 
   const retry = useCallback(() => {
     void load(false);

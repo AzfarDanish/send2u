@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, Switch, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
@@ -35,8 +35,15 @@ export default function HelperJobsScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
-  // Keep the queue fresh when availability flips
+  // Keep the queue fresh when availability flips. Skipped on mount: the
+  // hook's own focus effect already performs the initial load, and firing
+  // both would fetch the queue twice.
+  const firstAvailabilityRun = useRef(true);
   useEffect(() => {
+    if (firstAvailabilityRun.current) {
+      firstAvailabilityRun.current = false;
+      return;
+    }
     if (isAvailable) void refresh();
   }, [isAvailable, refresh]);
 

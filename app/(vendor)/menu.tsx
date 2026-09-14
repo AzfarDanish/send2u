@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, RefreshControl, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -111,6 +111,13 @@ export default function VendorMenuScreen() {
                     {formatMYR(item.priceCents)} · {item.isAvailable ? 'Available' : 'Unavailable'}
                   </Text>
                 </View>
+                {workingId === item.id ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.primary}
+                    accessibilityLabel="Updating availability…"
+                  />
+                ) : null}
                 <Switch
                   value={item.isAvailable}
                   onValueChange={(next) => void handleToggle(item, next)}

@@ -3,6 +3,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HeaderBack } from '@/components/HeaderBack';
 import { HeaderBell } from '@/components/HeaderBell';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,6 +14,9 @@ function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
   }
   return TabIcon;
 }
+
+/** Back chevron for sub-screen headers; falls back to the role root on deep links. */
+const RequesterHeaderBack = () => <HeaderBack fallbackHref="/(requester)" />;
 
 export default function RequesterLayout() {
   const { user, role, isLoading } = useAuth();
@@ -75,11 +79,21 @@ export default function RequesterLayout() {
       />
       <Tabs.Screen
         name="notifications"
-        options={{ href: null, title: 'Notifications', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Notifications',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+        }}
       />
       <Tabs.Screen
         name="menu/[id]"
-        options={{ href: null, title: 'Item details', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Item details',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+        }}
       />
       <Tabs.Screen
         name="vendors/[id]"
@@ -87,23 +101,48 @@ export default function RequesterLayout() {
       />
       <Tabs.Screen
         name="orders/[id]"
-        options={{ href: null, title: 'Request details', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Request details',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+        }}
       />
       <Tabs.Screen
         name="orders/confirmation"
-        options={{ href: null, title: 'Request Submitted', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Request Submitted',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+        }}
       />
       <Tabs.Screen
         name="locations"
-        options={{ href: null, title: 'Drop-off Locations', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Drop-off Locations',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+        }}
       />
       <Tabs.Screen
         name="help"
-        options={{ href: null, title: 'Help Center', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Help Center',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+        }}
       />
       <Tabs.Screen
         name="report"
-        options={{ href: null, title: 'Report an Issue', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Report an Issue',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+        }}
       />
       <Tabs.Screen
         name="location"

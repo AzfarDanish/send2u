@@ -92,10 +92,24 @@ export default function CreateRequestScreen() {
         .map((line) => `${line.quantity} × ${line.item.name}`)
         .join(', ');
       clear();
-      // Terminal transition: replace (not push) so the now-emptied cart
-      // screen leaves history — back from confirmation/orders returns to
-      // the menu, never to a cleared Review Request that invites resubmit.
-      router.replace({
+      // Terminal transition: the emptied cart must leave history, so step
+      // back to the menu first, then open the next screen on top — back
+      // from detail/confirmation returns to the menu, never to a cleared
+      // Review Request that invites resubmit. (`router.replace` cannot do
+      // this: expo-router downgrades every action to JUMP_TO on tab
+      // navigators, so a replace would append and strand the empty cart
+      // underneath.) A single-vendor submit opens that request's detail
+      // page directly; multi-vendor submits keep the confirmation summary
+      // (one screen cannot represent several requests).
+      if (router.canGoBack()) router.back();
+      if (summaries.length === 1) {
+        router.push({
+          pathname: '/(requester)/orders/[id]',
+          params: { id: summaries[0].orderId },
+        });
+        return;
+      }
+      router.push({
         pathname: '/(requester)/orders/confirmation',
         params: {
           orderIds: summaries.map((s) => s.orderId).join(','),

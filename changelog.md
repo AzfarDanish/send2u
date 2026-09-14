@@ -1336,3 +1336,73 @@ only. No secrets are ever recorded here.
   simulator/Android emulator in this environment, so hardware-back on
   device and swipe-back remain pending manual verification. Helper
   restore flow not exercised end-to-end (no open jobs in demo data).
+
+## 2026-09-14 — Header back button on all non-main tab screens
+
+- Change: Every non-main page (hidden-tab sub-screens) now shows a back chevron
+  in the Tabs default header via a shared `components/HeaderBack.tsx` component
+  wired as `headerLeft` in each role layout's `<Tabs.Screen>` options.
+  Fixed pages: requester `menu/[id]`, `notifications`, `orders/[id]`,
+  `orders/confirmation`, `locations`, `help`, `report`; helper `jobs/[id]`,
+  `notifications`. Pages that already hide the header and render their own
+  in-page back (`create`, `location`, `vendors/[id]`) are unchanged.
+  Main tab-bar screens (Home/Requests/Profile, Jobs/Deliveries/Earnings,
+  Stall/Menu/Profile) excluded per design.
+- Reason: the vendored expo-router bottom-tabs header never injects a `back`
+  option, so no tab screen rendered a back chevron by default — the food
+  detail page (`menu/[id]`) and all other sub-pages were missing one.
+- Details: `HeaderBack` renders a 44×44 `chevron-left` pressable with
+  `accessibilityLabel="Go back"` and deep-link fallback (`router.replace`
+  to the role root when `router.canGoBack()` is false). Layout files updated:
+  `app/(requester)/_layout.tsx`, `app/(helper)/_layout.tsx`.
+  `backBehavior="history"` is untouched — header back now complements
+  hardware back correctly.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` pass. Playwright
+  driver: header "Go back" present on all 9 fixed pages; menu/[id] back
+  returns to the true origin (`vendors/[id]`) when navigated from vendor.
+- Limitation: verified on web only (Playwright); on-device back button
+  rendering pending manual verification.
+
+## 2026-09-14 — Redesigned Request Detail screen
+
+- Change: rewrote `app/(requester)/orders/[id].tsx` into a polished,
+  data-driven Request Detail screen with: real order data only;
+  six-stage fulfilment progress tracker (`components/RequestProgress`
+  — Placed, Helper, Pickup, On the way, Delivered, Done; computed
+  from backend status + timestamps so terminal/cancelled requests
+  credit only stages with real timestamps); contextual status card
+  (`components/RequestStatusCard`) with per-status copy; order
+  summary via existing `OrderBreakdown`; drop-off location;
+  actions valid per state (Cancel, Confirm receipt, Report issue,
+  Get help, Browse menu); top-right `more-vert` overflow menu on
+  delivered orders (Report an issue, Get help, Browse menu); live
+  updates via the existing `useRealtimeReload` channel; loading/
+  not-found/cancelled/disputed/terminal states. Terminal orders
+  render their existing read-only detail inline (history, timeline,
+  payment, settlement, ratings) so `RequesterHistoryDetail` is no
+  longer imported anywhere.
+- Navigation: single-vendor submit now opens the created request's
+  detail page directly; multi-vendor submits keep the confirmation
+  summary. Implemented by stepping back to the menu before pushing
+  the detail/confirmation page — `router.replace` cannot swap a
+  tab-route history (expo-router downgrades every tab action to
+  `JUMP_TO`, so a replace appends instead of replacing).
+- New components: `components/RequestProgress.tsx`,
+  `components/RequestStatusCard.tsx`. Removed:
+  `components/RequesterHistoryDetail.tsx`.
+- Reason: the previous screen was a minimal list of rows with no
+  progress tracker, no contextual status messaging, and no overflow
+  actions; requesters needed a clear view of where their request
+  stood and what to do next.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` pass. Playwright
+  driver: 29 checks + 16 helper-lifecycle checks — all pass
+  (pending state with cancel, assigned badge + helper-id line,
+  `Food is available` badge after helper reaches stall, `Delivered`
+  + Confirm receipt card after mark-delivered, payment card after
+  confirm, Browse menu + Help on cancelled, no overflow at 360pt).
+- Known limitations: helper lifecycle tests run sequentially in a
+  single Playwright context (no parallel sessions); real-time
+  subscription re-render after helper advances is refreshed via
+  `reload()` but not asserted on screen content.

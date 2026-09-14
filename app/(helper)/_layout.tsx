@@ -2,6 +2,7 @@ import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { ColorValue } from 'react-native';
 
+import { HeaderBack } from '@/components/HeaderBack';
 import { HeaderBell } from '@/components/HeaderBell';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,6 +13,9 @@ function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
   }
   return TabIcon;
 }
+
+/** Back chevron for sub-screen headers; falls back to the role root on deep links. */
+const HelperHeaderBack = () => <HeaderBack fallbackHref="/(helper)" />;
 
 export default function HelperLayout() {
   const { user, role, isLoading } = useAuth();
@@ -60,8 +64,22 @@ export default function HelperLayout() {
         name="profile"
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
       />
-      <Tabs.Screen name="jobs/[id]" options={{ href: null, title: 'Job details' }} />
-      <Tabs.Screen name="notifications" options={{ href: null, title: 'Notifications' }} />
+      <Tabs.Screen
+        name="jobs/[id]"
+        options={{
+          href: null,
+          title: 'Job details',
+          headerLeft: HelperHeaderBack,
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+          title: 'Notifications',
+          headerLeft: HelperHeaderBack,
+        }}
+      />
     </Tabs>
   );
 }

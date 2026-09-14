@@ -1289,3 +1289,50 @@ only. No secrets are ever recorded here.
   `adb` empty) — hardware back, swipe-back, and the interactive
   location/confirm/submit flows are marked PENDING manual
   verification and must not be claimed as tested.
+
+## 2026-09-14 — Fix: Back (chevron + Android hardware) returns to origin, not Home
+
+- Problem: pressing Back from Cart / Review Request / Drop-off Location
+  landed on Home instead of the screen the user actually came from
+  (e.g. Vendor Page or Item Detail), and repeated Backs could not return
+  to the true origin chain.
+- Root cause (proven from vendored expo-router ~57.0.21 bytecode): these
+  role groups are flat single-`Tabs` navigators. `router.push(path)` to a
+  `href:null` tab route is downgraded by `getNavigationAction.js:51-56`
+  (PUSH→NAVIGATE/JUMP_TO), so it is a tab switch, not a stack push.
+  `TabRouter.js:96` defaults `backBehavior` to `'firstRoute'`: every
+  NAVIGATE/JUMP_TO rebuilds tab history to exactly `[firstTab, target]`
+  (`getRouteHistory`, TabRouter.js:17-58), evicting the real origin.
+  Both the custom chevron (`router.back()`) and Android hardware back
+  (`fork/useBackButton.native.js:49-51`) emit GO_BACK, which pops
+  `history[length-2]` — the first tab (Home's `index`) for any
+  non-Home origin.
+- Fix: `backBehavior="history"` on all three role `Tabs` so visited tabs
+  are appended (deduped) instead of rebuilt — Back restores the true
+  origin chain. Applied at `app/(requester)/_layout.tsx:33`,
+  `app/(helper)/_layout.tsx:26`, `app/(vendor)/_layout.tsx:24`. No other
+  code changed. `backBehavior` is a supported `BottomTabNavigatorProps`
+  option in this exact install
+  (`react-navigation/routers/TabRouter.d.ts`, `backBehavior` union
+  includes `'history'`).
+- Runtime evidence (web, requester `dev.requester1@send2u.test`, cart
+  flow, tab `history` arrays captured from the root navigation state):
+  - Default (bug, before): Home `[index]` → Vendor
+    `[index,vendors/[id]]` → Item `[index,menu/[id]]` (Vendor evicted)
+    → Cart `[index,create]` → Location `[index,location]` → Back ⇒ HOME
+    `[index]`, url `/`. Origin unrecoverable.
+  - Fixed: Home `[index]` → Vendor `[index,vendors/[id]]` → Item
+    `[index,vendors/[id],menu/[id]]` → Cart
+    `[index,vendors/[id],menu/[id],create]` → Location `+location` →
+    Back ⇒ Review `[index,vendors/[id],menu/[id],create]`, url `/create`;
+    Back again ⇒ Item Detail `[index,vendors/[id],menu/[id]]`, url
+    `/menu/<id>`. Vendor tab flow `[index,menu]` ↔ `[menu,index]` also
+    correct.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo-doctor` 21/21, `expo export -p web --clear` — pass. Transient
+  `[nav-dbg]` instrumentation added, then removed; no production logging
+  remains (`grep` confirms none). Confirm-submit `replace` unchanged.
+- Limitations: verified on web only (Playwright, Chromium); no iOS
+  simulator/Android emulator in this environment, so hardware-back on
+  device and swipe-back remain pending manual verification. Helper
+  restore flow not exercised end-to-end (no open jobs in demo data).

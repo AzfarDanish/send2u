@@ -30,6 +30,7 @@ export default function RequesterLayout() {
 
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={{
         headerShown: true,
         headerStyle: { backgroundColor: navigation.headerBackground },

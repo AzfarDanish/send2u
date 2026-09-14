@@ -23,6 +23,7 @@ export default function HelperLayout() {
 
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={{
         headerShown: true,
         headerStyle: { backgroundColor: navigation.headerBackground },

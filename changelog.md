@@ -1624,3 +1624,58 @@ only. No secrets are ever recorded here.
   backend") — overridden by explicit request, scoped to real data only
   (no preference toggles: push is auto-registered, language is
   English-only).
+
+## 2026-09-15 — Post-submission workflow: 5-screen requester suite (Submitted, Payment, Receipt, Confirm, Rate)
+
+- Backend (migrations `add_helper_public_identity_rpc`,
+  `restrict_helper_identity_to_authenticated`):
+  `send2u_helper_public_identity(p_order_id)` (SECURITY DEFINER,
+  `authenticated` only) returns the assigned helper's display label and
+  nothing else — callable only by the order's own requester, NULL
+  otherwise (non-party, no helper, unnamed helper). No email/phone/IDs
+  leak; requester RLS stays ownership-pinned.
+- Dependency: installed `expo-clipboard` for real copy-ID / copy-amount
+  actions with inline "Copied" feedback (silent no-op where clipboard is
+  unavailable).
+- Shared: `services/helperIdentity.ts` (`getHelperIdentity`, honest
+  `Helper #<short-id>` fallback — never a fabricated name, no Verified
+  badge the backend cannot confirm), `hooks/useHelperIdentity`,
+  `HelperIdentity` row, `CopyButton`, and `hooks/usePaymentFlow` — the
+  payment state machine (stale-while-revalidate context, staging,
+  submit with orphan cleanup) extracted verbatim from
+  `RequesterPaymentCard`, which now renders identically on top of it.
+- Screens (all real data, state-gated, no full-page reloads):
+  confirmation gains per-order copy-ID; new `orders/[id]/payment`
+  (external-pay info card, real subtotal + RM2 fee + total with copy,
+  HelperIdentity, real helper QR with missing-QR state, "I Have Made
+  the Payment" routes without marking anything verified, "Need Help?"
+  to the payment article); new `orders/[id]/receipt` (actual limits in
+  copy: JPG/PNG/WEBP/HEIC/PDF, 10 MB — not the reference's 5 MB;
+  staged preview with name/size, remove/replace, submit-then-reconcile,
+  already-submitted state); new `orders/[id]/confirm` (delivered-only
+  checklist with honest copy — confirming OPENS payment, irreversible;
+  "Not Yet" mutates nothing; success continues to payment);
+  new `orders/[id]/rate` (completed + verified only, reuses the rating
+  section in `inline` form mode, already-rated read-only).
+- Detail integration: inline confirm replaced by "Review & confirm"
+  navigation (report form stays); "Continue to Payment" entry when
+  payable; helper caption uses the real label; requester rating section
+  is now a summary + entry (helper keeps the inline form).
+  Routes: 4 hidden `Tabs.Screen` entries, centered titles, back with
+  fallback; all form screens focus-reset (mounted-tab staleness).
+- Validation: `tsc`, `lint` (0 problems), `expo-doctor` 21/21,
+  `expo export -p web` pass. Playwright on live backend with a real
+  accept→delivered→confirm→pay→receipt→complete→rate lifecycle:
+  7/7 confirmation (UI cart order, real ID, clipboard copy,
+  view-request, back), 23 checks across confirm checklist/not-yet/
+  success, payment totals/QR/name/copy, receipt invalid-type/preview/
+  submit/success, single rating + counter + already-rated, gates on
+  completed orders, full back-chain, 360px no-overflow, helper detail
+  regression (inline form + sees requester's rating). No-rating default
+  + disabled-submit verified at code level (`score === null` disables).
+  Test residue is genuine lifecycle data; helper1/requester1 dev
+  passwords are `Testpass123!`.
+- Notes: success illustration stays icon-circle (no art in the design
+  system); tab bar stays hidden on workflow screens per app
+  architecture (reference shows tabs — adapted, no duplicate bar);
+  pre-existing `MenuItemRow` nested-button web warning noted, untouched.

@@ -3,6 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
+import { CopyButton } from '@/components/CopyButton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -162,13 +163,22 @@ export default function OrderConfirmationScreen() {
         </View>
 
         <View style={styles.idCard}>
-          <Text variant="caption" color="secondary">
-            Request ID{orders.length === 1 ? '' : 's'}
-          </Text>
-          {orders.map((order) => (
-            <Text key={order.id} variant="subtitle" numberOfLines={1} ellipsizeMode="tail">
-              #{order.id.slice(0, 8)}
+          <View style={styles.idHeader}>
+            <MaterialIcons name="receipt-long" size={20} color={colors.primary} />
+            <Text variant="caption" color="secondary">
+              Request ID{orders.length === 1 ? '' : 's'}
             </Text>
+          </View>
+          {orders.map((order) => (
+            <View key={order.id} style={styles.idRow}>
+              <Text variant="subtitle" numberOfLines={1} ellipsizeMode="tail" style={styles.idText}>
+                #{order.id.slice(0, 8)}
+              </Text>
+              <CopyButton
+                value={`#${order.id.slice(0, 8)}`}
+                accessibilityLabel={`Copy request ID ${order.id.slice(0, 8)}`}
+              />
+            </View>
           ))}
         </View>
 
@@ -296,9 +306,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSecondary,
     borderRadius: radii.lg,
     padding: spacing.lg,
-    gap: spacing.xs,
-    alignItems: 'center',
+    gap: spacing.sm,
   },
+  idHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  idRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  idText: { flex: 1 },
   statusCard: {
     flexDirection: 'row',
     gap: spacing.md,

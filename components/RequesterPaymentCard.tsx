@@ -1,5 +1,3 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
@@ -13,11 +11,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
-import { useAuth } from '@/hooks/useAuth';
+import { usePaymentFlow } from '@/hooks/usePaymentFlow';
 import { formatMYR } from '@/lib/money';
-import { getPaymentContext, submitPaymentEvidence, type PaymentContext } from '@/services/payments';
-import { evidencePathFor, pickReceiptFile, removeObject, uploadObject } from '@/services/storage';
-import type { PickedReceipt } from '@/services/storage';
 
 interface RequesterPaymentCardProps {
   orderId: string;
@@ -29,137 +24,27 @@ interface RequesterPaymentCardProps {
  * Requester payment section: helper QR, payment instructions, and receipt
  * submission. Receipt submission writes verified and closes the order in one
  * step — no helper review and no rejected/resubmit state. Amounts always come
- * from the order via payment context.
+ * from the order via payment context. State lives in `usePaymentFlow`,
+ * shared with the dedicated payment/receipt screens.
  */
 export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPaymentCardProps) {
-  const { user } = useAuth();
-  const [context, setContext] = useState<PaymentContext | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [error, setError] = useState<string | null>(null);
-  // Background refresh in flight while a context is already visible: the
-  // card keeps showing stale content with a small inline spinner instead
-  // of flashing back to the full loading card.
-  const [reloading, setReloading] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [busyMessage, setBusyMessage] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const hasContext = useRef(false);
-  // Picked-but-not-submitted receipt awaiting explicit confirmation. Nothing
-  // is uploaded or recorded until the user confirms.
-  const [staged, setStaged] = useState<PickedReceipt | null>(null);
+  const {
+    context,
+    status,
+    error,
+    reloading,
+    retry,
+    busy,
+    busyMessage,
+    submitError,
+    staged,
+    cancelStaged,
+    choose,
+    confirm,
+  } = usePaymentFlow(orderId, refreshToken);
 
-  const load = useCallback(
-    async (opts?: { background?: boolean }) => {
-      const background = opts?.background ?? false;
-      if (background && hasContext.current) {
-        setReloading(true);
-      } else {
-        setStatus('loading');
-        setError(null);
-      }
-      try {
-        const next = await getPaymentContext(orderId);
-        setContext(next);
-        hasContext.current = true;
-        setStatus('ready');
-      } catch (err) {
-        // Background failures keep the stale card; foreground failures
-        // (first mount, explicit retry) show the error card.
-        if (!background || !hasContext.current) {
-          setError(err instanceof Error ? err.message : 'Could not load payment details.');
-          setStatus('error');
-        }
-      } finally {
-        setReloading(false);
-      }
-    },
-    [orderId],
-  );
-
-  // Timestamp of the last token-driven refetch. The focus effect below
-  // skips its own refetch within a short window after one — the token
-  // effect already covers it, so returning to the screen doesn't fetch
-  // twice for the same update.
-  const tokenBumpAt = useRef(0);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (Date.now() - tokenBumpAt.current < 1500) return;
-      void load({ background: true });
-    }, [load]),
-  );
-
-  useEffect(() => {
-    if (refreshToken <= 0) return;
-    tokenBumpAt.current = Date.now();
-    let cancelled = false;
-    (async () => {
-      try {
-        const next = await getPaymentContext(orderId);
-        if (!cancelled) {
-          setContext(next);
-          hasContext.current = true;
-          setStatus('ready');
-        }
-      } catch (err) {
-        if (!cancelled && !hasContext.current) {
-          setError(err instanceof Error ? err.message : 'Could not load payment details.');
-          setStatus('error');
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [orderId, refreshToken]);
-
-  const handleChoose = useCallback(async () => {
-    if (!user || busy) return;
-    setBusy(true);
-    setBusyMessage('Choosing receipt…');
-    setSubmitError(null);
-    try {
-      const picked = await pickReceiptFile();
-      if (picked) setStaged(picked);
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Could not choose the receipt.');
-    } finally {
-      setBusy(false);
-      setBusyMessage(null);
-    }
-  }, [user, busy]);
-
-  const handleConfirm = useCallback(async () => {
-    if (!user || busy || !staged) return;
-    setBusy(true);
-    setBusyMessage('Uploading receipt…');
-    setSubmitError(null);
-    let uploadedPath: string | null = null;
-    try {
-      const path = evidencePathFor(user.id, orderId, staged.extension, staged.fileName);
-      await uploadObject(path, staged);
-      uploadedPath = path;
-      setBusyMessage('Submitting…');
-      await submitPaymentEvidence(orderId, path);
-      setStaged(null);
-      // Background reconcile: the RPC returns only amount+status (not the
-      // full payment row), so refetch — preserving the visible card with an
-      // inline spinner instead of blanking it.
-      await load({ background: true });
-    } catch (err) {
-      if (uploadedPath) {
-        try {
-          await removeObject(uploadedPath);
-        } catch {
-          // Orphaned upload is harmless; the payment row was never created.
-        }
-      }
-      setSubmitError(err instanceof Error ? err.message : 'Could not submit payment evidence.');
-    } finally {
-      setBusy(false);
-      setBusyMessage(null);
-    }
-  }, [user, busy, staged, orderId, load]);
+  const handleChoose = () => void choose();
+  const handleConfirm = () => void confirm();
 
   if (status === 'loading') {
     return (
@@ -175,7 +60,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
           title="Couldn't load payment"
           message={error ?? 'Check your connection and try again.'}
           retryTitle="Try again"
-          onRetry={() => void load()}
+          onRetry={retry}
         />
       </Card>
     );
@@ -302,9 +187,9 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
               busy={busy}
               busyMessage={busyMessage}
               confirmTitle={`Confirm & submit (${formatMYR(context.totalCents)})`}
-              onConfirm={() => void handleConfirm()}
-              onRechoose={() => void handleChoose()}
-              onCancel={() => setStaged(null)}
+              onConfirm={handleConfirm}
+              onRechoose={handleChoose}
+              onCancel={cancelStaged}
             />
           ) : (
             <>
@@ -312,7 +197,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
                 accessibilityRole="button"
                 accessibilityLabel="Choose payment receipt"
                 accessibilityState={{ disabled: busy || !context.helperQrPath, busy }}
-                onPress={() => void handleChoose()}
+                onPress={handleChoose}
                 disabled={busy || !context.helperQrPath}
                 style={({ pressed }) => [
                   styles.uploadArea,

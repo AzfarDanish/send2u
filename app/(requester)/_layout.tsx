@@ -125,6 +125,46 @@ export default function RequesterLayout() {
         }}
       />
       <Tabs.Screen
+        name="orders/[id]/payment"
+        options={{
+          href: null,
+          title: 'Payment Required',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="orders/[id]/receipt"
+        options={{
+          href: null,
+          title: 'Upload Payment Receipt',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="orders/[id]/confirm"
+        options={{
+          href: null,
+          title: 'Confirm Delivery',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="orders/[id]/rate"
+        options={{
+          href: null,
+          title: 'Rate Your Helper',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
         name="locations"
         options={{
           href: null,

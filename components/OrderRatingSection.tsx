@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -17,6 +18,13 @@ interface OrderRatingSectionProps {
   order: OrderWithDetails;
   /** Bump to refetch (e.g. realtime rating event from the other party). */
   refreshToken?: number;
+  /**
+   * Requester form placement. `link` (default) renders a compact entry that
+   * pushes the dedicated rate screen; `inline` renders the full stars +
+   * comment form (used BY the rate screen). Helpers always get the inline
+   * form — their rating has no dedicated screen.
+   */
+  requesterForm?: 'link' | 'inline';
 }
 
 /**
@@ -26,7 +34,7 @@ interface OrderRatingSectionProps {
  * rating-free by design. Shows both directions' states plus the viewer's
  * submit form; submitted ratings are immutable and render read-only.
  */
-export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSectionProps) {
+export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'link' }: OrderRatingSectionProps) {
   const { user } = useAuth();
   const viewerId = user?.id ?? null;
   const viewerRole =
@@ -126,6 +134,19 @@ export function OrderRatingSection({ order, refreshToken = 0 }: OrderRatingSecti
           <Text variant="caption" color="muted">
             Submitted {formatOrderDate(mine.createdAt)} · cannot be changed.
           </Text>
+        </View>
+      ) : viewerRole === 'requester' && requesterForm === 'link' ? (
+        // Requesters rate on the dedicated screen (stars + comment + helper
+        // identity in one guided flow); compact entries stay a link there.
+        <View style={styles.block}>
+          <Text color="secondary">How was your helper? Share your experience.</Text>
+          <Button
+            title="Rate your helper"
+            variant="secondary"
+            onPress={() =>
+              router.push({ pathname: '/(requester)/orders/[id]/rate', params: { id: order.id } })
+            }
+          />
         </View>
       ) : (
         <View style={styles.block}>

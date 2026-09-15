@@ -32,7 +32,9 @@ import {
   paymentStatusTone,
   requesterStatusMessage,
 } from '@/lib/orders';
-import { cancelOrder, confirmDelivery, getOrderDetail, openDispute, withdrawDispute } from '@/services/orders';
+import { cancelOrder, getOrderDetail, openDispute, withdrawDispute } from '@/services/orders';
+import { helperLabel } from '@/services/helperIdentity';
+import { useHelperIdentity } from '@/hooks/useHelperIdentity';
 import type { OrderWithDetails } from '@/types/domain';
 import type { RequesterDisputeReason } from '@/services/orders';
 
@@ -233,8 +235,6 @@ export default function OrderDetailScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [paymentTick, setPaymentTick] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState<RequesterDisputeReason | null>(null);
@@ -284,7 +284,6 @@ export default function OrderDetailScreen() {
     setCancelError(null);
     setCancelled(false);
     setReason('');
-    setConfirmError(null);
     setPaymentTick(0);
     setReportOpen(false);
     setReportCategory(null);
@@ -356,24 +355,13 @@ export default function OrderDetailScreen() {
     }
   }, [order, cancelling, reason]);
 
-  const handleConfirm = useCallback(async () => {
-    if (!order || confirming) return;
-    const previous = order;
-    setConfirming(true);
-    setConfirmError(null);
-    try {
-      const result = await confirmDelivery(order.id);
-      const patched = { ...previous, status: result.status };
-      setOrder(patched);
-      emitOrderChanged(patched);
-      setPaymentTick((t) => t + 1);
-    } catch (err) {
-      setOrder(previous);
-      setConfirmError(err instanceof Error ? err.message : 'Could not confirm delivery.');
-    } finally {
-      setConfirming(false);
-    }
-  }, [order, confirming]);
+  // Delivery confirmation lives on the dedicated confirm screen (checklist
+  // + attestation); the detail screen routes there instead of confirming
+  // inline. Report/withdraw stay inline — they belong to this record view.
+  const { identity: helperIdentity } = useHelperIdentity(
+    typeof id === 'string' ? id : '',
+    order?.helperId ?? null,
+  );
 
   const handleReport = useCallback(async () => {
     if (!order || reporting || !reportCategory) return;
@@ -538,7 +526,7 @@ export default function OrderDetailScreen() {
         <Text variant="caption" color="secondary">
           Placed {formatOrderDate(order.createdAt)}
           {order.helperId
-            ? ` · Helper ${order.helperId.slice(0, 8)}…${order.acceptedAt ? ` accepted ${formatOrderDate(order.acceptedAt)}` : ''}`
+            ? ` · ${helperLabel(helperIdentity, order.helperId)}${order.acceptedAt ? ` accepted ${formatOrderDate(order.acceptedAt)}` : ''}`
             : ''}
         </Text>
 
@@ -587,24 +575,20 @@ export default function OrderDetailScreen() {
             <Badge label="Delivered" tone="success" />
             <Text variant="subtitle">Confirm receipt</Text>
             <Text color="secondary">Did you receive your items?</Text>
-            {confirmError ? (
-              <ErrorState title="Could not confirm" message={confirmError} retryTitle="Dismiss" onRetry={() => setConfirmError(null)} />
-            ) : null}
             <Button
-              title={confirming ? 'Confirming…' : 'Confirm receipt'}
-              onPress={() => void handleConfirm()}
-              disabled={confirming}
-              loading={confirming}
+              title="Review & confirm"
+              onPress={() =>
+                router.push({ pathname: '/(requester)/orders/[id]/confirm', params: { id: order.id } })
+              }
             />
             <Text variant="caption" color="muted">
-              By confirming, you attest that you received the request. Confirm only after
+              Check your items against the confirmation checklist. Confirm only after
               you have your items.
             </Text>
             <Button
               title={reportOpen ? 'Hide problem report' : 'Report an issue'}
               variant="secondary"
               onPress={() => setReportOpen((open) => !open)}
-              disabled={confirming}
             />
             {reportOpen ? (
               <View style={styles.reportForm}>
@@ -655,6 +639,18 @@ export default function OrderDetailScreen() {
         ) : null}
 
         {!terminal ? <RequesterPaymentCard orderId={order.id} refreshToken={paymentTick} /> : null}
+
+        {!terminal &&
+        (order.status === 'confirmed' || order.status === 'awaiting_requester_payment') &&
+        !order.payment ? (
+          <Button
+            title="Continue to Payment"
+            variant="secondary"
+            onPress={() =>
+              router.push({ pathname: '/(requester)/orders/[id]/payment', params: { id: order.id } })
+            }
+          />
+        ) : null}
 
         {showCancel ? (
           <Card>

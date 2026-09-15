@@ -180,6 +180,47 @@ export function qrPathFor(userId: string, extension: string, originalName?: stri
   return `qr/${userId}/${Date.now()}${suffix}.${extension}`;
 }
 
+/** Storage path for a fresh profile-avatar upload. */
+export function avatarPathFor(userId: string, extension: string): string {
+  return `avatar/${userId}/${Date.now()}.${extension}`;
+}
+
+/**
+ * Opens the system image library for a single profile photo. Square crop
+ * on native; returns null when the user cancels. Throws a friendly error
+ * on denial/failure.
+ */
+export async function pickAvatarImage(): Promise<PickedImage | null> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('Photo access is needed to change your photo. Allow it and try again.');
+  }
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.8,
+  });
+  if (result.canceled) return null;
+  const asset = result.assets[0];
+  if (!asset || asset.type !== 'image') throw new Error('Please choose a photo image.');
+  const mimeType = asset.mimeType ?? 'image/jpeg';
+  if (!mimeType.startsWith('image/')) throw new Error('Please choose a photo image.');
+  const bytes = await assetToBytes(asset.uri, asset.file);
+  if (bytes.byteLength === 0) throw new Error('That photo could not be read. Try another one.');
+  if (bytes.byteLength > MAX_IMAGE_BYTES) {
+    throw new Error('That photo is too large. Pick one under 5 MB.');
+  }
+  return {
+    bytes,
+    mimeType,
+    extension: extensionFor(mimeType),
+    name: asset.fileName ?? 'avatar.jpg',
+    sizeBytes: asset.fileSize ?? bytes.byteLength,
+    uri: asset.uri,
+  };
+}
+
 /** Storage path for a fresh payment-evidence upload. */
 export function evidencePathFor(
   userId: string,

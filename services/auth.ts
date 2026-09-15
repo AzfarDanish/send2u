@@ -28,7 +28,7 @@ function requireClient() {
 }
 
 const PROFILE_SELECT =
-  'id, role, vendor_id, payment_qr_path, is_available, availability_updated_at, is_dev_account, display_name, created_at, updated_at';
+  'id, role, vendor_id, payment_qr_path, is_available, availability_updated_at, is_dev_account, display_name, full_name, student_id, phone_number, avatar_path, created_at, updated_at';
 
 function toProfile(row: {
   id: string;
@@ -39,6 +39,10 @@ function toProfile(row: {
   availability_updated_at: string | null;
   is_dev_account: boolean | null;
   display_name: string | null;
+  full_name: string | null;
+  student_id: string | null;
+  phone_number: string | null;
+  avatar_path: string | null;
   created_at: string;
   updated_at: string;
 }): Profile {
@@ -51,6 +55,10 @@ function toProfile(row: {
     availabilityUpdatedAt: row.availability_updated_at ?? null,
     isDevAccount: row.is_dev_account ?? false,
     displayName: row.display_name ?? null,
+    fullName: row.full_name ?? null,
+    studentId: row.student_id ?? null,
+    phoneNumber: row.phone_number ?? null,
+    avatarPath: row.avatar_path ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -233,4 +241,75 @@ export async function signOut(): Promise<void> {
   const supabase = requireClient();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+}
+
+export interface ProfileUpdate {
+  fullName: string | null;
+  studentId: string | null;
+  phoneNumber: string | null;
+}
+
+/**
+ * Updates the signed-in user's editable identity fields. Own row only —
+ * enforced by RLS. Role and dev-flag columns are untouched (and
+ * trigger-guarded regardless). Returns the authoritative row so callers
+ * can patch shared state without a refetch.
+ */
+export async function updateMyProfile(update: ProfileUpdate): Promise<Profile> {
+  const supabase = requireClient();
+  const active = await getActiveSession();
+  if (!active) throw new Error('No active session. Sign in first.');
+  const { data, error } = await supabase
+    .from('send2u_profiles')
+    .update({
+      full_name: update.fullName,
+      student_id: update.studentId,
+      phone_number: update.phoneNumber,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', active.user.id)
+    .select(PROFILE_SELECT)
+    .single();
+  if (error) throw error;
+  return toProfile(data as any);
+}
+
+/**
+ * Points the signed-in user's profile at their avatar object
+ * (or clears it with null). Own row only — enforced by RLS.
+ */
+export async function setAvatarPath(path: string | null): Promise<Profile> {
+  const supabase = requireClient();
+  const active = await getActiveSession();
+  if (!active) throw new Error('No active session. Sign in first.');
+  const { data, error } = await supabase
+    .from('send2u_profiles')
+    .update({ avatar_path: path, updated_at: new Date().toISOString() })
+    .eq('id', active.user.id)
+    .select(PROFILE_SELECT)
+    .single();
+  if (error) throw error;
+  return toProfile(data as any);
+}
+
+/**
+ * Changes the account password. Supabase `updateUser` does not verify the
+ * current password, so this re-authenticates with the current password
+ * first — a wrong current password fails here with the standard
+ * invalid-credentials message instead of silently rotating the password.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const supabase = requireClient();
+  const active = await getActiveSession();
+  const email = active?.user.email;
+  if (!active || !email) throw new Error('No active session. Sign in first.');
+  if (currentPassword.length === 0) throw new Error('Enter your current password.');
+  requirePassword(newPassword);
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  });
+  if (signInError) throw new Error(friendlyAuthError(signInError.message));
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+  if (updateError) throw new Error(friendlyAuthError(updateError.message));
 }

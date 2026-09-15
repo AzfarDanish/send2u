@@ -1,18 +1,33 @@
-import { StyleSheet, View } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { router } from 'expo-router';
 import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Avatar } from '@/components/Avatar';
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, radii, spacing, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
-import { router } from 'expo-router';
+
+const MENU_ROWS = [
+  // `as const` at the end keeps icon glyphs and route literals narrow.
+  { icon: 'person-outline', title: 'Edit Profile', href: '/(requester)/edit-profile', accessibilityLabel: 'Edit profile' },
+  { icon: 'place', title: 'Saved Locations', href: '/(requester)/locations', accessibilityLabel: 'Saved locations' },
+  { icon: 'notifications-none', title: 'Notifications', href: '/(requester)/notifications', accessibilityLabel: 'Notifications' },
+  { icon: 'help-outline', title: 'Help Center', href: '/(requester)/help', accessibilityLabel: 'Help center' },
+  { icon: 'description', title: 'Terms & Privacy', href: '/(requester)/terms', accessibilityLabel: 'Terms and privacy' },
+] as const;
+
+function roleLabel(role: string | null | undefined): string {
+  if (role === 'helper') return 'Helper';
+  if (role === 'vendor') return 'Vendor';
+  return 'Requester';
+}
 
 export default function RequesterProfileScreen() {
   const { user, profile, signOut } = useAuth();
@@ -31,55 +46,37 @@ export default function RequesterProfileScreen() {
     }
   }
 
-  const displayName = profile?.displayName ?? user?.email ?? null;
-  const initial = (displayName?.trim().charAt(0) ?? '?').toUpperCase();
+  const displayName =
+    profile?.fullName?.trim() || profile?.displayName?.trim() || 'Campus requester';
 
   return (
     <Screen underTabs>
-      <SectionHeader eyebrow="Profile" title="Your account" />
-      <Card>
-        <View style={styles.identity}>
-          <View style={styles.avatar}>
-            <Text variant="title" style={styles.initial}>
-              {initial}
-            </Text>
-          </View>
-          <View style={styles.identityText}>
-            <Text variant="subtitle">{profile?.displayName ?? 'Campus requester'}</Text>
-            <Text variant="caption" color="secondary">
-              {user?.email ?? 'Signed in'}
-            </Text>
-          </View>
-          <Badge label="Requester" tone="primary" />
+      <View style={styles.header}>
+        <Avatar name={displayName} path={profile?.avatarPath} size={96} />
+        <Text variant="subtitle" style={styles.name} numberOfLines={2}>
+          {displayName}
+        </Text>
+        {user?.email ? (
+          <Text variant="secondary" color="secondary" numberOfLines={1} ellipsizeMode="middle">
+            {user.email}
+          </Text>
+        ) : null}
+        <View style={styles.pillWrap}>
+          <Badge label={roleLabel(profile?.role)} tone="primary" />
         </View>
-      </Card>
+      </View>
 
       <Card style={styles.menuCard}>
-        <ListRow
-          icon="receipt-long"
-          title="My Requests"
-          onPress={() => router.push('/(requester)/orders')}
-        />
-        <ListRow
-          icon="place"
-          title="Saved Drop-off Locations"
-          onPress={() => router.push('/(requester)/locations')}
-        />
-        <ListRow
-          icon="notifications-none"
-          title="Notifications"
-          onPress={() => router.push('/(requester)/notifications')}
-        />
-        <ListRow
-          icon="help-outline"
-          title="Help Center"
-          onPress={() => router.push('/(requester)/help')}
-        />
-        <ListRow
-          icon="report-problem"
-          title="Report an Issue"
-          onPress={() => router.push('/(requester)/report')}
-        />
+        {MENU_ROWS.map((row, index) => (
+          <View key={row.href} style={index < MENU_ROWS.length - 1 && styles.divider}>
+            <ListRow
+              icon={row.icon}
+              title={row.title}
+              accessibilityLabel={row.accessibilityLabel}
+              onPress={() => router.push(row.href)}
+            />
+          </View>
+        ))}
       </Card>
 
       <DevProfileSwitcher />
@@ -94,30 +91,42 @@ export default function RequesterProfileScreen() {
           />
         </Card>
       ) : null}
-      <Button
-        title={signingOut ? 'Signing out…' : 'Sign out'}
-        variant="danger"
-        style={styles.signOut}
-        onPress={() => void handleSignOut()}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Log out"
+        accessibilityState={{ disabled: signingOut, busy: signingOut }}
         disabled={signingOut}
-        loading={signingOut}
-      />
+        onPress={() => void handleSignOut()}
+        style={({ pressed }) => [styles.logOut, pressed && !signingOut && styles.pressed]}>
+        <MaterialIcons name="logout" size={20} color={colors.primary} />
+        <Text variant="button" style={styles.logOutLabel}>
+          {signingOut ? 'Signing out…' : 'Log Out'}
+        </Text>
+      </Pressable>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.full,
-    backgroundColor: colors.primary,
+  header: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.md },
+  pillWrap: { alignItems: 'center' },
+  name: { color: colors.text, textAlign: 'center' },
+  menuCard: { gap: 0 },
+  divider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
+  logOut: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: touchTargets.button,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
   },
-  initial: { color: colors.onPrimary },
-  identityText: { flex: 1, gap: spacing.xs },
-  menuCard: { gap: 0 },
-  signOut: { backgroundColor: colors.errorSoft },
+  logOutLabel: { color: colors.primary, ...typography.button },
+  pressed: { opacity: 0.7 },
 });

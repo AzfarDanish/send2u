@@ -40,6 +40,12 @@ interface AuthContextValue {
   claimMissingProfile: (role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /**
+   * Replaces shared profile state with the authoritative row returned by a
+   * mutation (Edit Profile, avatar change). No refetch; the whole app —
+   * Profile, Settings, headers — sees the new values immediately.
+   */
+  updateProfile: (next: Profile) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -180,6 +186,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(nextProfile);
   }, [authUser]);
 
+  const updateProfile = useCallback((next: Profile) => {
+    setProfile(next);
+    setAuthError(null);
+  }, []);
+
   const value = useMemo<AuthContextValue>(() => {
     const user = authUser ? toAppUser(authUser, profile) : null;
     return {
@@ -197,8 +208,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       claimMissingProfile,
       signOut,
       refreshProfile,
+      updateProfile,
     };
-  }, [session, authUser, profile, isLoading, authError, signUp, signIn, claimMissingProfile, signOut, refreshProfile]);
+  }, [session, authUser, profile, isLoading, authError, signUp, signIn, claimMissingProfile, signOut, refreshProfile, updateProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

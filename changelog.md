@@ -1579,3 +1579,48 @@ only. No secrets are ever recorded here.
   at 360pt. Debugging notes: tab history keeps detail screens
   mounted, so Playwright assertions must scope to list cards —
   whole-body text matches hidden screens; all temp probes removed.
+
+## 2026-09-15 — Profile area: iOS-style requester suite (Notifications, Profile, Edit Profile, Help Center, Settings)
+
+- Backend (migrations `add_requester_profile_fields`,
+  `add_avatar_storage_policies`): `send2u_profiles` += nullable
+  `full_name`, `student_id`, `phone_number`, `avatar_path` (existing
+  ownership-pinned UPDATE policy already scopes writes; role guard
+  untouched); `avatar/<uid>/…` owner-only policies in `send2u-private`
+  mirroring the QR convention.
+- Services/context: `updateMyProfile` + `setAvatarPath` (authoritative
+  row return), `changePassword` (re-authenticates current password, then
+  `updateUser`), `pickAvatarImage` (square crop) + `avatarPathFor`;
+  `AuthContext.updateProfile` patches shared state with no refetch.
+- New shared UI: `Avatar` (signed-URL photo, initials fallback, local
+  preview), `SegmentedControl` (generic N-segment), `SearchField`,
+  `LegalDocument`, `HeaderSettings`; content files `lib/help-content.ts`
+  (5 real-flow articles) and `lib/legal-content.ts` (drafted v1
+  Terms/Privacy from actual behavior).
+- Screens: Notifications gains working All/Unread/Orders(`order.*`)/
+  System filters, per-filter empty states, custom iOS nav bar with
+  header Mark-all-read (same hook instance — immediate, no reload);
+  Profile matches reference (centered header, gear, menu incl. Terms &
+  Privacy, outlined Log Out, real sign-out); Edit Profile validates
+  (MY mobile normalization) and photo-uploads in place, back with
+  fallback; Help has in-place search, detail route, report deep-link, no
+  dead support CTA; Settings shows real account values, working password
+  change, display-only English, version from `expo-config`, v1 legal.
+- Navigation: 6 hidden routes (`edit-profile`, `settings`,
+  `settings/change-password`, `help/[id]`, `terms`, `privacy`) with
+  centered titles + back; Profile keeps tab + gear; Notifications hides
+  the native header. Fixed a real stale-state bug class: hidden tab
+  routes stay mounted, so Change Password / Edit Profile reset on focus
+  via `useFocusEffect` (revisit after success showed the old
+  confirmation); save/done use `canGoBack` fallback for deep links.
+- Validation: `tsc`, `lint`, `expo-doctor` 21/21, `expo export -p web`
+  pass. Playwright 35/35 + photo upload + logout on live backend
+  (edit round-trip, filter matrix incl. System empty state, tap-to-detail,
+  mark-all, password change incl. wrong-password + input preservation,
+  help search/detail/back-preserved, 360px no overflow). Test seed rows,
+  avatar object, and profile edits reverted; requester1 password left as
+  `Testpass123!` (dev account).
+- Note: `docs/design.md:382` banned a Settings screen ("no settings
+  backend") — overridden by explicit request, scoped to real data only
+  (no preference toggles: push is auto-registered, language is
+  English-only).

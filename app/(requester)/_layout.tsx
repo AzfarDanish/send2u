@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderBack } from '@/components/HeaderBack';
 import { HeaderBell } from '@/components/HeaderBell';
+import { HeaderSettings } from '@/components/HeaderSettings';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -69,7 +70,12 @@ export default function RequesterLayout() {
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
+        options={{
+          title: 'Profile',
+          tabBarIcon: tabIcon('person-outline'),
+          headerTitleAlign: 'center',
+          headerRight: () => <HeaderSettings href="/(requester)/settings" />,
+        }}
       />
       {/* The tab bar lives only on Home, Requests, and Profile. Every
         other requester route hides it so content owns the full screen. */}
@@ -83,7 +89,8 @@ export default function RequesterLayout() {
           href: null,
           title: 'Notifications',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          // Custom in-screen nav bar (back + centered title + Mark all read).
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -133,6 +140,67 @@ export default function RequesterLayout() {
           title: 'Help Center',
           tabBarStyle: { display: 'none' },
           headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="edit-profile"
+        options={{
+          href: null,
+          title: 'Edit Profile',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          href: null,
+          title: 'Settings',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="settings/change-password"
+        options={{
+          href: null,
+          title: 'Change Password',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="help/[id]"
+        options={{
+          href: null,
+          title: 'Help Center',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="terms"
+        options={{
+          href: null,
+          title: 'Terms of Service',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
+        name="privacy"
+        options={{
+          href: null,
+          title: 'Privacy Policy',
+          tabBarStyle: { display: 'none' },
+          headerLeft: RequesterHeaderBack,
+          headerTitleAlign: 'center',
         }}
       />
       <Tabs.Screen

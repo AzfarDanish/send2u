@@ -29,6 +29,12 @@ export interface Profile {
   isDevAccount: boolean;
   /** Optional dev label (seeded out-of-band). Never PII or auth data. */
   displayName: string | null;
+  /** Editable requester identity (Edit Profile). Nullable until set. */
+  fullName: string | null;
+  studentId: string | null;
+  phoneNumber: string | null;
+  /** Storage path of the profile photo (`avatar/<uid>/…`), null when unset. */
+  avatarPath: string | null;
   createdAt: string;
   updatedAt: string;
 }

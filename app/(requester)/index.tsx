@@ -1,4 +1,4 @@
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -39,7 +39,6 @@ export default function RequesterHomeScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
       <Screen
         underTabs
         refreshControl={

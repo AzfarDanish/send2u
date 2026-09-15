@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { changePassword } from '@/services/auth';
@@ -66,7 +67,9 @@ export default function ChangePasswordScreen() {
 
   if (done) {
     return (
-      <Screen>
+      <>
+        <GlassHeader title="Change Password" />
+        <Screen beneathHeader>
         <Card>
           <Text variant="subtitle">Password changed</Text>
           <Text color="secondary">Use your new password the next time you sign in.</Text>
@@ -81,12 +84,15 @@ export default function ChangePasswordScreen() {
             }
           }}
         />
-      </Screen>
+        </Screen>
+      </>
     );
   }
 
   return (
-    <Screen>
+    <>
+      <GlassHeader title="Change Password" />
+      <Screen beneathHeader>
       <Input
         label="Current Password"
         value={current}
@@ -144,6 +150,7 @@ export default function ChangePasswordScreen() {
         disabled={saving}
         onPress={() => void handleSave()}
       />
-    </Screen>
+      </Screen>
+    </>
   );
 }

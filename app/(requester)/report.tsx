@@ -1,13 +1,13 @@
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
+import { GlassHeader } from '@/components/GlassHeader';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { useMyOrders } from '@/hooks/useMyOrders';
 import { formatOrderDate } from '@/lib/orders';
@@ -25,9 +25,8 @@ export default function ReportIssueScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Report an Issue' }} />
-      <Screen>
-        <SectionHeader eyebrow="Support" title="Report an Issue" />
+      <GlassHeader title="Report an Issue" />
+      <Screen beneathHeader>
         <Text color="secondary">
           Issues can be reported on delivered requests. Pick one below to open it.
         </Text>

@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { CopyButton } from '@/components/CopyButton';
@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -51,8 +52,8 @@ export default function OrderPaymentScreen() {
   if (!orderId) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Payment Required' }} />
-        <Screen>
+        <GlassHeader title="Payment Required" />
+        <Screen beneathHeader>
           <ErrorState
             title="Request not found"
             message="This request isn't available to you."
@@ -66,8 +67,8 @@ export default function OrderPaymentScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Payment Required' }} />
-      <Screen>
+      <GlassHeader title="Payment Required" />
+      <Screen beneathHeader>
         {status === 'loading' ? (
           <LoadingState message="Loading payment…" />
         ) : status === 'error' || !context ? (

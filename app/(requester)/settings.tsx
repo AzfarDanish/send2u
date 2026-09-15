@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/constants/theme';
@@ -27,7 +28,9 @@ export default function SettingsScreen() {
   const appVersion = Constants.expoConfig?.version ?? '—';
 
   return (
-    <Screen>
+    <>
+      <GlassHeader title="Settings" />
+      <Screen beneathHeader>
       <Text variant="subtitle" style={styles.groupTitle}>
         Account
       </Text>
@@ -114,7 +117,8 @@ export default function SettingsScreen() {
           onPress={() => router.push('/(requester)/privacy')}
         />
       </Card>
-    </Screen>
+      </Screen>
+    </>
   );
 }
 

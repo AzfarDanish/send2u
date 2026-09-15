@@ -2,12 +2,15 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type RefreshControlProps,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GLASS_HEADER_ROW } from '@/components/GlassHeader';
 import { colors, spacing, touchTargets } from '@/constants/theme';
 
 interface ScreenProps {
@@ -25,31 +28,57 @@ interface ScreenProps {
   underTabs?: boolean;
   /** Indices of children to pin while scrolling (e.g. a filter bar). */
   stickyHeaderIndices?: number[];
+  /** Scroll listener (e.g. collapsing headers). Throttled to animation frames. */
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /**
+   * Set when the screen renders a `GlassHeader`: the top safe-area inset is
+   * dropped (the glass owns it) and content starts below the glass, sliding
+   * behind it on scroll. Never combined with the native header.
+   */
+  beneathHeader?: boolean;
 }
 
 /**
  * Send2U screen shell: light background, safe areas, consistent padding.
  * Scrollable by default so content survives small screens.
  */
-export function Screen({ children, scrollable = true, contentStyle, refreshControl, underTabs = false, stickyHeaderIndices }: ScreenProps) {
+export function Screen({ children, scrollable = true, contentStyle, refreshControl, underTabs = false, stickyHeaderIndices, beneathHeader = false, onScroll }: ScreenProps) {
+  const insets = useSafeAreaInsets();
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+    <SafeAreaView
+      style={styles.safe}
+      edges={beneathHeader ? ['bottom', 'left', 'right'] : ['top', 'bottom', 'left', 'right']}>
       {scrollable ? (
         <ScrollView
           style={styles.flex}
           contentContainerStyle={[
             styles.content,
             underTabs && styles.tabsClearance,
+            beneathHeader && {
+              paddingTop: insets.top + GLASS_HEADER_ROW + spacing.md,
+            },
             contentStyle,
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           stickyHeaderIndices={stickyHeaderIndices}
-          refreshControl={refreshControl}>
+          refreshControl={refreshControl}
+          onScroll={onScroll}
+          scrollEventThrottle={onScroll ? 16 : undefined}>
           {children}
         </ScrollView>
       ) : (
-        <View style={[styles.content, underTabs && styles.tabsClearance, contentStyle]}>{children}</View>
+        <View
+          style={[
+            styles.content,
+            underTabs && styles.tabsClearance,
+            beneathHeader && {
+              paddingTop: insets.top + GLASS_HEADER_ROW + spacing.md,
+            },
+            contentStyle,
+          ]}>
+          {children}
+        </View>
       )}
     </SafeAreaView>
   );

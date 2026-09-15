@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -63,8 +64,8 @@ export default function OrderReceiptScreen() {
   if (!orderId) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Upload Payment Receipt' }} />
-        <Screen>
+        <GlassHeader title="Upload Payment Receipt" />
+        <Screen beneathHeader>
           <ErrorState
             title="Request not found"
             message="This request isn't available to you."
@@ -80,8 +81,8 @@ export default function OrderReceiptScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Upload Payment Receipt' }} />
-      <Screen>
+      <GlassHeader title="Upload Payment Receipt" />
+      <Screen beneathHeader>
         {status === 'loading' ? (
           <LoadingState message="Loading payment…" />
         ) : status === 'error' || !context ? (
@@ -139,9 +140,12 @@ export default function OrderReceiptScreen() {
             </Card>
             <Button
               title="View Request"
-              onPress={() =>
-                router.push({ pathname: '/(requester)/orders/[id]', params: { id: orderId } })
-              }
+              onPress={() => {
+                // Receipt success is terminal for this flow: leave it behind
+                // so Back from detail returns to the workflow, not here.
+                if (router.canGoBack()) router.back();
+                router.push({ pathname: '/(requester)/orders/[id]', params: { id: orderId } });
+              }}
             />
           </>
         ) : (

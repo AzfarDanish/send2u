@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { HeaderBack } from '@/components/HeaderBack';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -138,32 +138,34 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
       </Pressable>
     ) : null;
 
+  // Custom chrome renders the glass header above the scroll view; the
+  // native-header variant keeps its section header inside the screen.
+  const glass =
+    header === 'custom' ? (
+      <GlassHeader
+        title="Notifications"
+        fallbackHref={role === 'helper' ? '/(helper)' : '/(requester)'}
+        right={markAllAction}
+      />
+    ) : null;
+
   return (
-    <Screen
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-      }>
-      {header === 'custom' ? (
-        <View style={styles.navBar}>
-          <View style={styles.navTitleWrap} pointerEvents="none">
-            <Text variant="subtitle" style={styles.navTitle}>
-              Notifications
-            </Text>
-          </View>
-          <View style={styles.navSide}>
-            <HeaderBack fallbackHref={role === 'helper' ? '/(helper)' : '/(requester)'} />
-          </View>
-          <View style={[styles.navSide, styles.navRight]}>{markAllAction}</View>
-        </View>
-      ) : (
-        <SectionHeader
-          eyebrow="Notifications"
-          title="Updates for you"
-          badge={unreadCount > 0 ? `${unreadCount} unread` : undefined}
-          actionTitle={unreadCount > 0 ? 'Mark all read' : undefined}
-          onAction={unreadCount > 0 ? () => void handleMarkAllRead().catch(() => {}) : undefined}
-        />
-      )}
+    <>
+      {glass}
+      <Screen
+        beneathHeader={header === 'custom'}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+        }>
+        {header === 'custom' ? null : (
+          <SectionHeader
+            eyebrow="Notifications"
+            title="Updates for you"
+            badge={unreadCount > 0 ? `${unreadCount} unread` : undefined}
+            actionTitle={unreadCount > 0 ? 'Mark all read' : undefined}
+            onAction={unreadCount > 0 ? () => void handleMarkAllRead().catch(() => {}) : undefined}
+          />
+        )}
       {markAllError ? (
         <Text variant="caption" color="error" accessibilityRole="alert">
           {markAllError}
@@ -227,24 +229,12 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
             </Pressable>
           ))
         : null}
-    </Screen>
+      </Screen>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  navBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 44,
-  },
-  navTitleWrap: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navTitle: { color: colors.text },
-  navSide: { minWidth: 44, justifyContent: 'center', zIndex: 1 },
-  navRight: { flex: 1, alignItems: 'flex-end' },
   markAll: { color: colors.primary, fontWeight: '600' },
   markAllDisabled: { color: colors.disabled },
   stateCard: { minHeight: 200, justifyContent: 'center' },

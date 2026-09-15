@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
+import { setUnreadCount as setSharedUnread } from '@/lib/unread';
 import {
   countUnreadNotifications,
   listMyNotifications,
@@ -48,6 +49,7 @@ export function useNotifications(): UseNotificationsResult {
       const [next, unread] = await Promise.all([listMyNotifications(), countUnreadNotifications()]);
       setItems(next);
       setUnreadCount(unread);
+      setSharedUnread(unread);
       setStatus(next.length === 0 ? 'empty' : 'ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load notifications.');
@@ -66,6 +68,7 @@ export function useNotifications(): UseNotificationsResult {
       const [next, unread] = await Promise.all([listMyNotifications(), countUnreadNotifications()]);
       setItems(next);
       setUnreadCount(unread);
+      setSharedUnread(unread);
       setStatus(next.length === 0 ? 'empty' : 'ready');
     } catch {
       // Keep stale data; explicit refresh/retry surfaces errors.
@@ -92,6 +95,19 @@ export function useNotifications(): UseNotificationsResult {
     itemsRef.current = items;
   }, [items]);
 
+  // Local unread mirror for optimistic math (updaters must stay pure —
+  // the shared store is written beside setState, never inside it).
+  const unreadRef = useRef(0);
+  useEffect(() => {
+    unreadRef.current = unreadCount;
+  }, [unreadCount]);
+
+  /** Pushes a count to local state and the shared bell store together. */
+  const applyUnread = useCallback((next: number) => {
+    setUnreadCount(next);
+    setSharedUnread(next);
+  }, []);
+
   const markRead = useCallback(async (id: string) => {
     const target = itemsRef.current.find((item) => item.id === id);
     // Already read (or gone): no-op. This also guards rapid double-taps —
@@ -99,7 +115,8 @@ export function useNotifications(): UseNotificationsResult {
     if (!target || target.readAt) return;
     const stamped = new Date().toISOString();
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, readAt: stamped } : item)));
-    setUnreadCount((count) => Math.max(0, count - 1));
+    // Global bells update in the same frame as the list.
+    applyUnread(Math.max(0, unreadRef.current - 1));
     try {
       await markNotificationRead(id);
     } catch (err) {
@@ -109,13 +126,13 @@ export function useNotifications(): UseNotificationsResult {
         prev.map((item) => (item.id === id ? { ...item, readAt: target.readAt } : item)),
       );
       try {
-        setUnreadCount(await countUnreadNotifications());
+        applyUnread(await countUnreadNotifications());
       } catch {
         // Keep the optimistic count; realtime/refresh reconciles.
       }
       throw err;
     }
-  }, []);
+  }, [applyUnread]);
 
   const markAllRead = useCallback(async () => {
     const unreadIds = new Set(
@@ -126,7 +143,7 @@ export function useNotifications(): UseNotificationsResult {
     setItems((prev) =>
       prev.map((item) => (unreadIds.has(item.id) ? { ...item, readAt: stamped } : item)),
     );
-    setUnreadCount(0);
+    applyUnread(0);
     try {
       await markAllNotificationsRead();
     } catch (err) {
@@ -134,13 +151,13 @@ export function useNotifications(): UseNotificationsResult {
         prev.map((item) => (unreadIds.has(item.id) ? { ...item, readAt: null } : item)),
       );
       try {
-        setUnreadCount(await countUnreadNotifications());
+        applyUnread(await countUnreadNotifications());
       } catch {
         // Keep the optimistic count; realtime/refresh reconciles.
       }
       throw err;
     }
-  }, []);
+  }, [applyUnread]);
 
   return { items, unreadCount, status, error, refreshing, retry, refresh, markRead, markAllRead };
 }

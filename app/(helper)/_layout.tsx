@@ -4,6 +4,7 @@ import type { ColorValue } from 'react-native';
 
 import { HeaderBack } from '@/components/HeaderBack';
 import { HeaderBell } from '@/components/HeaderBell';
+import { UnreadSync } from '@/components/UnreadSync';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -25,10 +26,14 @@ export default function HelperLayout() {
   if (role === 'requester') return <Redirect href="/(requester)" />;
   if (role === 'vendor') return <Redirect href="/(vendor)" />;
 
+  // Bell on the four main tabs only — never inside job detail or the
+  // notification center itself. UnreadSync feeds the shared count once.
   return (
-    <Tabs
-      backBehavior="history"
-      screenOptions={{
+    <>
+      <UnreadSync />
+      <Tabs
+        backBehavior="history"
+        screenOptions={{
         headerShown: true,
         headerStyle: { backgroundColor: navigation.headerBackground },
         headerTitleStyle: { ...typography.subtitle, color: navigation.headerText },
@@ -70,6 +75,7 @@ export default function HelperLayout() {
           href: null,
           title: 'Job details',
           headerLeft: HelperHeaderBack,
+          headerRight: () => null,
         }}
       />
       <Tabs.Screen
@@ -78,8 +84,10 @@ export default function HelperLayout() {
           href: null,
           title: 'Notifications',
           headerLeft: HelperHeaderBack,
+          headerRight: () => null,
         }}
       />
-    </Tabs>
+      </Tabs>
+    </>
   );
 }

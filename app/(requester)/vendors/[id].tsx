@@ -1,12 +1,15 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MenuItemRow } from '@/components/MenuItemRow';
 import { CartFab } from '@/components/CartFab';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { GlassHeader, GLASS_HEADER_ROW } from '@/components/GlassHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -89,11 +92,26 @@ export default function VendorPageScreen() {
     return category === 'All' ? list : list.filter((item) => menuCategory(item) === category);
   }, [section, category]);
 
+  // Docked filter bar: the in-flow chips scroll away, so once the hero
+  // collapses a translucent copy docks under the glass header (a sticky
+  // index would tuck *behind* the overlay glass instead). Hysteresis
+  // avoids flicker at the threshold.
+  const insets = useSafeAreaInsets();
+  const [heroHeight, setHeroHeight] = useState(0);
+  const [docked, setDocked] = useState(false);
+  const handleScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+      const y = event.nativeEvent.contentOffset.y;
+      setDocked((was) => (y > heroHeight ? true : y <= heroHeight - 24 ? false : was));
+    },
+    [heroHeight],
+  );
+
   if (status === 'loading') {
     return (
       <>
-        <Stack.Screen options={{ title: 'Vendor' }} />
-        <Screen>
+        <GlassHeader title="Vendor" />
+        <Screen beneathHeader>
           <LoadingState message="Loading vendor…" />
         </Screen>
       </>
@@ -103,8 +121,8 @@ export default function VendorPageScreen() {
   if (status === 'error') {
     return (
       <>
-        <Stack.Screen options={{ title: 'Vendor' }} />
-        <Screen>
+        <GlassHeader title="Vendor" />
+        <Screen beneathHeader>
           <Card style={styles.stateCard}>
             <ErrorState
               title="Couldn't load the vendor"
@@ -121,8 +139,8 @@ export default function VendorPageScreen() {
   if (!section) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Vendor' }} />
-        <Screen>
+        <GlassHeader title="Vendor" />
+        <Screen beneathHeader>
           <ErrorState
             title="Vendor not found"
             message="This stall isn't available right now. Pick another vendor."
@@ -139,31 +157,54 @@ export default function VendorPageScreen() {
 
   const { vendor, items } = section;
 
+  const filterChips = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chips}>
+      {categories.map((name) => {
+        const selected = name === category;
+        return (
+          <Pressable
+            key={name}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            accessibilityLabel={`Show ${name}`}
+            onPress={() => setCategory(name)}
+            style={({ pressed }) => [
+              styles.chip,
+              selected && styles.chipSelected,
+              pressed && styles.pressed,
+            ]}>
+            <Text
+              variant="secondary"
+              style={selected ? styles.chipLabelSelected : styles.chipLabel}>
+              {name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <Screen
-        contentStyle={styles.noTopPad}
-        stickyHeaderIndices={showBar ? [1] : undefined}>
-        <View style={styles.heroPanel}>
+      <GlassHeader title={vendor.name} tone="dark" backLabel="Back to Home" />
+      {showBar && docked ? (
+        <View style={[styles.dockBar, { top: insets.top + GLASS_HEADER_ROW }]}>
+          <BlurView intensity={85} tint="light" style={StyleSheet.absoluteFill} />
+          <View style={styles.dockChips}>{filterChips}</View>
+        </View>
+      ) : null}
+      <Screen beneathHeader contentStyle={styles.noTopPad} onScroll={handleScroll}>
+        <View
+          style={styles.heroPanel}
+          onLayout={(event) => setHeroHeight(event.nativeEvent.layout.height)}>
           <PlaceholderImage style={styles.heroBackground} />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.65)']}
             style={styles.heroShade}
           />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back to Home"
-            onPress={() => {
-              // Vendor pages open from Home; a history-less entry (deep
-              // link) falls back there explicitly instead of a dead button.
-              if (router.canGoBack()) router.back();
-              else router.replace('/(requester)');
-            }}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            hitSlop={8}>
-            <MaterialIcons name="chevron-left" size={26} color={colors.primary} />
-          </Pressable>
           <View style={styles.heroContent}>
             <View style={styles.heroTitleRow}>
               <Text variant="title" style={styles.heroName}>
@@ -200,37 +241,7 @@ export default function VendorPageScreen() {
           </View>
         </View>
 
-        {showBar ? (
-          <View style={styles.stickyBar}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chips}>
-              {categories.map((name) => {
-                const selected = name === category;
-                return (
-                  <Pressable
-                    key={name}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`Show ${name}`}
-                    onPress={() => setCategory(name)}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      selected && styles.chipSelected,
-                      pressed && styles.pressed,
-                    ]}>
-                    <Text
-                      variant="secondary"
-                      style={selected ? styles.chipLabelSelected : styles.chipLabel}>
-                      {name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        ) : null}
+        {showBar ? <View style={styles.stickyBar}>{filterChips}</View> : null}
 
         <SectionHeader
           title="Menu"
@@ -281,18 +292,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 210,
   },
-  backButton: {
-    position: 'absolute',
-    top: spacing.md,
-    left: spacing.md,
-    zIndex: 1,
-    width: 44,
-    height: 44,
-    borderRadius: radii.full,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   pressed: { opacity: 0.7 },
   heroContent: {
     gap: spacing.sm,
@@ -307,6 +306,17 @@ const styles = StyleSheet.create({
   stickyBar: {
     backgroundColor: colors.background,
     marginHorizontal: -spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+  },
+  dockBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 9,
+    overflow: 'hidden',
+  },
+  dockChips: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
   },

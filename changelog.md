@@ -1679,3 +1679,47 @@ only. No secrets are ever recorded here.
   system); tab bar stays hidden on workflow screens per app
   architecture (reference shows tabs — adapted, no duplicate bar);
   pre-existing `MenuItemRow` nested-button web warning noted, untouched.
+
+## 2026-09-15 — Correction pass: scoped bells, glass headers, submitted-screen history, fetch hygiene
+
+- Bells (root cause: global `headerRight` on all 25 requester + 6
+  helper screens): removed the global bell; Home/Requests keep their
+  in-screen bells, Profile stays gear-only, helper keeps bells on its 4
+  tab roots (removed from job detail + notification center). New
+  `lib/unread.ts` shared store + `UnreadSync` (one channel/query per
+  role layout) feeds every bell; `useNotifications` pushes optimistic
+  counts so the dot updates in the same frame as the list.
+- Glass headers (native blur impossible — vendored Tabs supports only
+  `headerShown`): installed `expo-blur`; new `GlassHeader` (absolute
+  blur, safe-area aware, back/centered-title/action, dark tone for
+  imagery, touch-transparent except controls) + `Screen beneathHeader`
+  (content starts below glass, slides behind). Applied to all 20
+  requester secondary screens, replacing 4 bespoke nav bars
+  (create/location/vendor-hero/notifications); tab roots unchanged.
+- Submitted screens: confirmation + receipt-success "View Request" now
+  `back()` + `push(detail)` — browser-history proof: back from detail
+  lands on the vendor origin, never the one-time confirmation, no
+  loops, no Home redirect.
+- Duplicates fixed: page-level `Stack.Screen` header declarations
+  cannot suppress Tabs headers (proven: native "Vendor" bar rendered
+  above custom chrome) — moved `headerShown: false` into all 22
+  requester `Tabs.Screen` entries (incl. index/orders, whose native
+  bars doubled the custom headers); removed dead declarations and the
+  triplicated `location.tsx` title; vendor gains a docked translucent
+  filter bar (a sticky index would tuck invisibly behind the overlay).
+- Cards/titles: dropped duplicative `SectionHeader`s (locations,
+  report, location) and inner legal/article titles (now glass titles);
+  kept cards for status/warning/payment/QR/receipt/checklist/groups.
+- Fetching: mount-guard on confirm/rate focus reloads (was
+  mount+focus double-fire); runtime counts show 1 orders query across
+  tab switches; hidden tabs fetch on visit only (verified); realtime
+  topology unchanged (channels are per-mount by design, handlers
+  deduped/silent).
+- Validation: `tsc`, `lint` (0), `expo-doctor` 21/21,
+  `expo export -p web` pass. Playwright 16/16 chrome matrix (bell per
+  main tab, zero bells + single back on 11 secondaries), 3/3 submit
+  back-skip, 4/4 unread accuracy (seed→dot→mark-all→cleared, no
+  reload), 360px clean, screenshots (light/dark glass, scroll-behind,
+  docked filter, hero bleed). No-rating default + disabled submit
+  remain code-verified; helper/vendor chrome intentionally unchanged
+  per scope. Test residue is genuine orders; dev passwords unchanged.

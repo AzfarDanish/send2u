@@ -1,4 +1,4 @@
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -58,7 +58,6 @@ export default function RequesterOrdersScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
       <Screen
         underTabs
         refreshControl={

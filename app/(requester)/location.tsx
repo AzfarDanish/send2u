@@ -1,14 +1,13 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, Stack } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
+import { GlassHeader } from '@/components/GlassHeader';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
@@ -18,8 +17,7 @@ import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
  * Drop-off picker for the request draft. Shares `locationId` with Review
  * Request through CartContext (same in-memory draft lifecycle). Tapping a
  * point only selects it — the user returns via back when ready, so the
- * selection never auto-redirects anywhere. Native header back is always
- * available.
+ * selection never auto-redirects anywhere.
  */
 export default function LocationPickerScreen() {
   const locations = useDeliveryLocations();
@@ -27,26 +25,8 @@ export default function LocationPickerScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <Screen>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={() => {
-              if (router.canGoBack()) router.back();
-              else router.replace('/(requester)/create');
-            }}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            hitSlop={8}>
-            <MaterialIcons name="chevron-left" size={26} color={colors.text} />
-          </Pressable>
-          <Text variant="subtitle" style={styles.headerTitle}>
-            Drop-off Location
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        <SectionHeader eyebrow="Review Request" title="Drop-off Location" />
+      <GlassHeader title="Drop-off Location" fallbackHref="/(requester)/create" />
+      <Screen beneathHeader>
         <Text color="secondary">
           Choose where your helper should deliver this request.
         </Text>
@@ -104,16 +84,6 @@ export default function LocationPickerScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center' },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: { opacity: 0.7 },
-  headerTitle: { flex: 1, textAlign: 'center' },
-  headerSpacer: { width: 44 },
   stateCard: { minHeight: 160, justifyContent: 'center' },
   locationsCard: { gap: 0 },
 });

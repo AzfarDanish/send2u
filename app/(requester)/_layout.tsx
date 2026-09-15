@@ -3,9 +3,8 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HeaderBack } from '@/components/HeaderBack';
-import { HeaderBell } from '@/components/HeaderBell';
 import { HeaderSettings } from '@/components/HeaderSettings';
+import { UnreadSync } from '@/components/UnreadSync';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -15,9 +14,6 @@ function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
   }
   return TabIcon;
 }
-
-/** Back chevron for sub-screen headers; falls back to the role root on deep links. */
-const RequesterHeaderBack = () => <HeaderBack fallbackHref="/(requester)" />;
 
 export default function RequesterLayout() {
   const { user, role, isLoading } = useAuth();
@@ -33,17 +29,22 @@ export default function RequesterLayout() {
   // inset instead of sitting behind it.
   const tabBarBottom = Math.max(insets.bottom, 8);
 
+  // The bell lives only on the main tabs (Home + Requests render it
+  // in-screen; Profile shows the gear). No global headerRight: secondary
+  // screens must not show it. UnreadSync feeds the shared count once.
   return (
-    <Tabs
-      backBehavior="history"
-      screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: navigation.headerBackground },
-        headerTitleStyle: { ...typography.subtitle, color: navigation.headerText },
-        headerTintColor: navigation.headerText,
-        headerShadowVisible: false,
-        tabBarActiveTintColor: navigation.tabActive,
-        tabBarInactiveTintColor: navigation.tabInactive,
+    <>
+      <UnreadSync />
+      <Tabs
+        backBehavior="history"
+        screenOptions={{
+          headerShown: true,
+          headerStyle: { backgroundColor: navigation.headerBackground },
+          headerTitleStyle: { ...typography.subtitle, color: navigation.headerText },
+          headerTintColor: navigation.headerText,
+          headerShadowVisible: false,
+          tabBarActiveTintColor: navigation.tabActive,
+          tabBarInactiveTintColor: navigation.tabInactive,
         tabBarStyle: {
           position: 'absolute',
           left: 0,
@@ -58,15 +59,14 @@ export default function RequesterLayout() {
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.background },
-        headerRight: () => <HeaderBell role="requester" />,
       }}>
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: tabIcon('home') }}
+        options={{ title: 'Home', tabBarIcon: tabIcon('home'), headerShown: false }}
       />
       <Tabs.Screen
         name="orders"
-        options={{ title: 'Requests', tabBarIcon: tabIcon('receipt-long') }}
+        options={{ title: 'Requests', tabBarIcon: tabIcon('receipt-long'), headerShown: false }}
       />
       <Tabs.Screen
         name="profile"
@@ -81,7 +81,12 @@ export default function RequesterLayout() {
         other requester route hides it so content owns the full screen. */}
       <Tabs.Screen
         name="create"
-        options={{ href: null, title: 'Review Request', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Review Request',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
       />
       <Tabs.Screen
         name="notifications"
@@ -99,12 +104,17 @@ export default function RequesterLayout() {
           href: null,
           title: 'Item details',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="vendors/[id]"
-        options={{ href: null, title: 'Vendor', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Vendor',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
       />
       <Tabs.Screen
         name="orders/[id]"
@@ -112,7 +122,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Request details',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -121,7 +131,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Request Submitted',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -130,7 +140,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Payment Required',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -140,7 +150,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Upload Payment Receipt',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -150,7 +160,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Confirm Delivery',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -160,7 +170,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Rate Your Helper',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -170,7 +180,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Drop-off Locations',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -179,7 +189,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Help Center',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -189,7 +199,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Edit Profile',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -199,7 +209,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Settings',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -209,7 +219,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Change Password',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -219,7 +229,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Help Center',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -229,7 +239,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Terms of Service',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -239,7 +249,7 @@ export default function RequesterLayout() {
           href: null,
           title: 'Privacy Policy',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
           headerTitleAlign: 'center',
         }}
       />
@@ -249,13 +259,19 @@ export default function RequesterLayout() {
           href: null,
           title: 'Report an Issue',
           tabBarStyle: { display: 'none' },
-          headerLeft: RequesterHeaderBack,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="location"
-        options={{ href: null, title: 'Drop-off Location', tabBarStyle: { display: 'none' } }}
+        options={{
+          href: null,
+          title: 'Drop-off Location',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
       />
-    </Tabs>
+      </Tabs>
+    </>
   );
 }

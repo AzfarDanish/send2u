@@ -1,8 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { GlassHeader } from '@/components/GlassHeader';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { Button } from '@/components/ui/Button';
@@ -108,29 +109,8 @@ export default function CreateRequestScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <Screen>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={() => {
-              // Review Request is entered from menu/cart flows; a
-              // history-less entry (deep link) falls back to Home, its
-              // genuine parent, instead of a dead button.
-              if (router.canGoBack()) router.back();
-              else router.replace('/(requester)');
-            }}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            hitSlop={8}>
-            <MaterialIcons name="chevron-left" size={26} color={colors.text} />
-          </Pressable>
-          <Text variant="subtitle" style={styles.headerTitle}>
-            Review Request
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
+      <GlassHeader title="Review Request" />
+      <Screen beneathHeader>
         {lines.length === 0 ? (
           <EmptyState
             icon="add-shopping-cart"
@@ -293,16 +273,7 @@ export default function CreateRequestScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center' },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   pressed: { opacity: 0.7 },
-  headerTitle: { flex: 1, textAlign: 'center' },
-  headerSpacer: { width: 44 },
   group: { gap: spacing.md },
   sectionLabel: { marginTop: spacing.sm },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

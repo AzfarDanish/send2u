@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { GlassHeader } from '@/components/GlassHeader';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListRow } from '@/components/ui/ListRow';
@@ -29,8 +30,10 @@ export default function HelpCenterScreen() {
   }, [query]);
 
   return (
-    <Screen>
-      <SearchField
+    <>
+      <GlassHeader title="Help Center" />
+      <Screen beneathHeader>
+        <SearchField
         value={query}
         onChangeText={setQuery}
         placeholder="Search for help..."
@@ -58,8 +61,9 @@ export default function HelpCenterScreen() {
             </View>
           ))}
         </Card>
-      )}
-    </Screen>
+        )}
+      </Screen>
+    </>
   );
 }
 

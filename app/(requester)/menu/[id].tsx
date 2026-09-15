@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -80,8 +81,8 @@ export default function MenuItemDetailScreen() {
   if (status === 'loading' || !item) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Item details' }} />
-        <Screen>
+        <GlassHeader title="Item details" />
+        <Screen beneathHeader>
           {status === 'loading' ? (
             <LoadingState message="Loading item…" />
           ) : loadFailed ? (
@@ -113,8 +114,8 @@ export default function MenuItemDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: item.name }} />
-      <Screen>
+      <GlassHeader title={item.name} />
+      <Screen beneathHeader>
         <View style={styles.visual}>
           <PlaceholderImage style={styles.visualImage} />
         </View>

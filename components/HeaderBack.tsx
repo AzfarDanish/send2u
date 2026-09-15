@@ -10,11 +10,20 @@ import { colors } from '@/constants/theme';
  * shows a native back button on its own — this is wired per screen via
  * `headerLeft`.
  */
-export function HeaderBack({ fallbackHref }: { fallbackHref: string }) {
+export function HeaderBack({
+  fallbackHref,
+  color = colors.text,
+  accessibilityLabel = 'Go back',
+}: {
+  fallbackHref: string;
+  /** Chevron color — defaults to body text; pass white over imagery. */
+  color?: string;
+  accessibilityLabel?: string;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Go back"
+      accessibilityLabel={accessibilityLabel}
       onPress={() => {
         // Back restores the true origin (backBehavior="history"); a
         // history-less entry (deep link) falls back to the role root
@@ -24,7 +33,7 @@ export function HeaderBack({ fallbackHref }: { fallbackHref: string }) {
       }}
       style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
       hitSlop={8}>
-      <MaterialIcons name="chevron-left" size={26} color={colors.text} />
+      <MaterialIcons name="chevron-left" size={26} color={color} />
     </Pressable>
   );
 }

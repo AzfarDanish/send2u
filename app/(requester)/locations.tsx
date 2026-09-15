@@ -1,13 +1,12 @@
-import { Stack } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
+import { GlassHeader } from '@/components/GlassHeader';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
 
@@ -21,15 +20,12 @@ export default function DropOffLocationsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Drop-off Locations' }} />
-      <Screen>
-        <SectionHeader
-          eyebrow="Campus"
-          title="Drop-off Locations"
-          badge={status === 'ready' ? `${locations.length} points` : undefined}
-        />
+      <GlassHeader title="Drop-off Locations" />
+      <Screen beneathHeader>
         <Text color="secondary">
-          Pick one of these points as your delivery location when you submit a request.
+          {status === 'ready'
+            ? `${locations.length} campus points — pick one as your delivery location when you submit a request.`
+            : 'Pick one of these points as your delivery location when you submit a request.'}
         </Text>
         {status === 'loading' ? (
           <Card style={styles.stateCard}>

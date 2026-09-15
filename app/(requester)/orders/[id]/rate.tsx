@@ -1,5 +1,5 @@
-import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { HelperIdentity } from '@/components/HelperIdentity';
 import { OrderRatingSection } from '@/components/OrderRatingSection';
@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/hooks/useAuth';
 import { useHelperIdentity } from '@/hooks/useHelperIdentity';
@@ -66,8 +67,14 @@ export default function OrderRateScreen() {
 
   // Ratings can land while this screen is mounted (the other party rates
   // from their side) — refetch silently so the section below reconciles.
+  // Skipped on first mount: the mount fetch above already covers it.
+  const firstFocusRun = useRef(true);
   useFocusEffect(
     useCallback(() => {
+      if (firstFocusRun.current) {
+        firstFocusRun.current = false;
+        return;
+      }
       void getOrderDetail(orderId ?? '')
         .then((found) => {
           setOrder(found);
@@ -85,8 +92,8 @@ export default function OrderRateScreen() {
   if (!orderId) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Rate Your Helper' }} />
-        <Screen>
+        <GlassHeader title="Rate Your Helper" />
+        <Screen beneathHeader>
           <ErrorState
             title="Request not found"
             message="This request isn't available to you."
@@ -108,8 +115,8 @@ export default function OrderRateScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Rate Your Helper' }} />
-      <Screen>
+      <GlassHeader title="Rate Your Helper" />
+      <Screen beneathHeader>
         {status === 'loading' || !order ? (
           status === 'loading' ? (
             <LoadingState message="Loading request…" />

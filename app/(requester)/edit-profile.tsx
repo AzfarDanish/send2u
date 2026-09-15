@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -155,7 +156,9 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <Screen>
+    <>
+      <GlassHeader title="Edit Profile" />
+      <Screen beneathHeader>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Change profile photo"
@@ -244,7 +247,8 @@ export default function EditProfileScreen() {
         disabled={saving}
         onPress={() => void handleSave()}
       />
-    </Screen>
+      </Screen>
+    </>
   );
 }
 

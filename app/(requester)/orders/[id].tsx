@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 
@@ -11,6 +11,7 @@ import { RequestProgress } from '@/components/RequestProgress';
 import { RequestStatusCard, type StatusCardTone } from '@/components/RequestStatusCard';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { SettlementRecord } from '@/components/SettlementRecord';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -407,8 +408,8 @@ export default function OrderDetailScreen() {
   if (status === 'loading' || !order) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Request Detail' }} />
-        <Screen>
+        <GlassHeader title="Request Detail" />
+        <Screen beneathHeader>
           {status === 'loading' ? (
             <LoadingState message="Loading request…" />
           ) : loadFailed ? (
@@ -502,8 +503,9 @@ export default function OrderDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Request Detail' }} />
+      <GlassHeader title="Request Detail" />
       <Screen
+        beneathHeader
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
         }>

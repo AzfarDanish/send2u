@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -107,7 +108,7 @@ export default function OrderConfirmationScreen() {
   if (status === 'loading' || !orders) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Request Submitted' }} />
+        <GlassHeader title="Request Submitted" />
         <Screen>
           {status === 'loading' ? (
             <LoadingState message="Confirming your request…" />
@@ -144,8 +145,8 @@ export default function OrderConfirmationScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Request Submitted' }} />
-      <Screen
+      <GlassHeader title="Request Submitted" />
+      <Screen beneathHeader
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
         }>
@@ -277,9 +278,13 @@ export default function OrderConfirmationScreen() {
         {single ? (
           <Button
             title="View Request"
-            onPress={() =>
-              router.push({ pathname: '/(requester)/orders/[id]', params: { id: single.id } })
-            }
+            onPress={() => {
+              // One-time confirmation: step back to the origin first so the
+              // confirmation leaves history — Back from detail returns to
+              // the menu, never to this screen.
+              if (router.canGoBack()) router.back();
+              router.push({ pathname: '/(requester)/orders/[id]', params: { id: single.id } });
+            }}
           />
         ) : (
           <Button title="View Requests" onPress={() => router.push('/(requester)/orders')} />

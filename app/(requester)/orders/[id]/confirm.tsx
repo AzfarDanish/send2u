@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -99,9 +100,15 @@ export default function OrderConfirmScreen() {
 
   // The order can move while this screen is mounted (helper/dispute flows
   // run elsewhere) — reconcile silently so the gate below never acts on a
-  // stale status.
+  // stale status. Skipped on first mount: the mount fetch above already
+  // covers it (same first-run guard pattern as the helper queue).
+  const firstFocusRun = useRef(true);
   useFocusEffect(
     useCallback(() => {
+      if (firstFocusRun.current) {
+        firstFocusRun.current = false;
+        return;
+      }
       void load(true);
     }, [load]),
   );
@@ -128,8 +135,8 @@ export default function OrderConfirmScreen() {
   if (!orderId) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Confirm Delivery' }} />
-        <Screen>
+        <GlassHeader title="Confirm Delivery" />
+        <Screen beneathHeader>
           <ErrorState
             title="Request not found"
             message="This request isn't available to you."
@@ -149,8 +156,8 @@ export default function OrderConfirmScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Confirm Delivery' }} />
-      <Screen>
+      <GlassHeader title="Confirm Delivery" />
+      <Screen beneathHeader>
         {status === 'loading' || !order ? (
           status === 'loading' ? (
             <LoadingState message="Loading request…" />

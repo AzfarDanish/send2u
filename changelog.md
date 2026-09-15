@@ -1723,3 +1723,28 @@ only. No secrets are ever recorded here.
   docked filter, hero bleed). No-rating default + disabled submit
   remain code-verified; helper/vendor chrome intentionally unchanged
   per scope. Test residue is genuine orders; dev passwords unchanged.
+
+## 2026-09-15 — Headers: soft faded treatment, vendor gradient removed
+
+- Change: vendor hero loses its black `LinearGradient` scrim
+  (`expo-linear-gradient` now unused) — replaced with a soft white
+  veil (`rgba(255,255,255,0.78)`) over the photo so the stall name,
+  meta rows, and badges use normal body text colors; glass header
+  over the hero switches from dark tone to the standard light blur.
+  It was the last large decorative header shape: all other listed
+  screens already render the shared translucent near-white
+  `GlassHeader` (verified by screenshot on Request Detail/Submitted,
+  Payment, Receipt, Confirm, Rate, Vendor, Item, Review, Drop-off,
+  Notifications, Help, Settings, Edit Profile — single back chevron,
+  centered title, readable over scrolled content, no bells on
+  secondaries, 360px clean).
+- Reason: headers must blend with the white app background — no
+  colored blocks, gradients, heavy shadows, or banner-like chrome.
+- Details: `app/(requester)/vendors/[id].tsx` only (`heroVeil`
+  style, `heroText`/`heroName`/meta colors, `GlassHeader` tone
+  dropped). Home red banner intentionally kept: marketing content,
+  not header chrome, and outside the listed screens.
+- Validation: `tsc`, `lint` (0), `expo-doctor` 21/21,
+  `expo export -p web` pass; 12 scrolled screenshots inspected, no
+  clipping/overlap/unreadable text; temp probes removed, no test
+  residue (read-only validation, dev passwords unchanged).

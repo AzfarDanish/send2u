@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MenuItemRow } from '@/components/MenuItemRow';
@@ -189,7 +188,7 @@ export default function VendorPageScreen() {
 
   return (
     <>
-      <GlassHeader title={vendor.name} tone="dark" backLabel="Back to Home" />
+      <GlassHeader title={vendor.name} backLabel="Back to Home" />
       {showBar && docked ? (
         <View style={[styles.dockBar, { top: insets.top + GLASS_HEADER_ROW }]}>
           <BlurView intensity={85} tint="light" style={StyleSheet.absoluteFill} />
@@ -201,10 +200,7 @@ export default function VendorPageScreen() {
           style={styles.heroPanel}
           onLayout={(event) => setHeroHeight(event.nativeEvent.layout.height)}>
           <PlaceholderImage style={styles.heroBackground} />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.65)']}
-            style={styles.heroShade}
-          />
+          <View style={styles.heroVeil} />
           <View style={styles.heroContent}>
             <View style={styles.heroTitleRow}>
               <Text variant="title" style={styles.heroName}>
@@ -214,7 +210,7 @@ export default function VendorPageScreen() {
             </View>
             {vendor.locationHint ? (
               <View style={styles.metaRow}>
-                <MaterialIcons name="place" size={18} color={colors.onPrimary} />
+                <MaterialIcons name="place" size={18} color={colors.primary} />
                 <Text variant="caption" style={styles.heroText}>
                   {vendor.locationHint}
                 </Text>
@@ -222,7 +218,7 @@ export default function VendorPageScreen() {
             ) : null}
             {vendor.operatingHours ? (
               <View style={styles.metaRow}>
-                <MaterialIcons name="schedule" size={18} color={colors.onPrimary} />
+                <MaterialIcons name="schedule" size={18} color={colors.primary} />
                 <Text variant="caption" style={styles.heroText}>
                   {vendor.operatingHours}
                 </Text>
@@ -285,12 +281,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   heroBackground: { ...StyleSheet.absoluteFill },
-  heroShade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 210,
+  // Soft white veil instead of a dark gradient scrim: the photo fades into
+  // the near-white surface so header text stays readable with body colors.
+  heroVeil: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
   },
   pressed: { opacity: 0.7 },
   heroContent: {
@@ -300,8 +295,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   heroTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  heroName: { flex: 1, color: colors.onPrimary },
-  heroText: { color: colors.onPrimary },
+  heroName: { flex: 1, color: colors.text },
+  heroText: { color: colors.secondary },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   stickyBar: {
     backgroundColor: colors.background,

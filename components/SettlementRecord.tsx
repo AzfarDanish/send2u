@@ -18,11 +18,10 @@ const REASON_LABELS: Record<string, string> = {
 /**
  * Settlement record for admin-resolved disputes. Renders only when the order
  * carries a resolution — i.e. `resolvedAt` is set, which happens exclusively
- * through `send2u_resolve_dispute` (completed via payment verification never
- * sets it, plain cancellations never set it). Covers both settle-as-cancelled
- * (where the plain cancelled copy would otherwise hide the dispute) and
- * settle-as-completed (where "delivered and paid" would otherwise mislead).
- * No money moved in-app either way: settlement is manual and external.
+ * through `send2u_resolve_dispute` settled as completed (a cancelled
+ * settlement permanently deletes the order, so nothing to record remains).
+ * "Delivered and paid" would otherwise mislead the requester, since no money
+ * moved in-app: settlement is manual and external.
  */
 export function SettlementRecord({ order }: { order: OrderWithDetails }) {
   if (!order.resolvedAt) return null;

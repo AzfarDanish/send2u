@@ -2,9 +2,11 @@ import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBell } from '@/components/HeaderBell';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
@@ -33,25 +35,29 @@ export default function HelperEarningsScreen() {
   const totalCents = completed.reduce((sum, d) => sum + d.deliveryFeeCents, 0);
 
   return (
-    <Screen
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-      }>
-      <SectionHeader eyebrow="Earnings" title="Your payouts" />
+    <>
+      <GlassHeader title="Earnings" right={<HeaderBell role="helper" />} />
+      <Screen
+        beneathHeader
+        underTabs
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+        }>
+        <SectionHeader eyebrow="Earnings" title="Your payouts" />
       {status === 'loading' ? (
-        <Card style={styles.stateCard}>
+        <Section style={styles.stateCard}>
           <LoadingState message="Loading earnings…" />
-        </Card>
+        </Section>
       ) : null}
       {status === 'error' ? (
-        <Card style={styles.stateCard}>
+        <Section style={styles.stateCard}>
           <ErrorState
             title="Couldn't load earnings"
             message={error ?? 'Check your connection and try again.'}
             retryTitle="Try again"
             onRetry={retry}
           />
-        </Card>
+        </Section>
       ) : null}
       {status !== 'loading' && status !== 'error' ? (
         <Card>
@@ -64,7 +70,7 @@ export default function HelperEarningsScreen() {
               ? 'Finish a delivery to earn your first fee.'
               : `From ${completed.length} completed deliver${completed.length === 1 ? 'y' : 'ies'}. Delivery fees only.`}
           </Text>
-        </Card>
+        </Section>
       ) : null}
       {status === 'ready' && completed.length === 0 ? (
         <EmptyState
@@ -75,7 +81,7 @@ export default function HelperEarningsScreen() {
       ) : null}
       {status === 'ready'
         ? completed.map((trip) => (
-            <Card key={trip.id} style={styles.tripCard}>
+            <Section key={trip.id} style={styles.tripCard}>
               <ListRow
                 icon="payments"
                 title={trip.vendor.name}
@@ -89,10 +95,11 @@ export default function HelperEarningsScreen() {
                   </View>
                 }
               />
-            </Card>
+            </Section>
           ))
         : null}
-    </Screen>
+      </Screen>
+    </>
   );
 }
 

@@ -14,8 +14,8 @@ const DOT_SIZE = 28;
 /**
  * Derives the tracker position from the real backend status. Returns the
  * highest fully-completed stage index (-1 when none) and the current stage
- * index (null when the request ended — completed, cancelled, or disputed).
- * Terminal cancellations/disputes credit only stages with real timestamps,
+ * index (null when the request ended — completed or disputed).
+ * Terminal disputes credit only stages with real timestamps,
  * so the tracker never claims progress that did not happen.
  */
 export function progressPosition(order: OrderWithDetails): { reached: number; current: number | null } {
@@ -43,7 +43,6 @@ export function progressPosition(order: OrderWithDetails): { reached: number; cu
       return { reached: 4, current: 5 };
     case 'completed':
       return { reached: 5, current: null };
-    case 'cancelled':
     case 'disputed': {
       // Credit only what the timestamps prove happened.
       let reached = -1;

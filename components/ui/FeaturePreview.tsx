@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { colors, spacing } from '@/constants/theme';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { Text } from '@/components/ui/Text';
 
 interface FeaturePreviewProps {
@@ -34,7 +34,7 @@ export function FeaturePreview({ icon, title, description, bullets = [] }: Featu
         </View>
       ))}
       <Badge label="Coming soon" tone="info" />
-    </Card>
+    </Section>
   );
 }
 

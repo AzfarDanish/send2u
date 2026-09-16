@@ -5,7 +5,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { RatingInput, RatingStars } from '@/components/RatingStars';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -196,7 +196,7 @@ export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'l
           Waiting for the {otherLabel === 'Helper' ? 'helper' : 'requester'} rating.
         </Text>
       )}
-    </Card>
+    </Section>
   );
 }
 

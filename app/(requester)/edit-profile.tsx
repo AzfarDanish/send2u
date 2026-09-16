@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { GlassHeader } from '@/components/GlassHeader';
@@ -239,7 +239,7 @@ export default function EditProfileScreen() {
             retryTitle="Dismiss"
             onRetry={() => setSaveError(null)}
           />
-        </Card>
+        </Section>
       ) : null}
       <Button
         title={saving ? 'Saving…' : 'Save Changes'}

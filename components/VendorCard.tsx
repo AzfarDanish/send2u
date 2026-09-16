@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -32,7 +32,7 @@ export function VendorCard({ vendor, onPress }: VendorCardProps) {
       accessibilityLabel={`${vendor.name}${vendor.isOpen ? '' : ', closed'}`}
       onPress={() => onPress(vendor)}
       style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.card}>
+      <Section style={styles.card}>
         <View style={styles.tile}>
           <PlaceholderImage style={styles.tileImage} />
         </View>
@@ -50,7 +50,7 @@ export function VendorCard({ vendor, onPress }: VendorCardProps) {
           ) : null}
         </View>
         <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
-      </Card>
+      </Section>
     </Pressable>
   );
 }

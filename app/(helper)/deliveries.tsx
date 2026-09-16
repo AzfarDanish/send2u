@@ -3,8 +3,10 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ActiveHistoryToggle, type HistoryTab } from '@/components/ActiveHistoryToggle';
+import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBell } from '@/components/HeaderBell';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
@@ -44,31 +46,35 @@ export default function HelperDeliveriesScreen() {
   }, [active, history, tab]);
 
   return (
-    <Screen
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
-      }>
-      <SectionHeader
-        eyebrow="Deliveries"
-        title={tab === 'active' ? 'Your active jobs' : 'Delivery history'}
-      />
+    <>
+      <GlassHeader title="My Deliveries" right={<HeaderBell role="helper" />} />
+      <Screen
+        beneathHeader
+        underTabs
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
+        }>
+        <SectionHeader
+          eyebrow="Deliveries"
+          title={tab === 'active' ? 'Your active jobs' : 'Delivery history'}
+        />
       <ActiveHistoryToggle tab={tab} onChange={setTab} historyCount={history.deliveries.length} />
       {tab === 'active' ? (
         <>
           {active.status === 'loading' ? (
-            <Card style={styles.stateCard}>
+            <Section style={styles.stateCard}>
               <LoadingState message="Loading your deliveries…" />
-            </Card>
+            </Section>
           ) : null}
           {active.status === 'error' ? (
-            <Card style={styles.stateCard}>
+            <Section style={styles.stateCard}>
               <ErrorState
                 title="Couldn't load deliveries"
                 message={active.error ?? 'Check your connection and try again.'}
                 retryTitle="Try again"
                 onRetry={active.retry}
               />
-            </Card>
+            </Section>
           ) : null}
           {active.status === 'empty' ? (
             <EmptyState
@@ -85,7 +91,7 @@ export default function HelperDeliveriesScreen() {
           ) : null}
           {active.status === 'ready'
             ? active.deliveries.map((delivery) => (
-                <Card key={delivery.id} style={styles.deliveryCard}>
+                <Section key={delivery.id} style={styles.deliveryCard}>
                   <ListRow
                     icon="delivery-dining"
                     title={delivery.vendor.name}
@@ -109,37 +115,37 @@ export default function HelperDeliveriesScreen() {
                       </View>
                     }
                   />
-                </Card>
+                </Section>
               ))
             : null}
         </>
       ) : (
         <>
           {history.status === 'loading' ? (
-            <Card style={styles.stateCard}>
+            <Section style={styles.stateCard}>
               <LoadingState message="Loading your history…" />
-            </Card>
+            </Section>
           ) : null}
           {history.status === 'error' ? (
-            <Card style={styles.stateCard}>
+            <Section style={styles.stateCard}>
               <ErrorState
                 title="Couldn't load history"
                 message={history.error ?? 'Check your connection and try again.'}
                 retryTitle="Try again"
                 onRetry={history.retry}
               />
-            </Card>
+            </Section>
           ) : null}
           {history.status === 'empty' ? (
             <EmptyState
               icon="history"
               title="No history yet"
-              message="Completed and cancelled deliveries appear here."
+              message="Completed and disputed deliveries appear here."
             />
           ) : null}
           {history.status === 'ready'
             ? history.deliveries.map((delivery) => (
-                <Card key={delivery.id} style={styles.deliveryCard}>
+                <Section key={delivery.id} style={styles.deliveryCard}>
                   <ListRow
                     icon="history"
                     title={delivery.vendor.name}
@@ -157,12 +163,13 @@ export default function HelperDeliveriesScreen() {
                       </View>
                     }
                   />
-                </Card>
+                </Section>
               ))
             : null}
         </>
       )}
-    </Screen>
+      </Screen>
+    </>
   );
 }
 

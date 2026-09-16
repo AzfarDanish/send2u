@@ -57,7 +57,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       'Accepted through Out for delivery: a helper is working on it — heading to the stall, buying your food, and bringing it to your drop-off point.',
       'Delivered: the helper marked your food as handed over. Open the request and confirm receipt — confirm only food you actually received.',
       'Awaiting payment: pay the helper through their QR code and attach your receipt.',
-      'Completed: payment confirmed. Cancelled and Disputed are the exception states — disputed requests need manual settlement.',
+      'Completed: payment confirmed. Disputed is the exception state — disputed requests need manual settlement.',
     ],
   },
   {

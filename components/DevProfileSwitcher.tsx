@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-nat
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -133,7 +133,7 @@ export function DevProfileSwitcher() {
     role === 'requester' ? 'Requester' : role === 'helper' ? 'Helper' : role === 'vendor' ? 'Vendor' : role;
 
   return (
-    <Card style={styles.devCard}>
+    <Section style={styles.devCard}>
       <View style={styles.devHeader}>
         <Badge label="Development" tone="error" />
         {profiles.length > 0 && !loading && (
@@ -264,7 +264,7 @@ export function DevProfileSwitcher() {
           />
         </View>
       )}
-    </Card>
+    </Section>
   );
 }
 

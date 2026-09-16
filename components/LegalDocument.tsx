@@ -1,5 +1,5 @@
 import { GlassHeader } from '@/components/GlassHeader';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import type { LegalSection } from '@/lib/legal-content';
@@ -11,14 +11,14 @@ export function LegalDocument({ title, sections }: { title: string; sections: Le
       <GlassHeader title={title} />
       <Screen beneathHeader>
         {sections.map((section) => (
-          <Card key={section.heading}>
+          <Section key={section.heading}>
             <Text variant="subtitle">{section.heading}</Text>
             {section.body.map((paragraph, index) => (
               <Text key={index} color="secondary">
                 {paragraph}
               </Text>
             ))}
-          </Card>
+          </Section>
         ))}
       </Screen>
     </>

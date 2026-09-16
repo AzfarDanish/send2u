@@ -3,14 +3,14 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ActiveHistoryToggle, type HistoryTab } from '@/components/ActiveHistoryToggle';
+import { GlassHeader } from '@/components/GlassHeader';
 import { HeaderBell } from '@/components/HeaderBell';
 import { RequestCard } from '@/components/RequestCard';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useMyOrderHistory } from '@/hooks/useMyOrderHistory';
 import { useMyOrders } from '@/hooks/useMyOrders';
@@ -20,7 +20,7 @@ function LoadingSkeletons() {
   return (
     <View accessibilityRole="progressbar" accessibilityLabel="Loading requests">
       {[0, 1, 2].map((row) => (
-        <Card key={row} style={styles.skeletonCard}>
+        <Section key={row} style={styles.skeletonCard}>
           <Skeleton width={56} height={56} radius={radii.md} />
           <View style={styles.skeletonText}>
             <Skeleton width="45%" height={14} />
@@ -31,7 +31,7 @@ function LoadingSkeletons() {
             <Skeleton width={72} height={22} radius={radii.full} />
             <Skeleton width={56} height={18} />
           </View>
-        </Card>
+        </Section>
       ))}
     </View>
   );
@@ -58,18 +58,13 @@ export default function RequesterOrdersScreen() {
 
   return (
     <>
+      <GlassHeader title="Requests" right={<HeaderBell role="requester" />} />
       <Screen
+        beneathHeader
         underTabs
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
         }>
-        <View style={styles.headerRow}>
-          <View style={styles.headings}>
-            <Text variant="title">Requests</Text>
-            <Text color="secondary">Keep track of your submitted requests.</Text>
-          </View>
-          <HeaderBell role="requester" />
-        </View>
         <ActiveHistoryToggle
           tab={tab}
           onChange={setTab}
@@ -78,14 +73,14 @@ export default function RequesterOrdersScreen() {
         />
         {list.status === 'loading' ? <LoadingSkeletons /> : null}
         {list.status === 'error' ? (
-          <Card style={styles.stateCard}>
+          <Section style={styles.stateCard}>
             <ErrorState
               title={tab === 'active' ? "Couldn't load orders" : "Couldn't load past requests"}
               message={list.error ?? 'Check your connection and try again.'}
               retryTitle="Try again"
               onRetry={list.retry}
             />
-          </Card>
+          </Section>
         ) : null}
         {list.status === 'empty' && tab === 'active' ? (
           <EmptyState
@@ -104,7 +99,7 @@ export default function RequesterOrdersScreen() {
           <EmptyState
             icon="history"
             title="No past requests"
-            message="Completed and cancelled orders will appear here."
+            message="Completed and disputed orders will appear here."
           />
         ) : null}
         {list.status === 'ready'
@@ -118,12 +113,6 @@ export default function RequesterOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  headings: { flex: 1, gap: spacing.xs },
   stateCard: { minHeight: 200, justifyContent: 'center' },
   skeletonCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   skeletonText: { flex: 1, gap: spacing.sm },

@@ -7,7 +7,7 @@ import { GlassHeader } from '@/components/GlassHeader';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { QuantityStepper } from '@/components/QuantityStepper';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -189,19 +189,19 @@ export default function CreateRequestScreen() {
               <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
             </Pressable>
             {locations.status === 'loading' ? (
-              <Card style={styles.stateCard}>
+              <Section style={styles.stateCard}>
                 <LoadingState message="Loading drop-off points…" />
-              </Card>
+              </Section>
             ) : null}
             {locations.status === 'error' ? (
-              <Card style={styles.stateCard}>
+              <Section style={styles.stateCard}>
                 <ErrorState
                   title="Couldn't load locations"
                   message={locations.error ?? 'Check your connection and try again.'}
                   retryTitle="Try again"
                   onRetry={locations.retry}
                 />
-              </Card>
+              </Section>
             ) : null}
             {locations.status === 'empty' ? (
               <EmptyState
@@ -218,7 +218,7 @@ export default function CreateRequestScreen() {
                   This request will be split into separate orders because the items come from
                   different vendors.
                 </Text>
-              </Card>
+              </Section>
             ) : null}
 
             <View style={styles.totals}>

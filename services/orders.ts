@@ -72,9 +72,6 @@ interface OrderRow {
   out_for_delivery_at: string | null;
   delivered_at: string | null;
   confirmed_at: string | null;
-  cancelled_at: string | null;
-  cancelled_by: string | null;
-  cancel_reason: string | null;
   dispute_reason: string | null;
   dispute_details: string | null;
   dispute_note: string | null;
@@ -140,9 +137,6 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
     outForDeliveryAt: row.out_for_delivery_at,
     deliveredAt: row.delivered_at,
     confirmedAt: row.confirmed_at,
-    cancelledAt: row.cancelled_at,
-    cancelledBy: row.cancelled_by,
-    cancelReason: row.cancel_reason,
     disputeReason: row.dispute_reason,
     disputeDetails: row.dispute_details,
     disputeNote: row.dispute_note,
@@ -201,7 +195,7 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
 const ORDER_SELECT =
   'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
   ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, picked_up_at, out_for_delivery_at, delivered_at, confirmed_at,' +
-  ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, dispute_details, dispute_note, disputed_at, resolved_at, resolution,' +
+  ' dispute_reason, dispute_details, dispute_note, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint),' +
   ' delivery_location:send2u_delivery_locations!inner(id, name),' +
@@ -242,7 +236,7 @@ export async function placeOrders(
 
 /**
  * Requester's ACTIVE orders only (as requester), newest first.
- * Terminal states (completed/cancelled/disputed) are excluded here by the
+ * Terminal states (completed/disputed) are excluded here by the
  * query itself — they live in `listMyOrderHistory`. RLS still enforces
  * ownership; this filter enforces the active/history separation.
  */
@@ -256,7 +250,7 @@ export async function listMyOrders(): Promise<OrderWithDetails[]> {
       .from('send2u_orders')
       .select(ORDER_SELECT)
       .eq('requester_id', userId)
-      .not('status', 'in', '(completed,cancelled,disputed)')
+      .not('status', 'in', '(completed,disputed)')
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Could not load your orders: ${error.message}`);
     return (data as unknown as OrderRow[]).map(toOrderWithDetails);
@@ -264,7 +258,7 @@ export async function listMyOrders(): Promise<OrderWithDetails[]> {
 }
 
 /**
- * HISTORICAL orders only (completed/cancelled/disputed),
+ * HISTORICAL orders only (completed/disputed),
  * newest first. Read-only records — no actions are valid on these.
  * Nothing is deleted or archived elsewhere; same table, status-filtered.
  */
@@ -276,7 +270,7 @@ export async function listMyOrderHistory(): Promise<OrderWithDetails[]> {
       .from('send2u_orders')
       .select(ORDER_SELECT)
       .eq('requester_id', userId)
-      .in('status', ['completed', 'cancelled', 'disputed'])
+      .in('status', ['completed', 'disputed'])
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Could not load your order history: ${error.message}`);
     return (data as unknown as OrderRow[]).map(toOrderWithDetails);
@@ -345,7 +339,7 @@ export async function listMyDeliveries(): Promise<OrderWithDetails[]> {
       .from('send2u_orders')
       .select(ORDER_SELECT)
       .eq('helper_id', userId)
-      .not('status', 'in', '(completed,cancelled,disputed)')
+      .not('status', 'in', '(completed,disputed)')
       .order('accepted_at', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Could not load your deliveries: ${error.message}`);
@@ -355,7 +349,7 @@ export async function listMyDeliveries(): Promise<OrderWithDetails[]> {
 
 /**
  * HISTORICAL deliveries assigned to the current helper
- * (completed/cancelled/disputed), newest accepted first. Read-only records.
+ * (completed/disputed), newest accepted first. Read-only records.
  * Food cost stays a fronted expense here — only the delivery fee is earnings.
  */
 export async function listMyDeliveryHistory(): Promise<OrderWithDetails[]> {
@@ -366,7 +360,7 @@ export async function listMyDeliveryHistory(): Promise<OrderWithDetails[]> {
       .from('send2u_orders')
       .select(ORDER_SELECT)
       .eq('helper_id', userId)
-      .in('status', ['completed', 'cancelled', 'disputed'])
+      .in('status', ['completed', 'disputed'])
       .order('accepted_at', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Could not load your delivery history: ${error.message}`);
@@ -437,24 +431,32 @@ export type FulfilmentAction =
   | 'abandon'
   | 'release';
 
+export type AdvanceResult =
+  | { deleted: false; status: OrderStatus }
+  | { deleted: true };
+
 /**
  * Advances fulfilment for the assigned helper. The database validates the
- * current state atomically; only valid transitions succeed.
+ * current state atomically; only valid transitions succeed. `deleted: true`
+ * means the order was permanently removed (food unavailable before purchase)
+ * and no longer exists server-side.
  */
 export async function advanceFulfilment(
   orderId: string,
   action: FulfilmentAction,
-): Promise<{ status: OrderStatus }> {
+): Promise<AdvanceResult> {
   const supabase = requireClient();
   const { data, error } = await supabase.rpc('send2u_helper_advance', {
     p_order_id: orderId,
     p_action: action,
   });
   if (error) throw new Error(friendlyFulfilmentError(error.message));
-  if (!isRecord(data) || typeof data.status !== 'string') {
+  if (!isRecord(data)) throw new Error('The update came back in an unexpected shape.');
+  if (data.deleted === true) return { deleted: true };
+  if (typeof data.status !== 'string') {
     throw new Error('The update came back in an unexpected shape.');
   }
-  return { status: data.status as OrderStatus };
+  return { deleted: false, status: data.status as OrderStatus };
 }
 
 function friendlyFulfilmentError(message: string): string {
@@ -465,16 +467,14 @@ function friendlyFulfilmentError(message: string): string {
   return message ? `Could not update the order: ${message}` : 'Could not update the order.';
 }
 
-export interface CancelResult {
-  status: OrderStatus;
-  /** 'none' when cancelled cleanly, 'food_cost' when settlement may be owed. */
-  liability: 'none' | 'food_cost';
-  foodCostCents: number | null;
-}
+export type CancelResult =
+  | { deleted: true }
+  | { status: OrderStatus; liability: 'none' | 'food_cost'; foodCostCents: number | null };
 
 /**
- * Requester cancellation. Before purchase it is clean; after purchase the
- * order moves to dispute with the helper's fronted cost preserved.
+ * Requester cancellation. Before purchase the order is permanently deleted
+ * (`deleted: true` — nothing is stored); after purchase the order moves to
+ * dispute with the helper's fronted cost preserved.
  */
 export async function cancelOrder(orderId: string, reason: string): Promise<CancelResult> {
   const supabase = requireClient();
@@ -483,7 +483,9 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Canc
     p_reason: reason,
   });
   if (error) throw new Error(friendlyCancelError(error.message));
-  if (!isRecord(data) || typeof data.status !== 'string' || typeof data.liability !== 'string') {
+  if (!isRecord(data)) throw new Error('Cancellation came back in an unexpected shape.');
+  if (data.deleted === true) return { deleted: true };
+  if (typeof data.status !== 'string' || typeof data.liability !== 'string') {
     throw new Error('Cancellation came back in an unexpected shape.');
   }
   return {

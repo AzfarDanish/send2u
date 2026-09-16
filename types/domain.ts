@@ -39,7 +39,7 @@ export interface Profile {
   updatedAt: string;
 }
 
-export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
 
 export interface JobOffer {
   id: string;
@@ -137,7 +137,9 @@ export interface DeliveryLocation {
  * at_vendor → food_available → food_purchased → picked_up → out_for_delivery →
  * delivered → confirmed (requester confirms receipt) →
  * awaiting_requester_payment → completed.
- * Exception states: cancelled (clean) and disputed (needs settlement).
+ * Exception state: disputed (needs settlement).
+ * Cancelled requests are NOT stored — clean cancellation (before purchase)
+ * permanently deletes the order; no function ever writes status 'cancelled'.
  * Legacy values stay reserved but unused by current flows.
  */
 export type OrderStatus =
@@ -153,7 +155,6 @@ export type OrderStatus =
   | 'delivered'
   | 'awaiting_requester_payment'
   | 'completed'
-  | 'cancelled'
   | 'disputed'
   | 'accepted'
   | 'preparing'
@@ -194,9 +195,6 @@ export interface Order {
   deliveredAt: string | null;
   /** When the requester confirmed receipt; null until confirmed. */
   confirmedAt: string | null;
-  cancelledAt: string | null;
-  cancelledBy: string | null;
-  cancelReason: string | null;
   disputeReason: string | null;
   /** The opener's free-text account; preserved alongside any admin note. */
   disputeDetails: string | null;

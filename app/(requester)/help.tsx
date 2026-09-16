@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { GlassHeader } from '@/components/GlassHeader';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
@@ -46,7 +46,7 @@ export default function HelpCenterScreen() {
           message={`Nothing about “${query.trim()}”. Try different words.`}
         />
       ) : (
-        <Card style={styles.listCard}>
+        <Section style={styles.listCard}>
           {visible.map((article, index) => (
             <View key={article.id} style={index < visible.length - 1 && styles.divider}>
               <ListRow
@@ -60,7 +60,7 @@ export default function HelpCenterScreen() {
               />
             </View>
           ))}
-        </Card>
+        </Section>
         )}
       </Screen>
     </>

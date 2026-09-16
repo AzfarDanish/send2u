@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { GlassHeader } from '@/components/GlassHeader';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -26,7 +26,6 @@ const KIND_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'order.confirmed': 'verified',
   'order.awaiting_payment': 'payments',
   'order.completed': 'check-circle',
-  'order.cancelled': 'cancel',
   'order.disputed': 'report-problem',
 };
 
@@ -178,19 +177,19 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
         accessibilityLabel="Filter notifications"
       />
       {status === 'loading' ? (
-        <Card style={styles.stateCard}>
+        <Section style={styles.stateCard}>
           <LoadingState message="Loading notifications…" />
-        </Card>
+        </Section>
       ) : null}
       {status === 'error' ? (
-        <Card style={styles.stateCard}>
+        <Section style={styles.stateCard}>
           <ErrorState
             title="Couldn't load notifications"
             message={error ?? 'Check your connection and try again.'}
             retryTitle="Try again"
             onRetry={retry}
           />
-        </Card>
+        </Section>
       ) : null}
       {status === 'empty' || (status === 'ready' && visible.length === 0) ? (
         <EmptyState icon="notifications-none" title={emptyCopy.title} message={emptyCopy.message} />
@@ -203,7 +202,7 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
               accessibilityLabel={`${item.title}. ${item.body}`}
               onPress={() => void openNotification(item)}
               style={({ pressed }) => [pressed && styles.pressed]}>
-              <Card style={styles.rowCard}>
+              <Section style={styles.rowCard}>
                 <View style={styles.row}>
                   <View style={styles.iconWrap}>
                     <MaterialIcons
@@ -225,7 +224,7 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
                   </View>
                   {item.readAt ? null : <View style={styles.unreadDot} accessibilityLabel="Unread" />}
                 </View>
-              </Card>
+              </Section>
             </Pressable>
           ))
         : null}

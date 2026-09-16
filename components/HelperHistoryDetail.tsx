@@ -7,7 +7,7 @@ import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
@@ -52,18 +52,6 @@ export function HelperHistoryDetail({
             )}
             <SettlementRecord order={job} />
           </>
-        ) : job.status === 'cancelled' ? (
-          <>
-            <Badge label="Cancelled" tone="error" />
-            <Text variant="subtitle">This job was cancelled</Text>
-            <Text color="secondary">
-              {job.cancelReason === 'food_unavailable'
-                ? 'No food — no money changed hands.'
-                : `Cancelled${job.cancelReason ? `: ${job.cancelReason}` : ''}.`}
-              {job.cancelledAt ? ` (${formatOrderDate(job.cancelledAt)})` : ''}
-            </Text>
-            <SettlementRecord order={job} />
-          </>
         ) : (
           <>
             <Badge
@@ -102,7 +90,7 @@ export function HelperHistoryDetail({
             ) : null}
           </>
         )}
-      </Card>
+      </Section>
 
       {job.status === 'completed' ? (
         <OrderRatingSection order={job} refreshToken={refreshToken} />
@@ -140,7 +128,7 @@ export function HelperHistoryDetail({
         <Text variant="caption" color="muted">
           Requester {job.requesterId.slice(0, 8)}…
         </Text>
-      </Card>
+      </Section>
 
       <Card>
         <OrderBreakdown
@@ -152,12 +140,12 @@ export function HelperHistoryDetail({
         <Text variant="caption" color="muted">
           Only the delivery fee counts as your payout.
         </Text>
-      </Card>
+      </Section>
 
       <Card>
         <Text variant="subtitle">What happened</Text>
         <OrderTimeline order={job} />
-      </Card>
+      </Section>
 
       <Card>
         <View style={styles.moneyRow}>
@@ -187,7 +175,7 @@ export function HelperHistoryDetail({
               : 'No receipt was submitted for this delivery.'}
           </Text>
         )}
-      </Card>
+      </Section>
     </View>
   );
 }

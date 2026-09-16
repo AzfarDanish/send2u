@@ -34,16 +34,17 @@ export function formatRelativeTime(iso: string): string {
 /**
  * Terminal states: the fulfilment/payment workflow is over. These orders
  * are historical records — never actionable. Everything else is active.
+ * Cancelled orders are deleted, never stored, so they are not a status.
  * Kept as a single source of truth so list queries, badges, and detail
  * screens agree on what counts as "active work".
  */
-export const TERMINAL_ORDER_STATUSES = ['completed', 'cancelled', 'disputed'] as const;
+export const TERMINAL_ORDER_STATUSES = ['completed', 'disputed'] as const;
 
 export type TerminalOrderStatus = (typeof TERMINAL_ORDER_STATUSES)[number];
 
 const TERMINAL_SET: ReadonlySet<string> = new Set(TERMINAL_ORDER_STATUSES);
 
-/** True for completed/cancelled/disputed — the history bucket. */
+/** True for completed/disputed — the history bucket. */
 export function isTerminalOrderStatus(status: OrderStatus): status is TerminalOrderStatus {
   return TERMINAL_SET.has(status);
 }
@@ -73,7 +74,6 @@ export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warn
       return 'success';
     case 'completed':
       return 'success';
-    case 'cancelled':
     case 'disputed':
       return 'error';
     default:
@@ -168,8 +168,6 @@ export function requesterStatusMessage(status: OrderStatus): string {
       return 'Payment required';
     case 'completed':
       return 'Completed';
-    case 'cancelled':
-      return 'Cancelled';
     case 'disputed':
       return 'Under review';
     default:

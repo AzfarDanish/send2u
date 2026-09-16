@@ -3,7 +3,6 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HeaderSettings } from '@/components/HeaderSettings';
 import { UnreadSync } from '@/components/UnreadSync';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,13 +31,15 @@ export default function RequesterLayout() {
   // The bell lives only on the main tabs (Home + Requests render it
   // in-screen; Profile shows the gear). No global headerRight: secondary
   // screens must not show it. UnreadSync feeds the shared count once.
+  // All tabs render the shared GlassHeader in-screen, so the native
+  // Tabs header is hidden by default (screens may still override).
   return (
     <>
       <UnreadSync />
       <Tabs
         backBehavior="history"
         screenOptions={{
-          headerShown: true,
+          headerShown: false,
           headerStyle: { backgroundColor: navigation.headerBackground },
           headerTitleStyle: { ...typography.subtitle, color: navigation.headerText },
           headerTintColor: navigation.headerText,
@@ -73,8 +74,7 @@ export default function RequesterLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: tabIcon('person-outline'),
-          headerTitleAlign: 'center',
-          headerRight: () => <HeaderSettings href="/(requester)/settings" />,
+          headerShown: false,
         }}
       />
       {/* The tab bar lives only on Home, Requests, and Profile. Every

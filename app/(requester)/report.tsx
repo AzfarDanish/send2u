@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
 import { GlassHeader } from '@/components/GlassHeader';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
@@ -31,19 +31,19 @@ export default function ReportIssueScreen() {
           Issues can be reported on delivered requests. Pick one below to open it.
         </Text>
         {status === 'loading' ? (
-          <Card style={styles.stateCard}>
+          <Section style={styles.stateCard}>
             <LoadingState message="Checking your requests…" />
-          </Card>
+          </Section>
         ) : null}
         {status === 'error' ? (
-          <Card style={styles.stateCard}>
+          <Section style={styles.stateCard}>
             <ErrorState
               title="Couldn't load requests"
               message={error ?? 'Check your connection and try again.'}
               retryTitle="Try again"
               onRetry={retry}
             />
-          </Card>
+          </Section>
         ) : null}
         {status === 'ready' || status === 'empty' ? (
           reportable.length === 0 ? (
@@ -55,7 +55,7 @@ export default function ReportIssueScreen() {
               onAction={() => router.push('/(requester)/orders')}
             />
           ) : (
-            <Card style={styles.listCard}>
+            <Section style={styles.listCard}>
               {reportable.map((order) => (
                 <ListRow
                   key={order.id}
@@ -67,7 +67,7 @@ export default function ReportIssueScreen() {
                   }
                 />
               ))}
-            </Card>
+            </Section>
           )
         ) : null}
       </Screen>

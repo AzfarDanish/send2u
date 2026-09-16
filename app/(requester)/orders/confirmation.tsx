@@ -6,7 +6,7 @@ import { RefreshControl, StyleSheet, View } from 'react-native';
 import { CopyButton } from '@/components/CopyButton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -243,9 +243,9 @@ export default function OrderConfirmationScreen() {
                 {formatMYR(orderTotalCents(single.subtotalCents, single.deliveryFeeCents))}
               </Text>
             </View>
-          </Card>
+          </Section>
         ) : (
-          <Card style={styles.listCard}>
+          <Section style={styles.listCard}>
             {orders.map((order) => (
               <ListRow
                 key={order.id}
@@ -262,7 +262,7 @@ export default function OrderConfirmationScreen() {
                 }
               />
             ))}
-          </Card>
+          </Section>
         )}
 
         <Text variant="subtitle">Drop-off Location</Text>
@@ -273,7 +273,7 @@ export default function OrderConfirmationScreen() {
               {locationName ?? 'Drop-off location not set'}
             </Text>
           </View>
-        </Card>
+        </Section>
 
         {single ? (
           <Button

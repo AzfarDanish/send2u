@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { HeaderBell } from '@/components/HeaderBell';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { CartFab } from '@/components/CartFab';
+import { GlassHeader } from '@/components/GlassHeader';
 import { VendorCard } from '@/components/VendorCard';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
@@ -39,7 +39,9 @@ export default function RequesterHomeScreen() {
 
   return (
     <>
+      <GlassHeader title="Send2U" right={<HeaderBell role="requester" />} />
       <Screen
+        beneathHeader
         underTabs
         refreshControl={
           <RefreshControl
@@ -48,15 +50,6 @@ export default function RequesterHomeScreen() {
             tintColor={colors.primary}
           />
         }>
-        <View style={styles.brandRow}>
-          <View style={styles.logoTile}>
-            <MaterialIcons name="send" size={22} color={colors.secondary} />
-          </View>
-          <Text variant="title">Send2U</Text>
-          <View style={styles.brandSpacer} />
-          <HeaderBell role="requester" />
-        </View>
-
         <View style={styles.greeting}>
           <Text color="secondary">
             {greeting}
@@ -81,26 +74,26 @@ export default function RequesterHomeScreen() {
         {status === 'loading' ? (
           <View accessibilityRole="progressbar" accessibilityLabel="Loading vendors">
             {[0, 1, 2].map((row) => (
-              <Card key={row} style={styles.vendorSkeleton}>
+              <Section key={row} style={styles.vendorSkeleton}>
                 <Skeleton width={64} height={64} radius={radii.md} />
                 <View style={styles.skeletonText}>
                   <Skeleton width="60%" height={20} />
                   <Skeleton width="80%" height={14} />
                   <Skeleton width="30%" height={22} radius={radii.full} />
                 </View>
-              </Card>
+              </Section>
             ))}
           </View>
         ) : null}
         {status === 'error' ? (
-          <Card style={styles.stateCard}>
+          <Section style={styles.stateCard}>
             <ErrorState
               title="Couldn't load vendors"
               message={error ?? 'Check your connection and try again.'}
               retryTitle="Try again"
               onRetry={retry}
             />
-          </Card>
+          </Section>
         ) : null}
         {status === 'empty' ? (
           <EmptyState
@@ -126,16 +119,6 @@ export default function RequesterHomeScreen() {
 
 const styles = StyleSheet.create({
   stateCard: { minHeight: 200, justifyContent: 'center' },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  logoTile: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandSpacer: { flex: 1 },
   greeting: { gap: spacing.xs },
   banner: {
     flexDirection: 'row',

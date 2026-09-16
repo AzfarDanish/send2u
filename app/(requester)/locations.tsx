@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 import { GlassHeader } from '@/components/GlassHeader';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
@@ -28,19 +28,19 @@ export default function DropOffLocationsScreen() {
             : 'Pick one of these points as your delivery location when you submit a request.'}
         </Text>
         {status === 'loading' ? (
-          <Card style={styles.stateCard}>
+          <Section style={styles.stateCard}>
             <LoadingState message="Loading drop-off points…" />
-          </Card>
+          </Section>
         ) : null}
         {status === 'error' ? (
-          <Card style={styles.stateCard}>
+          <Section style={styles.stateCard}>
             <ErrorState
               title="Couldn't load locations"
               message={error ?? 'Check your connection and try again.'}
               retryTitle="Try again"
               onRetry={retry}
             />
-          </Card>
+          </Section>
         ) : null}
         {status === 'empty' ? (
           <EmptyState
@@ -50,7 +50,7 @@ export default function DropOffLocationsScreen() {
           />
         ) : null}
         {status === 'ready' ? (
-          <Card style={styles.listCard}>
+          <Section style={styles.listCard}>
             {locations.map((location) => (
               <ListRow
                 key={location.id}
@@ -60,7 +60,7 @@ export default function DropOffLocationsScreen() {
                 showChevron={false}
               />
             ))}
-          </Card>
+          </Section>
         ) : null}
       </Screen>
     </>

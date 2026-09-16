@@ -6,7 +6,7 @@ import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { StagedFileCard } from '@/components/StagedFileCard';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
@@ -48,25 +48,25 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
 
   if (status === 'loading') {
     return (
-      <Card style={styles.stateCard}>
+      <Section style={styles.stateCard}>
         <LoadingState message="Loading payment…" />
-      </Card>
+      </Section>
     );
   }
   if (status === 'error' || !context) {
     return (
-      <Card style={styles.stateCard}>
+      <Section style={styles.stateCard}>
         <ErrorState
           title="Couldn't load payment"
           message={error ?? 'Check your connection and try again.'}
           retryTitle="Try again"
           onRetry={retry}
         />
-      </Card>
+      </Section>
     );
   }
 
-  if (context.orderStatus === 'cancelled' || context.orderStatus === 'disputed') {
+  if (context.orderStatus === 'disputed') {
     return null;
   }
 
@@ -75,7 +75,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       <Card>
         <Badge label="No payment yet" tone="neutral" />
         <Text variant="subtitle">Waiting for a helper</Text>
-      </Card>
+      </Section>
     );
   }
 
@@ -87,7 +87,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
         <Text color="secondary">
           Confirm delivery above to open payment.
         </Text>
-      </Card>
+      </Section>
     );
   }
 
@@ -105,7 +105,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       <Card>
         <Badge label="Pay after delivery" tone="info" />
         <Text variant="subtitle">No payment yet</Text>
-      </Card>
+      </Section>
     );
   }
 
@@ -227,7 +227,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
           )}
         </>
       )}
-    </Card>
+    </Section>
   );
 }
 

@@ -41,13 +41,6 @@ function buildEvents(order: OrderWithDetails): TimelineEvent[] {
     { key: 'delivered', label: 'Delivered', at: order.deliveredAt },
     { key: 'confirmed', label: 'Delivery confirmed by requester', at: order.confirmedAt },
     {
-      key: 'cancelled',
-      label: 'Cancelled',
-      at: order.cancelledAt,
-      detail: order.cancelReason ?? undefined,
-      terminal: true,
-    },
-    {
       key: 'disputed',
       label: 'Marked as disputed',
       at: order.disputedAt,

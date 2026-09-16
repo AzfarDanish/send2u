@@ -1,10 +1,9 @@
-import { BlurView } from 'expo-blur';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderBack } from '@/components/HeaderBack';
 import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
+import { colors, navigation, spacing } from '@/constants/theme';
 
 /** Content-row height of the glass header (inset is added on top). */
 export const GLASS_HEADER_ROW = 48;
@@ -24,10 +23,10 @@ interface GlassHeaderProps {
 
 /**
  * Reusable translucent header for secondary screens: absolute-positioned
- * blur over scrolling content (Apple-style), safe-area aware, 44pt+ back
- * chevron, absolutely-centered title, optional right action. Screens using
- * it hide the native header and render `Screen beneathHeader` so content
- * starts below the glass and slides behind it on scroll.
+ * soft faded overlay over scrolling content (Apple-style), safe-area aware,
+ * 44pt+ back chevron, absolutely-centered title, optional right action.
+ * Screens using it hide the native header and render `Screen beneathHeader`
+ * so content starts below the header and slides behind it on scroll.
  */
 export function GlassHeader({
   title,
@@ -44,14 +43,9 @@ export function GlassHeader({
       style={[styles.position, { height: insets.top + GLASS_HEADER_ROW }]}
       accessibilityRole="header"
       accessibilityLabel={accessibilityLabel ?? title}
-      // Chrome must not swallow touches: only the back/right controls are
-      // interactive — taps anywhere else fall through to content sliding
-      // underneath (e.g. a pinned filter bar stays usable under the blur).
       pointerEvents="box-none">
-      <BlurView
-        intensity={85}
-        tint={dark ? 'dark' : 'light'}
-        style={StyleSheet.absoluteFill}
+      <View
+        style={[StyleSheet.absoluteFill, dark ? styles.bgDark : styles.bgLight]}
         pointerEvents="none"
       />
       <View style={[styles.row, { paddingTop: insets.top }]}>
@@ -73,7 +67,6 @@ export function GlassHeader({
         </View>
         <View style={[styles.side, styles.right]}>{right}</View>
       </View>
-      {dark ? null : <View style={styles.hairline} pointerEvents="none" />}
     </View>
   );
 }
@@ -102,8 +95,6 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text },
   titleDark: { color: colors.onPrimary },
-  hairline: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.divider,
-  },
+  bgLight: { backgroundColor: navigation.headerBackground },
+  bgDark: { backgroundColor: 'rgba(34, 25, 27, 0.86)' },
 });

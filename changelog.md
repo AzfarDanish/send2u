@@ -1748,3 +1748,104 @@ only. No secrets are ever recorded here.
   `expo export -p web` pass; 12 scrolled screenshots inspected, no
   clipping/overlap/unreadable text; temp probes removed, no test
   residue (read-only validation, dev passwords unchanged).
+
+## 2026-09-15 — Headers: glass blur → soft faded background, all roots unified
+
+- Change: GlassHeader loses `expo-blur` `BlurView`; background is now a
+  soft faded `View` (`bgLight: navigation.headerBackground`, `bgDark:
+  rgba(34,25,27,0.86)`) — Apple-style translucent tint over scrolling
+  content, no heavy shapes or gradients. `navigation.headerBackground`
+  updated to `rgba(246,244,242,0.86)`.
+- All remaining root screens converted to the shared GlassHeader
+  pattern (single reference = Request Detail): requester Home ("Send2U"
+  + bell), Requests ("Requests" + bell), Profile ("Profile" + gear,
+  was native header); helper Jobs / Deliveries / Earnings / Profile
+  (+ bell), jobs/[id] history + active state (was Stack.Screen native
+  header), notifications (passes `header="custom"` to
+  NotificationCenter); vendor Stall / Menu / Profile.
+- Layouts: helper/vendor/requester tab layouts now `headerShown: false`
+  globally; removed global headerRight bells (helper) and Profile's
+  native `HeaderSettings` import from requester layout (gear now lives
+  inside the screen's GlassHeader right slot). Vendor dock filter bar
+  `BlurView` → same soft faded background.
+- Removed `expo-blur` dependency (unused after changes).
+- Validation: `tsc` pass, `expo lint` exit 0, `expo-doctor` 21/21,
+  `expo export -p web` pass. Pre-existing 8 `eslint` errors in
+  `hooks/*.ts` (`react-hooks/set-state-in-effect`) unchanged and
+  unrelated.
+
+## 2026-09-15 — UI: white app background, unified fixed tab bar
+
+- Change: `colors.background` changed from `#F6F4F2` to `#FFFFFF`.
+  Header, content area, and bottom navigation now read as one unified
+  white surface. `navigation.headerBackground` updated to
+  `rgba(255,255,255,0.92)` (translucent white, no hairline).
+  GlassHeader hairline removed — the only separator in the UI is the
+  single `borderTopWidth: 1` hairline above the tab bar.
+- Tab bars: helper and vendor layouts converted from static
+  (`touchTargets.tabBar` height, 8pt padding) to the requester's
+  absolute-floating pattern (`position: absolute`, height absorbs the
+  bottom safe-area inset, content clears via `underTabs` padding).
+  All three role shells now render an identical fixed floating bar.
+  `underTabs` added to the 7 helper/vendor root screens (jobs index,
+  deliveries, earnings, helper profile, stall index, menu, vendor
+  profile).
+- Reason: the header/content/nav boundary must be invisible except for
+  the single separator above the navigation, giving the app a single
+  clean surface rather than banded off-white and white zones.
+- Details: `constants/theme.ts`, `components/GlassHeader.tsx`,
+  `app/(helper)/_layout.tsx`, `app/(vendor)/_layout.tsx`, and 7 root
+  screen files.
+- Validation: `tsc` pass, `expo lint` exit 0, `expo-doctor` 21/21,
+  `expo export -p web` pass.
+
+## 2026-09-16 — Orders: 'cancelled' state eliminated; cancelled orders deleted, not stored
+
+- Change: the `'cancelled'` order/offer state is removed end to end.
+  Clean cancellations (requester cancel or helper food-unavailable
+  before purchase, statuses pending/assigned/going_to_vendor/
+  at_vendor/food_available) permanently DELETE the order — all
+  transaction rows cascade. Late cancellations (food purchased onward)
+  still move the order to `disputed` (`late_cancellation`) with
+  `food_cost_cents` preserved. Admin `send2u_resolve_dispute`
+  settle-as-cancelled now also DELETEs the order; settle-as-completed
+  keeps the record.
+- Reason: no cancelled records should persist in the system; cancelled
+  requests are gone, period. Helper fronted-cost bookkeeping stays in
+  the admin's external/manual settlement records.
+- Details (DB migration `cancelled_records_hard_delete`,
+  CREATE OR REPLACE rewrites): `send2u_cancel_order` clean path →
+  DELETE (was UPDATE status='cancelled'), late path → disputed;
+  `send2u_helper_advance` `report_food_unavailable` → DELETE;
+  `send2u_resolve_dispute` `'cancelled'` → DELETE returning
+  `{deleted:true}`; `send2u_after_order_status_cancel_offers`,
+  `send2u_accept_order`, `send2u_respond_to_offer`,
+  `send2u_set_helper_availability` now DELETE losing pending offers
+  instead of writing offer status='cancelled';
+  `send2u_notify_order_event` dead cancelled branches removed.
+  Purged live data: 18 cancelled orders (cascade-cleaned children) + 2
+  cancelled job_offers; verified 0 remaining, terminal kept 3, active 16.
+- Frontend: `OrderStatus`/`OfferStatus` drop `'cancelled'`;
+  `OrderWithDetails` drops `cancelledAt/cancelledBy/cancelReason` fields
+  (columns remain in schema for dispute bookkeeping, no longer selected);
+  `TERMINAL_ORDER_STATUSES = ['completed','disputed']`; all list queries
+  use those; `cancelOrder` → `CancelResult` union `{deleted:true} |
+  {status, liability, foodCostCents}`, `advanceFulfilment` →
+  `AdvanceResult` union; new `emitOrderDeleted/applyOrderDeleted/
+  subscribeOrderDeletes` in `lib/orderEvents.ts`; all 5 list hooks
+  subscribe to deletions (delete event, no refetch); detail screens
+  navigate away and broadcast the delete on clean cancel / food
+  unavailable; requester/helper payment cards, receipt/payment screens,
+  OrderTimeline, RequestProgress, SettlementRecord, HelperHistoryDetail
+  lose cancelled branches; copy in orders/deliveries empty states,
+  help-content, legal-content updated; NotificationCenter dead
+  `order.cancelled` icon mapping removed.
+- Validation: `tsc --noEmit` pass, `expo lint` exit 0, DB RPC bodies
+  re-inspected (no `status='cancelled'` writes remain; only the intended
+  delete-on-resolve path and cancelled_* bookkeeping columns).
+  `expo-doctor` 20/21 — patch-version drift on 4 Expo packages
+  (expo, expo-image-picker, expo-notifications, expo-sharing), unrelated
+  to this change, will follow `npx expo install --check`.
+- Known limitation: `received` dispute resolutions continue to write
+  `cancel_reason/cancelled_by/cancelled_at` columns for bookkeeping;
+  columns intentionally kept in schema.

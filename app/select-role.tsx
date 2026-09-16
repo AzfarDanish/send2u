@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { OptionCard } from '@/components/ui/OptionCard';
@@ -80,14 +80,14 @@ export default function SelectRoleScreen() {
             title="Unsupported account role"
             message="This account carries a role this app does not serve. Sign out and use a requester, helper, or vendor account."
           />
-        </Card>
+        </Section>
       ) : (
         <>
           <Card>
             <Text color="secondary">
               Pick this account&apos;s role once — it&apos;s permanent.
             </Text>
-          </Card>
+          </Section>
           <View style={styles.roleBlock}>
             <OptionCard
               icon="shopping-bag"
@@ -107,7 +107,7 @@ export default function SelectRoleScreen() {
           {claimError && (
             <Card>
               <ErrorState title="Could not finish setup" message={claimError} />
-            </Card>
+            </Section>
           )}
           <Button
             title={busy ? 'Saving…' : 'Confirm role (permanent)'}

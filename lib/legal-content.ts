@@ -20,7 +20,7 @@ export const TERMS_OF_SERVICE: LegalSection[] = [
   {
     heading: 'Requests',
     body: [
-      'A request lists dishes from one stall plus a campus drop-off point. You may cancel a request while no helper has accepted it. Once a helper accepts, the request is committed and can no longer be cancelled from the app.',
+      'A request lists dishes from one stall plus a campus drop-off point. You may cancel a request while no helper has accepted it, and once a helper accepts you may cancel it until food has been purchased. A cancellation before the helper pays for food removes the request; cancelling after food is purchased flags it for admin review so the helper is not left out of pocket.',
       'Availability shown in the app comes from the stalls and helpers. Send2U cannot guarantee an item stays available after you submit.',
     ],
   },

@@ -3,8 +3,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { CopyButton } from '@/components/CopyButton';
+import { DownloadableQR } from '@/components/DownloadableQR';
 import { HelperIdentity } from '@/components/HelperIdentity';
-import { PrivateImage } from '@/components/PrivateImage';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { Badge } from '@/components/ui/Badge';
@@ -179,15 +179,10 @@ export default function OrderPaymentScreen() {
             <Text variant="subtitle">Helper Payment QR</Text>
             <Card>
               {context.helperQrPath ? (
-                <>
-                  <PrivateImage
-                    path={context.helperQrPath}
-                    accessibilityLabel="Helper payment QR code"
-                  />
-                  <Text color="secondary" style={styles.centered}>
-                    Scan with your banking app.
-                  </Text>
-                </>
+                <DownloadableQR
+                  path={context.helperQrPath}
+                  accessibilityLabel="Helper payment QR code"
+                />
               ) : (
                 <ErrorState title="Payment unavailable" message="Your helper hasn't added a payment QR yet. Check back soon — don't pay anyone outside this QR." />
               )}

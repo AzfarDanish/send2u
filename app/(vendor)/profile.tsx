@@ -5,36 +5,30 @@ import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyVendor } from '@/hooks/useMyVendor';
 
-/**
- * Vendor Profile tab: who is signed in and which stall is linked.
- * Stall editing lives on the Stall tab; menu editing on the Menu tab.
- * Vendor accounts never see orders, payments, or other stalls.
- */
 export default function VendorProfileScreen() {
   const { user, signOut } = useAuth();
   const { vendor } = useMyVendor();
 
   return (
-    <Screen>
-      <SectionHeader eyebrow="Profile" title="Your account" />
-      <Card>
-        <View style={styles.identity}>
-          <View style={styles.avatar}>
-            <MaterialIcons name="storefront" size={28} color={colors.primary} />
-          </View>
-          <View style={styles.identityText}>
-            <Text variant="subtitle">{vendor?.name ?? 'Stall operator'}</Text>
-            <Text variant="caption" color="secondary">
-              {user?.email ?? 'Signed in'} · ID {user?.id.slice(0, 8)}…
-            </Text>
-          </View>
+    <Screen underTabs>
+      <View style={styles.header}>
+        <View style={styles.avatar}>
+          <MaterialIcons name="storefront" size={28} color={colors.primary} />
         </View>
+        <Text variant="subtitle">{vendor?.name ?? 'Stall operator'}</Text>
+        {user?.email && (
+          <Text variant="caption" color="secondary" numberOfLines={1}>
+            {user.email}
+          </Text>
+        )}
+      </View>
+
+      <Card style={styles.section}>
         <Text variant="caption" color="muted">
           Vendor is permanent on this account — roles never change.
         </Text>
@@ -48,14 +42,20 @@ export default function VendorProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  header: { 
+    alignItems: 'center', 
+    gap: spacing.sm, 
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+  },
   avatar: {
-    width: 52,
-    height: 52,
+    width: 64,
+    height: 64,
     borderRadius: radii.full,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
-  identityText: { flex: 1, gap: spacing.xs },
+  section: { gap: 0 },
 });

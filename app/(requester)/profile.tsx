@@ -15,19 +15,12 @@ import { colors, radii, spacing, touchTargets, typography } from '@/constants/th
 import { useAuth } from '@/hooks/useAuth';
 
 const MENU_ROWS = [
-  // `as const` at the end keeps icon glyphs and route literals narrow.
-  { icon: 'person-outline', title: 'Edit Profile', href: '/(requester)/edit-profile', accessibilityLabel: 'Edit profile' },
-  { icon: 'place', title: 'Saved Locations', href: '/(requester)/locations', accessibilityLabel: 'Saved locations' },
-  { icon: 'notifications-none', title: 'Notifications', href: '/(requester)/notifications', accessibilityLabel: 'Notifications' },
-  { icon: 'help-outline', title: 'Help Center', href: '/(requester)/help', accessibilityLabel: 'Help center' },
-  { icon: 'description', title: 'Terms & Privacy', href: '/(requester)/terms', accessibilityLabel: 'Terms and privacy' },
+  { icon: 'person-outline', title: 'Edit Profile', href: '/(requester)/edit-profile' },
+  { icon: 'place', title: 'Saved Locations', href: '/(requester)/locations' },
+  { icon: 'notifications-none', title: 'Notifications', href: '/(requester)/notifications' },
+  { icon: 'help-outline', title: 'Help Center', href: '/(requester)/help' },
+  { icon: 'description', title: 'Terms & Privacy', href: '/(requester)/terms' },
 ] as const;
-
-function roleLabel(role: string | null | undefined): string {
-  if (role === 'helper') return 'Helper';
-  if (role === 'vendor') return 'Vendor';
-  return 'Requester';
-}
 
 export default function RequesterProfileScreen() {
   const { user, profile, signOut } = useAuth();
@@ -52,37 +45,33 @@ export default function RequesterProfileScreen() {
   return (
     <Screen underTabs>
       <View style={styles.header}>
-        <Avatar name={displayName} path={profile?.avatarPath} size={96} />
+        <Avatar name={displayName} path={profile?.avatarPath} size={72} />
         <Text variant="subtitle" style={styles.name} numberOfLines={2}>
           {displayName}
         </Text>
         {user?.email ? (
-          <Text variant="secondary" color="secondary" numberOfLines={1} ellipsizeMode="middle">
+          <Text variant="caption" color="secondary" numberOfLines={1}>
             {user.email}
           </Text>
         ) : null}
-        <View style={styles.pillWrap}>
-          <Badge label={roleLabel(profile?.role)} tone="primary" />
-        </View>
+        <Badge label={profile?.role ?? 'requester'} tone="primary" />
       </View>
 
-      <Card style={styles.menuCard}>
-        {MENU_ROWS.map((row, index) => (
-          <View key={row.href} style={index < MENU_ROWS.length - 1 && styles.divider}>
-            <ListRow
-              icon={row.icon}
-              title={row.title}
-              accessibilityLabel={row.accessibilityLabel}
-              onPress={() => router.push(row.href)}
-            />
-          </View>
+      <Card style={styles.section}>
+        {MENU_ROWS.map((row) => (
+          <ListRow
+            key={row.href}
+            icon={row.icon}
+            title={row.title}
+            onPress={() => router.push(row.href)}
+          />
         ))}
       </Card>
 
       <DevProfileSwitcher />
 
       {signOutError ? (
-        <Card>
+        <Card style={styles.section}>
           <ErrorState
             title="Could not sign out"
             message={signOutError}
@@ -91,6 +80,7 @@ export default function RequesterProfileScreen() {
           />
         </Card>
       ) : null}
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Log out"
@@ -108,14 +98,14 @@ export default function RequesterProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.md },
-  pillWrap: { alignItems: 'center' },
-  name: { color: colors.text, textAlign: 'center' },
-  menuCard: { gap: 0 },
-  divider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
+  header: { 
+    alignItems: 'center', 
+    gap: spacing.sm, 
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
+  name: { color: colors.text, textAlign: 'center' },
+  section: { gap: 0 },
   logOut: {
     flexDirection: 'row',
     alignItems: 'center',

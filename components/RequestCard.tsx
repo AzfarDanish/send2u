@@ -2,9 +2,8 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Badge } from '@/components/ui/Badge';
-import { Section } from '@/components/ui/Section';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
 import {
   formatRelativeTime,
@@ -34,7 +33,7 @@ function actionHint(status: OrderWithDetails['status']): string | null {
 /**
  * Compact request row for the Requests tab: thumbnail chip (no food imagery
  * exists in the product), `#id · relative time`, vendor, concise item
- * summary, status badge, chevron, and recorded total. The whole card is one
+ * summary, status badge, chevron, and recorded total. The whole row is one
  * large touch target opening the Request Detail page.
  */
 export function RequestCard({
@@ -56,7 +55,7 @@ export function RequestCard({
       accessibilityLabel={`Request #${order.id.slice(0, 8)} from ${order.vendor.name}, ${statusMessage}, ${age}`}
       onPress={() => onPress(order)}
       style={({ pressed }) => [pressed && styles.pressed]}>
-      <Section style={styles.card}>
+      <View style={styles.row}>
         <View style={styles.thumb}>
           <MaterialIcons name="receipt-long" size={26} color={colors.primary} />
         </View>
@@ -89,22 +88,23 @@ export function RequestCard({
             {age}
           </Text>
         </View>
-      </Section>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
-  card: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+    paddingVertical: spacing.sm,
   },
   thumb: {
     width: 56,
     height: 56,
-    borderRadius: radii.md,
+    borderRadius: 12,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',

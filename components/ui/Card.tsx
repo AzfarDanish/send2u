@@ -1,23 +1,13 @@
-import { StyleSheet, View, type ViewProps } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { colors, radii, spacing } from '@/constants/theme';
+import { spacing } from '@/constants/theme';
 
-/** Send2U surface card. Subtle border, no shadow; content spacing via `gap`. */
-export function Card({ children, style, ...rest }: ViewProps) {
-  return (
-    <View style={[styles.card, style]} {...rest}>
-      {children}
-    </View>
-  );
+/** Flat content group — no surface, border, radius, or shadow.
+ * Content separates through whitespace and typography. */
+export function Card({ children, style }: { children: React.ReactNode; style?: any }) {
+  return <View style={[styles.wrapper, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.divider,
-  },
+  wrapper: { gap: spacing.sm },
 });

@@ -1,10 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Section } from '@/components/ui/Section';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import type { Vendor } from '@/types/domain';
 
 interface VendorCardProps {
@@ -22,7 +21,7 @@ export function vendorInitials(name: string): string {
 /**
  * Vendor discovery row: grey initials tile covering the full left edge
  * (no vendor imagery exists in the product), name, plain-text open state
- * and hours, and a navigation affordance. The whole card is one large
+ * and hours, and a navigation affordance. The whole row is one large
  * touch target.
  */
 export function VendorCard({ vendor, onPress }: VendorCardProps) {
@@ -32,7 +31,7 @@ export function VendorCard({ vendor, onPress }: VendorCardProps) {
       accessibilityLabel={`${vendor.name}${vendor.isOpen ? '' : ', closed'}`}
       onPress={() => onPress(vendor)}
       style={({ pressed }) => [pressed && styles.pressed]}>
-      <Section style={styles.card}>
+      <View style={styles.row}>
         <View style={styles.tile}>
           <PlaceholderImage style={styles.tileImage} />
         </View>
@@ -50,34 +49,27 @@ export function VendorCard({ vendor, onPress }: VendorCardProps) {
           ) : null}
         </View>
         <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
-      </Section>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
-  card: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     minHeight: 88,
-    paddingLeft: 0,
-    paddingVertical: 0,
-    overflow: 'hidden',
+    paddingVertical: spacing.sm,
   },
   tile: {
     width: 88,
     height: 88,
-    borderTopLeftRadius: radii.lg,
-    borderBottomLeftRadius: radii.lg,
     backgroundColor: colors.surfaceSecondary,
     overflow: 'hidden',
   },
-  tileImage: {
-    borderTopLeftRadius: radii.lg,
-    borderBottomLeftRadius: radii.lg,
-  },
+  tileImage: { width: 88, height: 88 },
   textBlock: { flex: 1, gap: spacing.xs, paddingVertical: spacing.md },
   open: { color: colors.success },
   closed: { color: colors.warning },

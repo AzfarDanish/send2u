@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { formatFileSize } from '@/services/storage';
 
 /** A picked-but-not-yet-uploaded file awaiting the user's confirmation. */
@@ -53,9 +53,7 @@ export function StagedFileCard({
     <View style={styles.container}>
       <Text variant="subtitle">{title}</Text>
       {isImage ? (
-        <View style={styles.previewFrame}>
-          <Image source={{ uri: file.uri }} style={styles.preview} contentFit="contain" />
-        </View>
+        <Image source={{ uri: file.uri }} style={styles.preview} contentFit="contain" />
       ) : (
         <View style={styles.docRow}>
           <MaterialIcons
@@ -102,19 +100,12 @@ export function StagedFileCard({
 
 const styles = StyleSheet.create({
   container: { gap: spacing.md },
-  previewFrame: {
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-  },
-  preview: { width: '100%', aspectRatio: 1 },
+  preview: { width: '100%', aspectRatio: 1, backgroundColor: colors.surfaceSecondary },
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: radii.lg,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
   },
   docText: { flex: 1, gap: spacing.xs },
   meta: { gap: spacing.xs },

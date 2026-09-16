@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { applyOrderChange, applyOrderDeleted, subscribeOrderChanges, subscribeOrderDeletes } from '@/lib/orderEvents';
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
 import { isTerminalOrderStatus } from '@/lib/orders';
 import { listMyDeliveryHistory } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
@@ -18,10 +18,9 @@ interface UseMyDeliveryHistoryResult {
 }
 
 /**
- * Helper's terminal deliveries (completed/disputed), newest
+ * Helper's terminal deliveries (completed/cancelled/disputed), newest
  * accepted first. Read-only records — refetches on focus while visible so
- * a just-closed job appears without manual refresh. Cancelled deliveries
- * are never stored.
+ * a just-closed job appears without manual refresh.
  *
  * Pass `enabled={false}` while the history UI is hidden (e.g. the Active
  * tab is showing) to skip both the mount fetch and focus refetches; the
@@ -115,15 +114,6 @@ export function useMyDeliveryHistory(enabled = true): UseMyDeliveryHistoryResult
       setDeliveries(next);
     });
   }, [silentReload]);
-
-  // A locally-deleted delivery (dispute resolved as cancelled) drops off
-  // history immediately; there is nothing to refetch.
-  useEffect(() => {
-    return subscribeOrderDeletes((orderId) => {
-      const { next } = applyOrderDeleted(deliveriesRef.current, orderId);
-      setDeliveries(next);
-    });
-  }, []);
 
   const retry = useCallback(() => {
     void load(false);

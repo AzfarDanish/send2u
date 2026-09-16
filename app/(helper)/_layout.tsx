@@ -1,8 +1,9 @@
 import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { ColorValue } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HeaderBack } from '@/components/HeaderBack';
+import { HeaderBell } from '@/components/HeaderBell';
 import { UnreadSync } from '@/components/UnreadSync';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,19 +15,16 @@ function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
   return TabIcon;
 }
 
+/** Back chevron for sub-screen headers; falls back to the role root on deep links. */
+const HelperHeaderBack = () => <HeaderBack fallbackHref="/(helper)" />;
+
 export default function HelperLayout() {
   const { user, role, isLoading } = useAuth();
-  const insets = useSafeAreaInsets();
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (role === 'requester') return <Redirect href="/(requester)" />;
   if (role === 'vendor') return <Redirect href="/(vendor)" />;
-
-  // Matches the requester shell: the bar floats over scrolled content
-  // (which slides behind it), absorbing the system gesture area in its
-  // height. One hairline on top is the only separator in the UI.
-  const tabBarBottom = Math.max(insets.bottom, 8);
 
   // Bell on the four main tabs only — never inside job detail or the
   // notification center itself. UnreadSync feeds the shared count once.
@@ -36,7 +34,7 @@ export default function HelperLayout() {
       <Tabs
         backBehavior="history"
         screenOptions={{
-        headerShown: false,
+        headerShown: true,
         headerStyle: { backgroundColor: navigation.headerBackground },
         headerTitleStyle: { ...typography.subtitle, color: navigation.headerText },
         headerTintColor: navigation.headerText,
@@ -44,19 +42,16 @@ export default function HelperLayout() {
         tabBarActiveTintColor: navigation.tabActive,
         tabBarInactiveTintColor: navigation.tabInactive,
         tabBarStyle: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
           backgroundColor: navigation.tabBarBackground,
           borderTopColor: navigation.tabBarBorder,
           borderTopWidth: 1,
-          height: touchTargets.tabBar + tabBarBottom,
+          height: touchTargets.tabBar,
           paddingTop: 8,
-          paddingBottom: tabBarBottom,
+          paddingBottom: 8,
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.background },
+        headerRight: () => <HeaderBell role="helper" />,
       }}>
       <Tabs.Screen
         name="index"
@@ -79,8 +74,8 @@ export default function HelperLayout() {
         options={{
           href: null,
           title: 'Job details',
-          tabBarStyle: { display: 'none' },
-          headerShown: false,
+          headerLeft: HelperHeaderBack,
+          headerRight: () => null,
         }}
       />
       <Tabs.Screen
@@ -88,9 +83,8 @@ export default function HelperLayout() {
         options={{
           href: null,
           title: 'Notifications',
-          tabBarStyle: { display: 'none' },
-          // Custom glass nav bar in-screen (back + title + Mark all read).
-          headerShown: false,
+          headerLeft: HelperHeaderBack,
+          headerRight: () => null,
         }}
       />
       </Tabs>

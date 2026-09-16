@@ -2,6 +2,10 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Badge } from '@/components/ui/Badge';
+<<<<<<< HEAD
+=======
+import { Card } from '@/components/ui/Card';
+>>>>>>> parent of 9dd0d80 (refactor: standardize headers, backgrounds, and cardless UI)
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
@@ -55,7 +59,11 @@ export function RequestCard({
       accessibilityLabel={`Request #${order.id.slice(0, 8)} from ${order.vendor.name}, ${statusMessage}, ${age}`}
       onPress={() => onPress(order)}
       style={({ pressed }) => [pressed && styles.pressed]}>
+<<<<<<< HEAD
       <View style={styles.row}>
+=======
+      <Card style={styles.card}>
+>>>>>>> parent of 9dd0d80 (refactor: standardize headers, backgrounds, and cardless UI)
         <View style={styles.thumb}>
           <MaterialIcons name="receipt-long" size={26} color={colors.primary} />
         </View>
@@ -88,7 +96,11 @@ export function RequestCard({
             {age}
           </Text>
         </View>
+<<<<<<< HEAD
       </View>
+=======
+      </Card>
+>>>>>>> parent of 9dd0d80 (refactor: standardize headers, backgrounds, and cardless UI)
     </Pressable>
   );
 }

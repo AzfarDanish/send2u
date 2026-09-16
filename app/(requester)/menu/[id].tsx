@@ -8,7 +8,7 @@ import { CartFab } from '@/components/CartFab';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { GlassHeader } from '@/components/GlassHeader';
@@ -162,7 +162,7 @@ export default function MenuItemDetailScreen() {
               This vendor is currently closed.
             </Text>
           ) : null}
-        </Section>
+        </Card>
 
         {justAdded ? (
           <Card>
@@ -174,7 +174,7 @@ export default function MenuItemDetailScreen() {
             </View>
             <Button title="View cart" onPress={() => router.push('/(requester)/create')} />
             <Button title="Add more" variant="secondary" onPress={() => setJustAdded(false)} />
-          </Section>
+          </Card>
         ) : (
           <Card>
             <View style={styles.orderRow}>
@@ -196,7 +196,7 @@ export default function MenuItemDetailScreen() {
             <Text variant="caption" color="muted">
               Adds to your cart. Review and submit in Review Request.
             </Text>
-          </Section>
+          </Card>
         )}
       </Screen>
       <CartFab />

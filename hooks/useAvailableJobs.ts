@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
-import { applyOrderChange, applyOrderDeleted, subscribeOrderChanges, subscribeOrderDeletes } from '@/lib/orderEvents';
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
 import { listAvailableJobs } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
@@ -95,15 +95,6 @@ export function useAvailableJobs(): UseAvailableJobsResult {
         order,
         order.status === 'pending' && !order.helperId,
       );
-      setJobs(next);
-    });
-  }, []);
-
-  // A deleted order (clean requester cancel before purchase, food
-  // unavailable) disappears from the open queue at once.
-  useEffect(() => {
-    return subscribeOrderDeletes((orderId) => {
-      const { next } = applyOrderDeleted(jobsRef.current, orderId);
       setJobs(next);
     });
   }, []);

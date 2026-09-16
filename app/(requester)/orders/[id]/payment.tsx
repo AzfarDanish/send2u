@@ -9,7 +9,7 @@ import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -78,7 +78,7 @@ export default function OrderPaymentScreen() {
             retryTitle="Try again"
             onRetry={retry}
           />
-        ) : context.orderStatus === 'disputed' ? (
+        ) : context.orderStatus === 'cancelled' || context.orderStatus === 'disputed' ? (
           <EmptyState
             icon="receipt-long"
             title="Payment not available"
@@ -123,7 +123,7 @@ export default function OrderPaymentScreen() {
                 Payment of {formatMYR(context.payment.amountCents)} recorded.
               </Text>
               <ReceiptEvidenceView path={context.payment.evidencePath} />
-            </Section>
+            </Card>
             <Button title="Back to Request" onPress={() => router.back()} />
           </>
         ) : (
@@ -163,7 +163,7 @@ export default function OrderPaymentScreen() {
                 subtotalCents={context.subtotalCents}
                 deliveryFeeCents={context.deliveryFeeCents}
               />
-            </Section>
+            </Card>
 
             <Text variant="subtitle">Helper Details</Text>
             <Card>
@@ -174,7 +174,7 @@ export default function OrderPaymentScreen() {
                 loadFailed={identityStatus === 'error'}
                 onRetry={retryIdentity}
               />
-            </Section>
+            </Card>
 
             <Text variant="subtitle">Helper Payment QR</Text>
             <Card>
@@ -191,7 +191,7 @@ export default function OrderPaymentScreen() {
               ) : (
                 <ErrorState title="Payment unavailable" message="Your helper hasn't added a payment QR yet. Check back soon — don't pay anyone outside this QR." />
               )}
-            </Section>
+            </Card>
 
             <Button
               title="I Have Made the Payment"

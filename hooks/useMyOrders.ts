@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
-import { applyOrderChange, applyOrderDeleted, subscribeOrderChanges, subscribeOrderDeletes } from '@/lib/orderEvents';
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
 import { isTerminalOrderStatus } from '@/lib/orders';
 import { listMyOrders } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
@@ -93,15 +93,6 @@ export function useMyOrders(): UseMyOrdersResult {
       setOrders(next);
     });
   }, [silentReload]);
-
-  // A permanently deleted order (clean cancel before purchase, food
-  // unavailable) drops off this list immediately — no refetch needed.
-  useEffect(() => {
-    return subscribeOrderDeletes((orderId) => {
-      const { next } = applyOrderDeleted(ordersRef.current, orderId);
-      setOrders(next);
-    });
-  }, []);
 
   const retry = useCallback(() => {
     void load(false);

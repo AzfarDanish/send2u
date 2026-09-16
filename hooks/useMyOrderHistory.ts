@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { applyOrderChange, applyOrderDeleted, subscribeOrderChanges, subscribeOrderDeletes } from '@/lib/orderEvents';
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
 import { isTerminalOrderStatus } from '@/lib/orders';
 import { listMyOrderHistory } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
@@ -17,10 +17,9 @@ interface UseMyOrderHistoryResult {
 }
 
 /**
- * Requester's terminal orders (completed/disputed), newest first.
+ * Requester's terminal orders (completed/cancelled/disputed), newest first.
  * Read-only records — the query itself excludes every active status, so
  * terminal orders can never leak into the Active list and vice versa.
- * Cancelled orders are never stored, so they never appear here.
  *
  * Pass `enabled={false}` while the history UI is hidden (e.g. the Active
  * tab is showing) to skip the mount fetch; the query runs on the first
@@ -56,9 +55,9 @@ export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
     }
   }, []);
 
-  // Preserving background refetch for membership changes (an order newly
-  // turned terminal (dispute/completed) belongs here) and realtime-less
-  // reconciliation. Never blanks; failures keep stale rows.
+  // Preserving background refetch for membership changes (a cancelled
+  // order newly belongs here) and realtime-less reconciliation. Never
+  // blanks; failures keep stale rows.
   const silentReload = useCallback(async () => {
     try {
       const next = await listMyOrderHistory();
@@ -104,15 +103,6 @@ export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
       setOrders(next);
     });
   }, [silentReload]);
-
-  // A locally-deleted order (dispute resolved as cancelled) drops off
-  // history immediately; there is nothing to refetch.
-  useEffect(() => {
-    return subscribeOrderDeletes((orderId) => {
-      const { next } = applyOrderDeleted(ordersRef.current, orderId);
-      setOrders(next);
-    });
-  }, []);
 
   const retry = useCallback(() => {
     void load(false);

@@ -20,8 +20,7 @@ export const colors = {
   /** Tinted surfaces for highlights, icon chips, selected states. */
   primarySoft: '#FBE7E9',
 
-  /** Pure white app background — the header, content, and tab bar read as one surface. */
-  background: '#FFFFFF',
+  background: '#F6F4F2',
   surface: '#FFFFFF',
   /** Slightly elevated surface for cards/tips/tooltips — subtle lift over background. */
   surfaceElevated: '#FDFCFC',
@@ -96,8 +95,7 @@ export const touchTargets = {
 
 /** Shared tab-bar / header styling so both experiences stay consistent. */
 export const navigation = {
-  /** Soft white header tint (Apple-style translucent over content). */
-  headerBackground: 'rgba(255, 255, 255, 0.92)',
+  headerBackground: colors.surface,
   headerText: colors.text,
   tabBarBackground: colors.surface,
   tabBarBorder: colors.border,

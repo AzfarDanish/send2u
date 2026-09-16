@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -7,17 +7,16 @@ import { HelperHistoryDetail } from '@/components/HelperHistoryDetail';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { HelperPaymentCard } from '@/components/HelperPaymentCard';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
-import { emitOrderChanged, emitOrderDeleted } from '@/lib/orderEvents';
+import { emitOrderChanged } from '@/lib/orderEvents';
 import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone, orderTotalCents } from '@/lib/orders';
 import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
@@ -139,14 +138,6 @@ export default function JobDetailScreen() {
       setActionError(null);
       try {
         const result = await advanceFulfilment(job.id, action);
-        // Food unavailable before purchase deletes the order: there is no
-        // job to show any more, so broadcast the deletion and leave.
-        if (result.deleted) {
-          emitOrderDeleted(job.id);
-          if (router.canGoBack()) router.back();
-          else router.replace('/(helper)');
-          return;
-        }
         const patched = { ...previous, status: result.status };
         setJob(patched);
         emitOrderChanged(patched);
@@ -164,8 +155,8 @@ export default function JobDetailScreen() {
   if (status === 'loading' || !job) {
     return (
       <>
-        <GlassHeader title="Job details" fallbackHref="/(helper)" />
-        <Screen beneathHeader>
+        <Stack.Screen options={{ title: 'Job details' }} />
+        <Screen>
           {status === 'loading' ? (
             <LoadingState message="Loading job…" />
           ) : (
@@ -189,8 +180,8 @@ export default function JobDetailScreen() {
   if (isTerminalOrderStatus(job.status)) {
     return (
       <>
-        <GlassHeader title={`${job.vendor.name} · History`} fallbackHref="/(helper)" />
-        <Screen beneathHeader>
+        <Stack.Screen options={{ title: `${job.vendor.name} · History` }} />
+        <Screen>
           <HelperHistoryDetail job={job} refreshToken={paymentTick} />
         </Screen>
       </>
@@ -202,8 +193,8 @@ export default function JobDetailScreen() {
 
   return (
     <>
-      <GlassHeader title={job.vendor.name} fallbackHref="/(helper)" />
-      <Screen beneathHeader>
+      <Stack.Screen options={{ title: job.vendor.name }} />
+      <Screen>
         <View style={styles.heading}>
           <Text variant="title">{job.vendor.name}</Text>
           <Badge
@@ -237,7 +228,7 @@ export default function JobDetailScreen() {
               </Text>
             </View>
           </View>
-        </Section>
+        </Card>
 
         <Card>
           <OrderBreakdown
@@ -248,7 +239,7 @@ export default function JobDetailScreen() {
           <Text variant="caption" color="muted">
             You pay the stall first; the requester repays food + delivery.
           </Text>
-        </Section>
+        </Card>
 
         {accepted ? (
           <Card>
@@ -265,7 +256,7 @@ export default function JobDetailScreen() {
                 else router.replace('/(helper)');
               }}
             />
-          </Section>
+          </Card>
         ) : pending ? (
           <Card>
             {acceptError ? (
@@ -277,7 +268,7 @@ export default function JobDetailScreen() {
               disabled={accepting}
               loading={accepting}
             />
-          </Section>
+          </Card>
         ) : null}
 
         {job.status === 'assigned' ? (
@@ -299,7 +290,7 @@ export default function JobDetailScreen() {
               onPress={() => void handleAdvance('release')}
               disabled={busy}
             />
-          </Section>
+          </Card>
         ) : job.status === 'going_to_vendor' ? (
           <Card>
             <Badge label="Going to vendor" tone="info" />
@@ -319,7 +310,7 @@ export default function JobDetailScreen() {
               onPress={() => void handleAdvance('release')}
               disabled={busy}
             />
-          </Section>
+          </Card>
         ) : job.status === 'at_vendor' ? (
           <Card>
             <Badge label="At vendor" tone="info" />
@@ -345,7 +336,7 @@ export default function JobDetailScreen() {
               onPress={() => void handleAdvance('release')}
               disabled={busy}
             />
-          </Section>
+          </Card>
         ) : job.status === 'food_available' ? (
           <Card>
             <Badge label="Food available" tone="info" />
@@ -368,7 +359,7 @@ export default function JobDetailScreen() {
             <Text variant="caption" color="muted">
               Nothing spent yet — releasing returns the order to the queue.
             </Text>
-          </Section>
+          </Card>
         ) : job.status === 'food_purchased' ? (
           <Card>
             <Badge label="Purchased" tone="info" />
@@ -392,7 +383,7 @@ export default function JobDetailScreen() {
             <Text variant="caption" color="muted">
               Stopping here moves the order to dispute; your fronted cost is recorded.
             </Text>
-          </Section>
+          </Card>
         ) : job.status === 'picked_up' ? (
           <Card>
             <Badge label="Picked up" tone="info" />
@@ -416,7 +407,7 @@ export default function JobDetailScreen() {
             <Text variant="caption" color="muted">
               Stopping here moves the order to dispute; your fronted cost is recorded.
             </Text>
-          </Section>
+          </Card>
         ) : job.status === 'out_for_delivery' ? (
           <Card>
             <Badge label="Out for delivery" tone="warning" />
@@ -439,14 +430,14 @@ export default function JobDetailScreen() {
             <Text variant="caption" color="muted">
               No-show moves the order to dispute; your purchase is recorded.
             </Text>
-          </Section>
+          </Card>
         ) : job.status === 'delivered' ? (
           <Card>
             <Badge label="Delivered" tone="success" />
             <Text color="secondary">
               Waiting for the requester to confirm receipt.
             </Text>
-          </Section>
+          </Card>
         ) : job.status === 'confirmed' ? (
           <Card>
             <Badge label="Confirmed" tone="success" />
@@ -455,7 +446,7 @@ export default function JobDetailScreen() {
               They pay you {formatMYR(orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} externally
               using your QR.
             </Text>
-          </Section>
+          </Card>
         ) : (
           <Card>
             <Text variant="caption" color="muted">
@@ -469,7 +460,7 @@ export default function JobDetailScreen() {
                 else router.replace('/(helper)');
               }}
             />
-          </Section>
+          </Card>
         )}
 
         <HelperPaymentCard orderId={job.id} refreshToken={paymentTick} />

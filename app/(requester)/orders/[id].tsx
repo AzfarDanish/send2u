@@ -14,7 +14,7 @@ import { SettlementRecord } from '@/components/SettlementRecord';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -23,7 +23,7 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { formatMYR } from '@/lib/money';
-import { emitOrderChanged, emitOrderDeleted } from '@/lib/orderEvents';
+import { emitOrderChanged } from '@/lib/orderEvents';
 import {
   formatOrderDate,
   isTerminalOrderStatus,
@@ -164,6 +164,18 @@ function statusCardFor(order: OrderWithDetails): StatusCardContent {
         title: 'Request completed',
         description: 'This request was delivered and settled. Thanks for using Send2U.',
       };
+    case 'cancelled':
+      return {
+        tone: 'error',
+        icon: 'cancel',
+        title: 'Request cancelled',
+        description:
+          order.cancelReason === 'food_unavailable'
+            ? 'The stall had no food, so this request was cancelled. You owe nothing.'
+            : order.cancelReason
+              ? `Cancelled: ${order.cancelReason}${order.cancelledAt ? ` (${formatOrderDate(order.cancelledAt)})` : ''}`
+              : 'This request was cancelled and is no longer active.',
+      };
     case 'disputed':
       return {
         tone: 'error',
@@ -223,6 +235,7 @@ export default function OrderDetailScreen() {
   const [reason, setReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelled, setCancelled] = useState(false);
   const [paymentTick, setPaymentTick] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState<RequesterDisputeReason | null>(null);
@@ -270,6 +283,7 @@ export default function OrderDetailScreen() {
     setStatus('loading');
     setOrder(null);
     setCancelError(null);
+    setCancelled(false);
     setReason('');
     setPaymentTick(0);
     setReportOpen(false);
@@ -330,18 +344,10 @@ export default function OrderDetailScreen() {
     setCancelError(null);
     try {
       const result = await cancelOrder(order.id, reason);
-      // Clean cancellation (before purchase) permanently deletes the order:
-      // broadcast the deletion and leave the screen — there is no record to
-      // show any more.
-      if ('deleted' in result) {
-        emitOrderDeleted(order.id);
-        if (router.canGoBack()) router.back();
-        else router.replace('/(requester)/orders');
-        return;
-      }
       const patched = { ...previous, status: result.status };
       setOrder(patched);
       emitOrderChanged(patched);
+      setCancelled(true);
     } catch (err) {
       setOrder(previous);
       setCancelError(err instanceof Error ? err.message : 'Could not cancel the order.');
@@ -438,20 +444,21 @@ export default function OrderDetailScreen() {
 
   // Clean cancellation is possible while no food has been purchased — that
   // includes `food_available` (the purchase step itself leaves that status,
-  // so no money can have been spent there). Clean cancels permanently delete
-  // the request (nothing is stored as cancelled). Past purchase, cancelling
-  // moves the order to dispute with the helper's fronted cost preserved.
+  // so no money can have been spent there). Past purchase, cancelling moves
+  // the order to dispute with the helper's fronted cost preserved.
   const cancellable =
-    order.status === 'pending' ||
-    order.status === 'assigned' ||
-    order.status === 'going_to_vendor' ||
-    order.status === 'at_vendor' ||
-    order.status === 'food_available';
+    !cancelled &&
+    (order.status === 'pending' ||
+      order.status === 'assigned' ||
+      order.status === 'going_to_vendor' ||
+      order.status === 'at_vendor' ||
+      order.status === 'food_available');
   const lateCancellable =
-    order.status === 'food_purchased' ||
-    order.status === 'picked_up' ||
-    order.status === 'out_for_delivery' ||
-    order.status === 'delivering';
+    !cancelled &&
+    (order.status === 'food_purchased' ||
+      order.status === 'picked_up' ||
+      order.status === 'out_for_delivery' ||
+      order.status === 'delivering');
   const showCancel = cancellable || lateCancellable;
   const isDelivered = order.status === 'delivered';
   const canWithdraw =
@@ -553,7 +560,7 @@ export default function OrderDetailScreen() {
           <Text variant="caption" color="muted">
             Pay only after the food is in your hands.
           </Text>
-        </Section>
+        </Card>
 
         <Text variant="subtitle">Drop-off Location</Text>
         <Card>
@@ -563,7 +570,7 @@ export default function OrderDetailScreen() {
               {order.location.name}
             </Text>
           </View>
-        </Section>
+        </Card>
 
         {isDelivered ? (
           <Card>
@@ -630,7 +637,7 @@ export default function OrderDetailScreen() {
                 </Text>
               </View>
             ) : null}
-          </Section>
+          </Card>
         ) : null}
 
         {!terminal ? <RequesterPaymentCard orderId={order.id} refreshToken={paymentTick} /> : null}
@@ -678,22 +685,22 @@ export default function OrderDetailScreen() {
               disabled={cancelling || reason.trim().length === 0}
               loading={cancelling}
             />
-          </Section>
+          </Card>
         ) : null}
 
         {terminal ? (
           <>
-            {order.status === 'completed' ? (
+            {order.status === 'completed' || order.status === 'cancelled' ? (
               <SettlementRecord order={order} />
             ) : null}
             {order.status === 'completed' ? (
               <OrderRatingSection order={order} refreshToken={paymentTick} />
             ) : null}
-            {order.status === 'disputed' ? (
+            {order.status === 'cancelled' || order.status === 'disputed' ? (
               <Card>
                 <Text variant="subtitle">What happened</Text>
                 <OrderTimeline order={order} />
-              </Section>
+              </Card>
             ) : null}
             {order.disputeDetails ? (
               <Card>
@@ -704,7 +711,7 @@ export default function OrderDetailScreen() {
                     Resolution note: {order.disputeNote}
                   </Text>
                 ) : null}
-              </Section>
+              </Card>
             ) : null}
             {canWithdraw ? (
               <Card>
@@ -718,7 +725,7 @@ export default function OrderDetailScreen() {
                   disabled={withdrawing}
                   loading={withdrawing}
                 />
-              </Section>
+              </Card>
             ) : null}
             <Card>
               <View style={styles.moneyRow}>
@@ -748,7 +755,12 @@ export default function OrderDetailScreen() {
                     : 'No payment was submitted for this order.'}
                 </Text>
               )}
-            </Section>
+              {order.status === 'cancelled' && order.cancelReason === 'food_unavailable' ? (
+                <Text variant="caption" color="muted">
+                  No payment was due.
+                </Text>
+              ) : null}
+            </Card>
             <View style={styles.actionRow}>
               <View style={styles.actionFill}>
                 <Button title="Browse menu" onPress={() => router.push('/(requester)')} />

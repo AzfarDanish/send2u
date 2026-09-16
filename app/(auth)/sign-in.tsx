@@ -5,7 +5,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { BrandHeader } from '@/components/BrandHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { OptionCard } from '@/components/ui/OptionCard';
 import { Screen } from '@/components/ui/Screen';
@@ -82,7 +82,7 @@ export default function SignInScreen() {
           <Text color="secondary">
             Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to enable authentication.
           </Text>
-        </Section>
+        </Card>
       )}
 
       {authError && (
@@ -90,7 +90,7 @@ export default function SignInScreen() {
           <Badge label="Notice" tone="error" />
           <Text variant="subtitle">Session restore issue</Text>
           <Text color="secondary">{authError}</Text>
-        </Section>
+        </Card>
       )}
 
       {isSupabaseEnabled && (
@@ -124,7 +124,7 @@ export default function SignInScreen() {
               style={styles.input}
               accessibilityLabel="Password"
             />
-          </Section>
+          </Card>
 
           {mode === 'sign-up' && (
             <View style={styles.roleBlock}>
@@ -152,7 +152,7 @@ export default function SignInScreen() {
                 title={mode === 'sign-up' ? 'Could not create account' : 'Could not sign in'}
                 message={formError}
               />
-            </Section>
+            </Card>
           )}
 
           {confirmationSent && (
@@ -162,7 +162,7 @@ export default function SignInScreen() {
               <Text color="secondary">
                 Your account was created. Open the confirmation email, then come back and sign in.
               </Text>
-            </Section>
+            </Card>
           )}
 
           <Button

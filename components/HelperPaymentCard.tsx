@@ -7,7 +7,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { PrivateImage } from '@/components/PrivateImage';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
@@ -105,25 +105,25 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
 
   if (status === 'loading') {
     return (
-      <Section style={styles.stateCard}>
+      <Card style={styles.stateCard}>
         <LoadingState message="Loading payment…" />
-      </Section>
+      </Card>
     );
   }
   if (status === 'error' || !context) {
     return (
-      <Section style={styles.stateCard}>
+      <Card style={styles.stateCard}>
         <ErrorState
           title="Couldn't load payment"
           message={error ?? 'Check your connection and try again.'}
           retryTitle="Try again"
           onRetry={() => void load()}
         />
-      </Section>
+      </Card>
     );
   }
 
-  if (context.orderStatus === 'disputed') {
+  if (context.orderStatus === 'cancelled' || context.orderStatus === 'disputed') {
     return null;
   }
 
@@ -131,7 +131,7 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
     return (
       <Card>
         <Badge label="No payment yet" tone="neutral" />
-      </Section>
+      </Card>
     );
   }
 
@@ -148,7 +148,7 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
           loading={reloading}
           disabled={reloading}
         />
-      </Section>
+      </Card>
     );
   }
   if (!payment) {
@@ -166,7 +166,7 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
           loading={reloading}
           disabled={reloading}
         />
-      </Section>
+      </Card>
     );
   }
 
@@ -203,7 +203,7 @@ export function HelperPaymentCard({ orderId, refreshToken = 0 }: HelperPaymentCa
           />
         </>
       )}
-    </Section>
+    </Card>
   );
 }
 

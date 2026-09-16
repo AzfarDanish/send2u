@@ -7,7 +7,7 @@ import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { StagedFileCard } from '@/components/StagedFileCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -92,7 +92,7 @@ export default function OrderReceiptScreen() {
             retryTitle="Try again"
             onRetry={retry}
           />
-        ) : context.orderStatus === 'disputed' ? (
+        ) : context.orderStatus === 'cancelled' || context.orderStatus === 'disputed' ? (
           <EmptyState
             icon="receipt-long"
             title="Receipt not available"
@@ -137,7 +137,7 @@ export default function OrderReceiptScreen() {
                 Payment of {formatMYR(context.payment.amountCents)} recorded.
               </Text>
               <ReceiptEvidenceView path={context.payment.evidencePath} />
-            </Section>
+            </Card>
             <Button
               title="View Request"
               onPress={() => {

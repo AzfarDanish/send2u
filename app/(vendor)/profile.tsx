@@ -2,9 +2,8 @@ import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
-import { GlassHeader } from '@/components/GlassHeader';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
@@ -22,10 +21,8 @@ export default function VendorProfileScreen() {
   const { vendor } = useMyVendor();
 
   return (
-    <>
-      <GlassHeader title="Profile" />
-      <Screen beneathHeader underTabs>
-        <SectionHeader eyebrow="Profile" title="Your account" />
+    <Screen>
+      <SectionHeader eyebrow="Profile" title="Your account" />
       <Card>
         <View style={styles.identity}>
           <View style={styles.avatar}>
@@ -41,13 +38,12 @@ export default function VendorProfileScreen() {
         <Text variant="caption" color="muted">
           Vendor is permanent on this account — roles never change.
         </Text>
-      </Section>
+      </Card>
 
       <DevProfileSwitcher />
 
       <Button title="Sign out" variant="danger" onPress={signOut} />
-      </Screen>
-    </>
+    </Screen>
   );
 }
 

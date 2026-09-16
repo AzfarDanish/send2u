@@ -4,12 +4,10 @@ import { router } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
-import { GlassHeader } from '@/components/GlassHeader';
-import { HeaderBell } from '@/components/HeaderBell';
 import { PrivateImage } from '@/components/PrivateImage';
 import { StagedFileCard } from '@/components/StagedFileCard';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -109,10 +107,8 @@ export default function HelperProfileScreen() {
   }, [user, qrBusy, profile?.paymentQrPath, refreshProfile]);
 
   return (
-    <>
-      <GlassHeader title="Profile" right={<HeaderBell role="helper" />} />
-      <Screen beneathHeader underTabs>
-        <SectionHeader eyebrow="Profile" title="Your account" />
+    <Screen>
+      <SectionHeader eyebrow="Profile" title="Your account" />
       <Card>
         <View style={styles.identity}>
           <View style={styles.avatar}>
@@ -125,7 +121,7 @@ export default function HelperProfileScreen() {
             </Text>
           </View>
         </View>
-      </Section>
+      </Card>
 
       <Card>
         <ListRow
@@ -138,7 +134,7 @@ export default function HelperProfileScreen() {
           title="Payouts"
           onPress={() => router.push('/(helper)/earnings')}
         />
-      </Section>
+      </Card>
 
       <Card>
         <Text variant="subtitle">Payment QR</Text>
@@ -190,13 +186,12 @@ export default function HelperProfileScreen() {
             disabled={qrBusy || stagedQr !== null}
           />
         ) : null}
-      </Section>
+      </Card>
 
       <DevProfileSwitcher />
 
       <Button title="Sign out" variant="danger" onPress={signOut} />
-      </Screen>
-    </>
+    </Screen>
   );
 }
 

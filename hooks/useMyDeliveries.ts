@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
-import { applyOrderChange, applyOrderDeleted, subscribeOrderChanges, subscribeOrderDeletes } from '@/lib/orderEvents';
+import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
 import { isTerminalOrderStatus } from '@/lib/orders';
 import { listMyDeliveries } from '@/services/orders';
 import type { OrderWithDetails } from '@/types/domain';
@@ -101,15 +101,6 @@ export function useMyDeliveries(): UseMyDeliveriesResult {
       setDeliveries(next);
     });
   }, [silentReload]);
-
-  // A permanently deleted order (food unavailable before purchase, clean
-  // cancel) leaves the helper with nothing to deliver — drop it instantly.
-  useEffect(() => {
-    return subscribeOrderDeletes((orderId) => {
-      const { next } = applyOrderDeleted(deliveriesRef.current, orderId);
-      setDeliveries(next);
-    });
-  }, []);
 
   const retry = useCallback(() => {
     void load(false);

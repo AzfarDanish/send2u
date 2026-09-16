@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
@@ -34,7 +34,7 @@ export default function SettingsScreen() {
       <Text variant="subtitle" style={styles.groupTitle}>
         Account
       </Text>
-      <Section style={styles.groupCard}>
+      <Card style={styles.groupCard}>
         <View style={styles.divider}>
           <ListRow
             icon="mail-outline"
@@ -67,12 +67,12 @@ export default function SettingsScreen() {
           accessibilityLabel="Change password"
           onPress={() => router.push('/(requester)/settings/change-password')}
         />
-      </Section>
+      </Card>
 
       <Text variant="subtitle" style={styles.groupTitle}>
         Preferences
       </Text>
-      <Section style={styles.groupCard}>
+      <Card style={styles.groupCard}>
         <View style={styles.divider}>
           <ListRow
             icon="notifications-none"
@@ -88,12 +88,12 @@ export default function SettingsScreen() {
           right={<Value>English</Value>}
           accessibilityLabel="Language, English"
         />
-      </Section>
+      </Card>
 
       <Text variant="subtitle" style={styles.groupTitle}>
         About
       </Text>
-      <Section style={styles.groupCard}>
+      <Card style={styles.groupCard}>
         <View style={styles.divider}>
           <ListRow
             icon="info-outline"
@@ -116,7 +116,7 @@ export default function SettingsScreen() {
           accessibilityLabel="Privacy policy"
           onPress={() => router.push('/(requester)/privacy')}
         />
-      </Section>
+      </Card>
       </Screen>
     </>
   );

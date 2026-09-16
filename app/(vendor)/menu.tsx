@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { GlassHeader } from '@/components/GlassHeader';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -73,29 +72,25 @@ export default function VendorMenuScreen() {
   const showingForm = formKey !== 'closed';
 
   return (
-    <>
-      <GlassHeader title="Menu" />
-      <Screen
-        beneathHeader
-        underTabs
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-        }>
-        <SectionHeader eyebrow="Menu" title="Your menu" />
+    <Screen
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+      }>
+      <SectionHeader eyebrow="Menu" title="Your menu" />
       {status === 'loading' ? (
-        <Section style={styles.stateCard}>
+        <Card style={styles.stateCard}>
           <LoadingState message="Loading your menu…" />
-        </Section>
+        </Card>
       ) : null}
       {status === 'error' ? (
-        <Section style={styles.stateCard}>
+        <Card style={styles.stateCard}>
           <ErrorState
             title="Couldn't load your menu"
             message={error ?? 'Check your connection and try again.'}
             retryTitle="Try again"
             onRetry={retry}
           />
-        </Section>
+        </Card>
       ) : null}
       {status === 'empty' && !showingForm ? (
         <EmptyState
@@ -106,7 +101,7 @@ export default function VendorMenuScreen() {
       ) : null}
       {status === 'ready' || status === 'empty'
         ? items.map((item) => (
-            <Section key={item.id} style={styles.itemCard}>
+            <Card key={item.id} style={styles.itemCard}>
               <View style={styles.itemRow}>
                 <View style={styles.itemText}>
                   <Text variant="secondary" style={styles.itemName}>
@@ -147,7 +142,7 @@ export default function VendorMenuScreen() {
                   loading={workingId === item.id}
                 />
               </View>
-            </Section>
+            </Card>
           ))
         : null}
       {rowError ? (
@@ -163,8 +158,7 @@ export default function VendorMenuScreen() {
       ) : (
         <Button title="Add item" onPress={() => setFormKey('new')} disabled={busy} />
       )}
-      </Screen>
-    </>
+    </Screen>
   );
 }
 
@@ -272,7 +266,7 @@ function ItemForm({
         loading={saving}
       />
       <Button title="Cancel" variant="secondary" onPress={onClose} disabled={saving} />
-    </Section>
+    </Card>
   );
 }
 

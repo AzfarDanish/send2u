@@ -3,10 +3,9 @@ import { RefreshControl, StyleSheet, Switch, TextInput, View } from 'react-nativ
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { GlassHeader } from '@/components/GlassHeader';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -54,22 +53,18 @@ export default function VendorStallScreen() {
   };
 
   return (
-    <>
-      <GlassHeader title="Stall" />
-      <Screen
-        beneathHeader
-        underTabs
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-        }>
-        <SectionHeader eyebrow="Stall" title="Your stall" />
+    <Screen
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+      }>
+      <SectionHeader eyebrow="Stall" title="Your stall" />
       {status === 'loading' ? (
-        <Section style={styles.stateCard}>
+        <Card style={styles.stateCard}>
           <LoadingState message="Loading your stall…" />
-        </Section>
+        </Card>
       ) : null}
       {status === 'error' ? (
-        <Section style={styles.stateCard}>
+        <Card style={styles.stateCard}>
           {error?.includes('No stall is linked') ? (
             <EmptyState
               icon="storefront"
@@ -84,7 +79,7 @@ export default function VendorStallScreen() {
               onRetry={retry}
             />
           )}
-        </Section>
+        </Card>
       ) : null}
       {status === 'ready' && vendor ? (
         <>
@@ -116,7 +111,7 @@ export default function VendorStallScreen() {
                 Hidden by your administrator — requesters cannot see this stall regardless of the switch above.
               </Text>
             ) : null}
-          </Section>
+          </Card>
 
           {editing ? (
             <StallForm
@@ -141,7 +136,7 @@ export default function VendorStallScreen() {
                 </Text>
               ) : null}
               <Button title="Edit stall details" variant="secondary" onPress={() => setEditing(true)} disabled={busy} />
-            </Section>
+            </Card>
           )}
           {actionError ? (
             <ErrorState title="Could not save" message={actionError} retryTitle="Dismiss" onRetry={() => setActionError(null)} />
@@ -149,7 +144,6 @@ export default function VendorStallScreen() {
         </>
       ) : null}
     </Screen>
-    </>
   );
 }
 
@@ -259,7 +253,7 @@ function StallForm({
         loading={saving}
       />
       <Button title="Cancel" variant="secondary" onPress={onCancel} disabled={saving} />
-    </Section>
+    </Card>
   );
 }
 

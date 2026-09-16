@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -249,7 +249,7 @@ export default function OrderConfirmScreen() {
                   {order.location.name}
                 </Text>
               </View>
-            </Section>
+            </Card>
 
             <Card>
               <View style={styles.checkTitle}>
@@ -266,7 +266,7 @@ export default function OrderConfirmScreen() {
                   </Text>
                 </View>
               ))}
-            </Section>
+            </Card>
 
             {refreshing ? (
               <View style={styles.refreshRow}>

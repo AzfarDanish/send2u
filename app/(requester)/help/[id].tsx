@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { GlassHeader } from '@/components/GlassHeader';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -40,7 +40,7 @@ export default function HelpArticleScreen() {
               {paragraph}
             </Text>
           ))}
-        </Section>
+        </Card>
         {article.action ? (
           <Button
             title={article.action.label}

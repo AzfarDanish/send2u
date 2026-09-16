@@ -1,7 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { ColorValue } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,22 +14,16 @@ function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
 
 export default function VendorLayout() {
   const { user, role, isLoading } = useAuth();
-  const insets = useSafeAreaInsets();
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (role !== 'vendor') return <Redirect href="/" />;
 
-  // Matches the requester/helper shell: the bar floats over scrolled
-  // content, absorbing the system gesture area in its height. One hairline
-  // on top is the only separator in the UI.
-  const tabBarBottom = Math.max(insets.bottom, 8);
-
   return (
     <Tabs
       backBehavior="history"
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
         headerStyle: { backgroundColor: navigation.headerBackground },
         headerTitleStyle: { ...typography.subtitle, color: navigation.headerText },
         headerTintColor: navigation.headerText,
@@ -38,16 +31,12 @@ export default function VendorLayout() {
         tabBarActiveTintColor: navigation.tabActive,
         tabBarInactiveTintColor: navigation.tabInactive,
         tabBarStyle: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
           backgroundColor: navigation.tabBarBackground,
           borderTopColor: navigation.tabBarBorder,
           borderTopWidth: 1,
-          height: touchTargets.tabBar + tabBarBottom,
+          height: touchTargets.tabBar,
           paddingTop: 8,
-          paddingBottom: tabBarBottom,
+          paddingBottom: 8,
         },
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.background },

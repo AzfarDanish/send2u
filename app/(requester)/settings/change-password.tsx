@@ -2,7 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { GlassHeader } from '@/components/GlassHeader';
@@ -73,7 +73,7 @@ export default function ChangePasswordScreen() {
         <Card>
           <Text variant="subtitle">Password changed</Text>
           <Text color="secondary">Use your new password the next time you sign in.</Text>
-        </Section>
+        </Card>
         <Button
           title="Done"
           onPress={() => {
@@ -142,7 +142,7 @@ export default function ChangePasswordScreen() {
             retryTitle="Dismiss"
             onRetry={() => setSaveError(null)}
           />
-        </Section>
+        </Card>
       ) : null}
       <Button
         title={saving ? 'Saving…' : 'Save Changes'}

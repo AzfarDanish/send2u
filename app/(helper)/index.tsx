@@ -3,11 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, Switch, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { GlassHeader } from '@/components/GlassHeader';
-import { HeaderBell } from '@/components/HeaderBell';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
@@ -86,19 +84,15 @@ export default function HelperJobsScreen() {
   }, []);
 
   return (
-    <>
-      <GlassHeader title="Jobs" right={<HeaderBell role="helper" />} />
-      <Screen
-        beneathHeader
-        underTabs
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
-        }>
-        <SectionHeader
-          eyebrow="Helper hub"
-          title="Delivery jobs"
-          badge={isAvailable && status === 'ready' ? `${jobs.length} open` : undefined}
-        />
+    <Screen
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
+      }>
+      <SectionHeader
+        eyebrow="Helper hub"
+        title="Delivery jobs"
+        badge={isAvailable && status === 'ready' ? `${jobs.length} open` : undefined}
+      />
       <Card>
         <View style={styles.availability}>
           <View style={styles.availabilityText}>
@@ -118,7 +112,7 @@ export default function HelperJobsScreen() {
             accessibilityLabel="Availability for delivery jobs"
           />
         </View>
-      </Section>
+      </Card>
 
       {!isAvailable ? (
         <EmptyState
@@ -127,18 +121,18 @@ export default function HelperJobsScreen() {
           message="Go available to see open requests."
         />
       ) : status === 'loading' ? (
-        <Section style={styles.stateCard}>
+        <Card style={styles.stateCard}>
           <LoadingState message="Finding open jobs…" />
-        </Section>
+        </Card>
       ) : status === 'error' ? (
-        <Section style={styles.stateCard}>
+        <Card style={styles.stateCard}>
           <ErrorState
             title="Couldn't load open jobs"
             message={error ?? 'Check your connection and try again.'}
             retryTitle="Try again"
             onRetry={retry}
           />
-        </Section>
+        </Card>
       ) : status === 'empty' ? (
         <EmptyState
           icon="work-outline"
@@ -153,7 +147,7 @@ export default function HelperJobsScreen() {
           {jobs.map((job) => {
             const isAccepting = acceptingId === job.id;
             return (
-              <Section key={job.id} testID={`open-job-${job.id}`} style={styles.jobCard}>
+              <Card key={job.id} testID={`open-job-${job.id}`} style={styles.jobCard}>
                 <ListRow
                   icon="delivery-dining"
                   title={job.vendor.name}
@@ -173,13 +167,12 @@ export default function HelperJobsScreen() {
                   disabled={isAccepting}
                   loading={isAccepting}
                 />
-              </Section>
+              </Card>
             );
           })}
         </>
       )}
-      </Screen>
-    </>
+    </Screen>
   );
 }
 

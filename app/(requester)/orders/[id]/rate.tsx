@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { HelperIdentity } from '@/components/HelperIdentity';
 import { OrderRatingSection } from '@/components/OrderRatingSection';
 import { Button } from '@/components/ui/Button';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -153,7 +153,7 @@ export default function OrderRateScreen() {
                 loadFailed={identityStatus === 'error'}
                 onRetry={retryIdentity}
               />
-            </Section>
+            </Card>
             <OrderRatingSection order={order} refreshToken={refreshToken} requesterForm="inline" />
             <Button title="Back to Request" variant="secondary" onPress={() => router.back()} />
           </>

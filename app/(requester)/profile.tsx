@@ -5,10 +5,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
-import { GlassHeader } from '@/components/GlassHeader';
-import { HeaderSettings } from '@/components/HeaderSettings';
 import { Badge } from '@/components/ui/Badge';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
@@ -52,10 +50,8 @@ export default function RequesterProfileScreen() {
     profile?.fullName?.trim() || profile?.displayName?.trim() || 'Campus requester';
 
   return (
-    <>
-      <GlassHeader title="Profile" right={<HeaderSettings href="/(requester)/settings" />} />
-      <Screen beneathHeader underTabs>
-        <View style={styles.header}>
+    <Screen underTabs>
+      <View style={styles.header}>
         <Avatar name={displayName} path={profile?.avatarPath} size={96} />
         <Text variant="subtitle" style={styles.name} numberOfLines={2}>
           {displayName}
@@ -70,7 +66,7 @@ export default function RequesterProfileScreen() {
         </View>
       </View>
 
-      <Section style={styles.menuCard}>
+      <Card style={styles.menuCard}>
         {MENU_ROWS.map((row, index) => (
           <View key={row.href} style={index < MENU_ROWS.length - 1 && styles.divider}>
             <ListRow
@@ -81,7 +77,7 @@ export default function RequesterProfileScreen() {
             />
           </View>
         ))}
-      </Section>
+      </Card>
 
       <DevProfileSwitcher />
 
@@ -93,7 +89,7 @@ export default function RequesterProfileScreen() {
             retryTitle="Dismiss"
             onRetry={() => setSignOutError(null)}
           />
-        </Section>
+        </Card>
       ) : null}
       <Pressable
         accessibilityRole="button"
@@ -107,8 +103,7 @@ export default function RequesterProfileScreen() {
           {signingOut ? 'Signing out…' : 'Log Out'}
         </Text>
       </Pressable>
-      </Screen>
-    </>
+    </Screen>
   );
 }
 

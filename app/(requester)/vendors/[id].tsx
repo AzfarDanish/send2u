@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MenuItemRow } from '@/components/MenuItemRow';
@@ -9,14 +10,14 @@ import { CartFab } from '@/components/CartFab';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { GlassHeader, GLASS_HEADER_ROW } from '@/components/GlassHeader';
 import { Badge } from '@/components/ui/Badge';
-import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors, navigation, radii, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
 import { useMenu } from '@/hooks/useMenu';
 import type { MenuItemWithVendor } from '@/types/domain';
@@ -121,14 +122,14 @@ export default function VendorPageScreen() {
       <>
         <GlassHeader title="Vendor" />
         <Screen beneathHeader>
-          <Section style={styles.stateCard}>
+          <Card style={styles.stateCard}>
             <ErrorState
               title="Couldn't load the vendor"
               message={error ?? 'Check your connection and try again.'}
               retryTitle="Try again"
               onRetry={retry}
             />
-          </Section>
+          </Card>
         </Screen>
       </>
     );
@@ -190,7 +191,7 @@ export default function VendorPageScreen() {
       <GlassHeader title={vendor.name} backLabel="Back to Home" />
       {showBar && docked ? (
         <View style={[styles.dockBar, { top: insets.top + GLASS_HEADER_ROW }]}>
-          <View style={[StyleSheet.absoluteFill, styles.dockBg]} pointerEvents="none" />
+          <BlurView intensity={85} tint="light" style={StyleSheet.absoluteFill} />
           <View style={styles.dockChips}>{filterChips}</View>
         </View>
       ) : null}
@@ -310,7 +311,6 @@ const styles = StyleSheet.create({
     zIndex: 9,
     overflow: 'hidden',
   },
-  dockBg: { backgroundColor: navigation.headerBackground },
   dockChips: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,

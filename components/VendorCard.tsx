@@ -95,6 +95,6 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
   closed: {
-    color: colors.textSecondary,
+    color: colors.secondary,
   },
 });

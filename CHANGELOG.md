@@ -1748,3 +1748,15 @@ only. No secrets are ever recorded here.
   `expo export -p web` pass; 12 scrolled screenshots inspected, no
   clipping/overlap/unreadable text; temp probes removed, no test
   residue (read-only validation, dev passwords unchanged).
+
+## 2026-09-16 — Components: restore DownloadableQR and fix VendorCard color token
+
+- Change: created `components/DownloadableQR.tsx` (`PrivateImage` with
+  compact download action via `downloadStorageFile` and status/error feedback)
+  to satisfy imports in `app/(helper)/profile.tsx` and
+  `app/(requester)/orders/[id]/payment.tsx`; fixed invalid color token
+  `colors.textSecondary` -> `colors.secondary` in `components/VendorCard.tsx`.
+- Reason: unblock Metro bundling on Android/iOS/web due to missing module
+  `@/components/DownloadableQR` after recent profile/payment commit.
+- Validation: `tsc --noEmit` (0 errors), `npm run lint` (`expo lint`, 0
+  problems), `npx expo export -p web` (64 static routes bundled cleanly).

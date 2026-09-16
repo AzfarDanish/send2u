@@ -13,5 +13,5 @@ export const routes = {
   auth: '/(auth)/sign-in',
   selectRole: '/select-role',
   requesterHome: '/(requester)',
-  helperHome: '/(helper)',
+  helperPortal: '/(requester)/helper-portal',
 } as const;

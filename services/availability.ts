@@ -18,6 +18,6 @@ export async function setHelperAvailability(isAvailable: boolean): Promise<{ isA
 }
 function friendlyError(msg: string): string {
   if (/not authenticated/i.test(msg)) return 'Your session expired. Sign in again.';
-  if (/only helpers/i.test(msg)) return 'Only helpers can change availability.';
+  if (/only helpers/i.test(msg)) return 'Only verified helpers can change availability.';
   return msg ? `Could not update availability: ${msg}` : 'Could not update availability.';
 }

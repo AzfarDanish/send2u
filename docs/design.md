@@ -75,16 +75,16 @@ Conventions: **Route** as declared in Expo Router. **Redesign?** = Yes where pre
 | Notifications | `/(requester)/notifications` (tab) | Order updates inbox | "Updates for you" + unread badge + Mark-all-read; icon rows with unread dot, body, date | loading/error/empty; pull-to-refresh | notification rows | order detail (mark-read-first) | None | Light touch (§7.18) |
 | Profile | `/(requester)/profile` (tab) | Identity + sign out | Identity card (avatar, display name or fallback, email, short ID, Requester pill); My-orders row; env-gated dev switcher (invisible in prod); Sign out | none (sync context; gate handles loading) | auth user + profile | orders list | Hardcoded fallback name only when no display name | Light touch (§7.19) |
 
-### 2.3 Helper
+### 2.3 Helper Portal (supersedes the old `(helper)` tab app — see migration note below)
 
 | Screen | Route | Purpose / key behavior | States | Redesign? |
 |---|---|---|---|---|
-| Jobs queue | `/(helper)` (tab Jobs) | Availability switch gating `pending`-only queue; per-row preview + atomic Accept (single-winner, loser auto-refreshes) | offline / loading / error / empty; accepting lock | Yes (§8) |
-| Job detail | `/(helper)/jobs/[id]` (hidden) | Per-status fulfilment cards: go-to-vendor, arrive, food available/unavailable, purchase, confirm pickup, start delivery, mark delivered, release/abandon variants; read-only payment inspection; terminal → history | loading/missing; acting locks; update errors | Yes (§8) |
-| My Deliveries | `/(helper)/deliveries` (tab) | Active (order + payment badges) / History (fee-focused rows), same segmented control | loading/error/empty per tab; lazy history | Yes (§8) |
-| Earnings | `/(helper)/earnings` (tab) | Fee-only finalized total + per-trip fee rows; no withdrawal rail | loading/error/empty | Light touch (§8) |
-| Notifications | `/(helper)/notifications` (hidden) | Same center, helper routing | as requester | Light touch (§8) |
-| Profile | `/(helper)/profile` (tab) | Identity, My-deliveries/Payouts rows, staged confirm-first QR manager (upload/replace/remove), sign out | QR-local busy/error only | Yes (§8) |
+| Portal / job queue | `/(requester)/helper-portal` (Profile entry, guarded) | Availability switch gating `pending`-only queue; fee-first rows + atomic Accept (single-winner, loser auto-refreshes); active-delivery section | offline / loading / error / empty; accepting lock | Yes (§8) |
+| Delivery workspace | `/(requester)/helper-portal/jobs/[id]` (guarded) | Task-first per-status actions: go-to-vendor, arrive, food available/unavailable, purchase, confirm pickup, start delivery, mark delivered, release/abandon variants; state-aware external-Maps handoff; collapsible order details; read-only payment inspection; terminal → history | loading/missing; acting locks; update errors | Yes (§8) |
+| My Deliveries | `/(requester)/helper-portal/deliveries` (guarded) | Active / History single-badge rows, same segmented control | loading/error/empty per tab; lazy history | Yes (§8) |
+| Payment QR | `/(requester)/helper-portal/payment-qr` (guarded) | Staged confirm-first QR manager (upload/replace/remove) | QR-local busy/error only | Yes (§8) |
+
+Migration note (2026-09-16): Helper is no longer a mutually exclusive role. Verified helpers are `role = requester` + `is_verified_helper = true` and use the main requester app; the portal above is entered from Profile and guarded per screen. The old `(helper)` tab group (Jobs / My Deliveries / Earnings / Profile tabs) is deleted; Earnings survives as fee-only history rows, and helper notifications share the requester center. Backend capability (RLS/RPC guard) mirrors the UI guard.
 
 Known helper issues (verified): 5 legacy statuses fall through to a dead-end card; `picked_up` error retry refires instead of dismissing; rating title hardcoded for helper viewers; history empty-copy omits disputed; truncated-ID identities; no directions/contact/dispute-appeal (all absent backend support — correctly absent from UI).
 
@@ -112,12 +112,12 @@ No routes, tabs, screens, or components exist. `admin` is a database-only role (
 
 ### 3.2 Role routing
 
-Root gate redirects by immutable server role: requester → `/(requester)`, helper → `/(helper)`, vendor → `/(vendor)`; each group layout cross-ejects other roles to `/`. Vendor accounts are service-provisioned, never self-signed-up. Anonymous sessions are signed out at restore.
+Root gate redirects by immutable server role: non-vendors → `/(requester)` (verified helpers carry `is_verified_helper = true` on the same requester account and enter the Helper Portal from Profile, guarded per screen); vendor → `/(vendor)`; the requester layout ejects vendors and the vendor layout ejects non-vendors. Vendor accounts are service-provisioned, never self-signed-up. Anonymous sessions are signed out at restore.
 
 ### 3.3 Main tab navigation
 
-- Requester: Home / My Orders / Notifications / Profile (+ header bell duplicating Notifications — accepted duplication).
-- Helper: Jobs / My Deliveries / Earnings / Profile (+ header bell).
+- Requester (and verified helpers, same app): Home / Requests / Profile (+ in-screen bells on Home and Requests; Profile carries a gear).
+- Helper Portal (verified only, via Profile — never a bottom tab): portal home, delivery workspace, My Deliveries, Payment QR.
 - Vendor: Stall / Menu / Profile (no bell — no vendor notifications exist).
 All tab bars: white, 1px top border, 70pt height, 12pt semibold labels, teal active / muted inactive, full safe-area coverage.
 
@@ -382,6 +382,8 @@ Purpose: order-update inbox. Goal: triage unread in seconds. Entry: tab or heade
 Purpose: identity + exit. Goal: confirm account, leave safely. Entry: tab. Exit: orders list, sign-out → auth gate. Composition: `IdentityCard` (avatar tile, display name w/ fallback, email · short ID, role pill) → My-orders `NavRow` → env-gated dev switcher (invisible in prod — keep gate, never restyle as feature) → danger Sign out. States: none (sync; gate covers loading). Responsive/a11y: trivial. Issues: none. Changes: rebrand only. **Unchanged:** exposed fields; NO wallet/payments/addresses/favorites/loyalty/promo/referral/subscription/settings — the redesign must not add any.
 
 ## Section 8: Helper frontend redesign
+
+Route note (2026-09-16): the `/(helper)` paths below are the pre-migration locations. The current implementation lives at `/(requester)/helper-portal/` (index), `/(requester)/helper-portal/jobs/[id]`, `/(requester)/helper-portal/deliveries`, and `/(requester)/helper-portal/payment-qr`, following the same per-status behavior with a task-first presentation (fee-first queue rows, state-aware Maps emphasis, collapsible order details). Read route names below as their portal equivalents.
 
 Design posture: same system, operational tone — verbs first ("Go to the vendor", "Food purchased"), money framed as fronted-cost vs fee-earning, one action per step. All behaviors below are implemented today; "Proposed" marks pure presentation changes.
 

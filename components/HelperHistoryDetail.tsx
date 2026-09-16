@@ -1,4 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { OrderRatingSection } from '@/components/OrderRatingSection';
@@ -7,18 +8,20 @@ import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
+import { openMapsLocation } from '@/lib/maps';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, paymentStatusLabel, paymentStatusTone } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
 /**
- * Read-only historical delivery for the helper. Shows the final outcome,
- * route, requester, items, fronted food cost vs delivery earning, timeline,
- * and payment record. Renders no accept/advance/verify actions — those live
- * on the active job screen only.
+ * Read-only historical delivery for the helper. Structured as a record:
+ * outcome first, then the route (with external-maps handoff), then
+ * delivery information, timeline, and the payment record. Renders no
+ * accept/advance/verify actions — those live on the active job screen
+ * only. No approval or review workflow exists anywhere in this flow.
  */
 export function HelperHistoryDetail({
   job,
@@ -28,22 +31,31 @@ export function HelperHistoryDetail({
   /** Bump to refetch embedded live sections (e.g. other-party rating). */
   refreshToken?: number;
 }) {
+  const [mapsBusy, setMapsBusy] = useState(false);
+
+  const openMaps = useCallback(async (label: string) => {
+    if (mapsBusy) return;
+    setMapsBusy(true);
+    try {
+      await openMapsLocation(label);
+    } finally {
+      setMapsBusy(false);
+    }
+  }, [mapsBusy]);
+
+  const pickupLabel = job.vendor.locationHint ?? job.vendor.name;
+
   return (
     <View style={styles.container}>
-      <Card>
-        <Text variant="caption" color="muted">
-          Read-only record
-        </Text>
+      <View>
         {job.status === 'completed' ? (
           <>
             <Badge label="Completed" tone="success" />
             {job.resolvedAt ? (
-              <>
-                <Text variant="subtitle">Settled after dispute</Text>
-              </>
+              <Text variant="title">Settled after dispute</Text>
             ) : (
               <>
-                <Text variant="subtitle">Delivery complete</Text>
+                <Text variant="title">Delivery complete</Text>
                 <Text color="secondary">
                   Your {formatMYR(job.deliveryFeeCents)} earning is finalized
                   {job.deliveredAt ? ` · delivered ${formatOrderDate(job.deliveredAt)}` : ''}.
@@ -55,7 +67,7 @@ export function HelperHistoryDetail({
         ) : job.status === 'cancelled' ? (
           <>
             <Badge label="Cancelled" tone="error" />
-            <Text variant="subtitle">This job was cancelled</Text>
+            <Text variant="title">This job was cancelled</Text>
             <Text color="secondary">
               {job.cancelReason === 'food_unavailable'
                 ? 'No food — no money changed hands.'
@@ -70,7 +82,7 @@ export function HelperHistoryDetail({
               label={job.resolvedAt ? `Settled · ${job.resolution ?? 'resolved'}` : 'Disputed'}
               tone="error"
             />
-            <Text variant="subtitle">This delivery needs settlement</Text>
+            <Text variant="title">This delivery needs settlement</Text>
             <Text color="secondary">
               {job.disputeReason === 'helper_unable'
                 ? 'You stopped after paying. '
@@ -92,7 +104,7 @@ export function HelperHistoryDetail({
             </Text>
             {job.disputeDetails ? (
               <Text color="secondary">
-                Requester&apos;s report: {job.disputeDetails}
+                Report: {job.disputeDetails}
               </Text>
             ) : null}
             {job.disputeNote ? (
@@ -102,21 +114,19 @@ export function HelperHistoryDetail({
             ) : null}
           </>
         )}
-      </Card>
+      </View>
 
       {job.status === 'completed' ? (
         <OrderRatingSection order={job} refreshToken={refreshToken} />
       ) : null}
 
-      <Card>
-        <View style={styles.heading}>
-          <Text variant="title">{job.vendor.name}</Text>
-        </View>
+      <View style={styles.group}>
+        <Text variant="subtitle">{job.vendor.name}</Text>
         <Text variant="caption" color="secondary">
           Requested {formatOrderDate(job.createdAt)}
           {job.acceptedAt ? ` · you accepted ${formatOrderDate(job.acceptedAt)}` : ''}
         </Text>
-        <View style={styles.row}>
+        <View style={styles.placeRow}>
           <MaterialIcons name="storefront" size={20} color={colors.primary} />
           <View style={styles.rowText}>
             <Text variant="secondary" style={styles.placeName}>
@@ -128,21 +138,33 @@ export function HelperHistoryDetail({
               </Text>
             ) : null}
           </View>
+          <Button
+            title="Open Maps"
+            variant="secondary"
+            onPress={() => void openMaps(pickupLabel)}
+            disabled={mapsBusy}
+          />
         </View>
-        <View style={styles.row}>
+        <View style={styles.placeRow}>
           <MaterialIcons name="place" size={20} color={colors.primary} />
           <View style={styles.rowText}>
             <Text variant="secondary" style={styles.placeName}>
               Dropped off at {job.location.name}
             </Text>
           </View>
+          <Button
+            title="Open Maps"
+            variant="secondary"
+            onPress={() => void openMaps(job.location.name)}
+            disabled={mapsBusy}
+          />
         </View>
         <Text variant="caption" color="muted">
           Requester {job.requesterId.slice(0, 8)}…
         </Text>
-      </Card>
+      </View>
 
-      <Card>
+      <View style={styles.group}>
         <OrderBreakdown
           items={job.items}
           subtotalCents={job.subtotalCents}
@@ -152,14 +174,14 @@ export function HelperHistoryDetail({
         <Text variant="caption" color="muted">
           Only the delivery fee counts as your payout.
         </Text>
-      </Card>
+      </View>
 
-      <Card>
+      <View style={styles.group}>
         <Text variant="subtitle">What happened</Text>
         <OrderTimeline order={job} />
-      </Card>
+      </View>
 
-      <Card>
+      <View style={styles.group}>
         <View style={styles.moneyRow}>
           <Text variant="subtitle">Payment record</Text>
           {job.payment ? (
@@ -174,7 +196,7 @@ export function HelperHistoryDetail({
               {formatMYR(job.payment.amountCents)} receipt · submitted{' '}
               {formatOrderDate(job.payment.submittedAt)}
               {job.payment.verifiedAt
-                ? ` · reviewed ${formatOrderDate(job.payment.verifiedAt)}`
+                ? ` · recorded ${formatOrderDate(job.payment.verifiedAt)}`
                 : ''}
               .
             </Text>
@@ -187,15 +209,20 @@ export function HelperHistoryDetail({
               : 'No receipt was submitted for this delivery.'}
           </Text>
         )}
-      </Card>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { gap: spacing.lg },
-  heading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  group: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, gap: spacing.xs },
   placeName: { fontWeight: '600', color: colors.text },
   moneyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

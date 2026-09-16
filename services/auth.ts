@@ -28,7 +28,7 @@ function requireClient() {
 }
 
 const PROFILE_SELECT =
-  'id, role, vendor_id, payment_qr_path, is_available, availability_updated_at, is_dev_account, display_name, full_name, student_id, phone_number, avatar_path, created_at, updated_at';
+  'id, role, vendor_id, payment_qr_path, is_available, availability_updated_at, is_dev_account, is_verified_helper, display_name, full_name, student_id, phone_number, avatar_path, created_at, updated_at';
 
 function toProfile(row: {
   id: string;
@@ -38,6 +38,7 @@ function toProfile(row: {
   is_available: boolean | null;
   availability_updated_at: string | null;
   is_dev_account: boolean | null;
+  is_verified_helper: boolean | null;
   display_name: string | null;
   full_name: string | null;
   student_id: string | null;
@@ -54,6 +55,7 @@ function toProfile(row: {
     isAvailable: row.is_available ?? false,
     availabilityUpdatedAt: row.availability_updated_at ?? null,
     isDevAccount: row.is_dev_account ?? false,
+    isVerifiedHelper: row.is_verified_helper ?? false,
     displayName: row.display_name ?? null,
     fullName: row.full_name ?? null,
     studentId: row.student_id ?? null,

@@ -21,6 +21,7 @@ export interface DevProfile {
   role: ProfileRole;
   displayName: string | null;
   createdAt: string;
+  isVerifiedHelper: boolean;
 }
 
 function requireClient() {
@@ -63,6 +64,7 @@ export async function listDevProfiles(): Promise<DevProfile[]> {
       role: row.role as ProfileRole,
       displayName: typeof row.display_name === 'string' ? row.display_name : null,
       createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+      isVerifiedHelper: row.is_verified_helper === true,
     });
   }
   return profiles;

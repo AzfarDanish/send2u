@@ -78,14 +78,14 @@ export default function SelectRoleScreen() {
         <Card>
           <ErrorState
             title="Unsupported account role"
-            message="This account carries a role this app does not serve. Sign out and use a requester, helper, or vendor account."
+            message="This account carries a role this app does not serve. Sign out and use a requester or vendor account."
           />
         </Card>
       ) : (
         <>
           <Card>
             <Text color="secondary">
-              Pick this account&apos;s role once — it&apos;s permanent.
+              This account joins as a requester. Helper access is granted separately.
             </Text>
           </Card>
           <View style={styles.roleBlock}>
@@ -95,13 +95,6 @@ export default function SelectRoleScreen() {
               selected={selected === 'requester'}
               disabled={busy}
               onPress={() => setSelected('requester')}
-            />
-            <OptionCard
-              icon="delivery-dining"
-              title="Helper"
-              selected={selected === 'helper'}
-              disabled={busy}
-              onPress={() => setSelected('helper')}
             />
           </View>
           {claimError && (

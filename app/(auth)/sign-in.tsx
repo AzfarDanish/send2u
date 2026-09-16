@@ -19,8 +19,8 @@ type Mode = 'sign-in' | 'sign-up';
 
 /**
  * Production-style account entry: real email/password signup and login.
- * Signup requires exactly one role (Requester or Helper); the role is stored
- * once by the server at account creation and is permanent afterwards.
+ * New accounts are always requesters; the Helper Portal capability is
+ * granted manually out-of-band (never self-selected at signup).
  * Navigation after entry is declarative — `(auth)/_layout` redirects
  * authenticated users to `/`, which routes by role.
  */
@@ -128,20 +128,13 @@ export default function SignInScreen() {
 
           {mode === 'sign-up' && (
             <View style={styles.roleBlock}>
-              <Text variant="subtitle">Choose your role — it is permanent</Text>
+              <Text variant="subtitle">You join as a requester</Text>
               <OptionCard
                 icon="shopping-bag"
                 title="I'm ordering food"
-                selected={role === 'requester'}
+                selected
                 disabled={busy}
                 onPress={() => setRole('requester')}
-              />
-              <OptionCard
-                icon="delivery-dining"
-                title="I'm helping & earning"
-                selected={role === 'helper'}
-                disabled={busy}
-                onPress={() => setRole('helper')}
               />
             </View>
           )}

@@ -10,7 +10,9 @@ import { useAuth } from '@/hooks/useAuth';
  * loading → loading state
  * unauthenticated → auth screens
  * authenticated without role → role selection
- * authenticated with role → requester, helper, or vendor experience
+ * authenticated with role → vendor experience or the single main
+ * requester application (verified helpers use the same main app;
+ * Helper Portal lives under Profile, not as a separate root).
  */
 export default function Index() {
   const { user, role, isLoading } = useAuth();
@@ -32,7 +34,7 @@ export default function Index() {
   }
 
   return (
-    <Redirect href={role === 'helper' ? '/(helper)' : role === 'vendor' ? '/(vendor)' : '/(requester)'} />
+    <Redirect href={role === 'vendor' ? '/(vendor)' : '/(requester)'} />
   );
 }
 

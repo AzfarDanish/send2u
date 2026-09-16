@@ -1,29 +1,25 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { DownloadableQR } from '@/components/DownloadableQR';
+import { GlassHeader } from '@/components/GlassHeader';
+import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { StagedFileCard } from '@/components/StagedFileCard';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { setPaymentQrPath } from '@/services/auth';
-import {
-  pickPaymentImage,
-  qrPathFor,
-  removeObject,
-  uploadObject,
-  type PickedImage,
-} from '@/services/storage';
+import { pickPaymentImage, qrPathFor, removeObject, uploadObject, type PickedImage } from '@/services/storage';
 
-export default function HelperProfileScreen() {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+/**
+ * Payment QR inside Helper Portal. Same bucket, paths, staged confirm-first
+ * upload, preview, replace/remove, and orphan cleanup as the legacy helper
+ * profile manager — extracted into a dedicated screen.
+ */
+export default function PortalPaymentQrScreen() {
+  const { user, profile, refreshProfile } = useAuth();
   const [qrBusy, setQrBusy] = useState(false);
   const [qrBusyMessage, setQrBusyMessage] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -103,42 +99,18 @@ export default function HelperProfileScreen() {
   }, [user, qrBusy, profile?.paymentQrPath, refreshProfile]);
 
   return (
-    <Screen underTabs>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <MaterialIcons name="delivery-dining" size={28} color={colors.primary} />
-        </View>
-        <Text variant="subtitle">Student helper</Text>
-        {user?.email && (
-          <Text variant="caption" color="secondary" numberOfLines={1}>
-            {user.email}
-          </Text>
-        )}
-      </View>
-
-      <Card style={styles.section}>
-        <ListRow
-          icon="delivery-dining"
-          title="My deliveries"
-          onPress={() => router.push('/(helper)/deliveries')}
-        />
-        <ListRow
-          icon="payments"
-          title="Payouts"
-          onPress={() => router.push('/(helper)/earnings')}
-        />
-      </Card>
-
-      <Card style={styles.section}>
-        <Text variant="subtitle">Payment QR</Text>
+    <HelperPortalGuard title="Payment QR">
+      <GlassHeader title="Payment QR" fallbackHref="/(requester)/helper-portal" />
+      <Screen beneathHeader>
+        <Text variant="subtitle">Your payment QR</Text>
+        <Text color="secondary">Requesters use this to repay you after delivery.</Text>
         {profile?.paymentQrPath ? (
-          <DownloadableQR
-            path={profile.paymentQrPath}
-            accessibilityLabel="Your payment QR code"
-          />
+          <View style={styles.qrWrap}>
+            <DownloadableQR path={profile.paymentQrPath} accessibilityLabel="Your payment QR code" />
+          </View>
         ) : (
           <Text variant="caption" color="muted">
-            Requesters can&apos;t pay you without one.
+            No QR set yet. Requesters cannot pay you without one.
           </Text>
         )}
         {qrError ? (
@@ -147,57 +119,41 @@ export default function HelperProfileScreen() {
           </Text>
         ) : null}
         {stagedQr ? (
-          <StagedFileCard
-            file={stagedQr}
-            title="Review your new QR"
-            busy={qrBusy}
-            busyMessage={qrBusyMessage}
-            confirmTitle={profile?.paymentQrPath ? 'Confirm & replace QR' : 'Confirm & set QR'}
-            onConfirm={() => void handleQrConfirm()}
-            onRechoose={() => void handleQrChoose()}
-            onCancel={() => setStagedQr(null)}
-          />
+          <View style={styles.staged}>
+            <StagedFileCard
+              file={stagedQr}
+              title="Review your new QR"
+              busy={qrBusy}
+              busyMessage={qrBusyMessage}
+              confirmTitle={profile?.paymentQrPath ? 'Confirm & replace QR' : 'Confirm & set QR'}
+              onConfirm={() => void handleQrConfirm()}
+              onRechoose={() => void handleQrChoose()}
+              onCancel={() => setStagedQr(null)}
+            />
+          </View>
         ) : (
           <Button
-            title={qrBusy ? (qrBusyMessage ?? 'Working…') : profile?.paymentQrPath ? 'Replace QR' : 'Upload QR'}
+            title={qrBusy ? (qrBusyMessage ?? 'Working…') : profile?.paymentQrPath ? 'Change QR' : 'Upload QR'}
             variant="secondary"
             onPress={() => void handleQrChoose()}
             disabled={qrBusy}
             loading={qrBusy}
           />
         )}
-        {profile?.paymentQrPath ? (
+        {profile?.paymentQrPath && !stagedQr ? (
           <Button
             title="Remove QR"
             variant="danger"
             onPress={() => void handleQrRemove()}
-            disabled={qrBusy || stagedQr !== null}
+            disabled={qrBusy}
           />
         ) : null}
-      </Card>
-
-      <DevProfileSwitcher />
-
-      <Button title="Sign out" variant="danger" onPress={signOut} />
-    </Screen>
+      </Screen>
+    </HelperPortalGuard>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { 
-    alignItems: 'center', 
-    gap: spacing.sm, 
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.full,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  section: { gap: 0 },
+  staged: { gap: spacing.sm },
+  qrWrap: { maxWidth: 320 },
 });

@@ -100,8 +100,9 @@ app/                    # expo-router routes (auth gate + role groups)
   (auth)/               #   sign-in
   (requester)/          #   Home, vendors/[id], menu/[id], create (cart review),
                         #   orders/confirmation, orders (Active/Past), orders/[id],
-                        #   location(s), notifications, help, report, profile
-  (helper)/             #   Jobs, jobs/[id], deliveries, earnings, notifications, profile
+                        #   location(s), notifications, help, report, profile,
+                        #   helper-portal/ (verified helpers: queue, jobs/[id],
+                        #   deliveries, payment-qr)
   (vendor)/             #   Stall, menu, profile
 components/             # Domain components (RequestCard, OrderBreakdown,
                         # RequestProgress, NotificationCenter, …)
@@ -191,7 +192,9 @@ project skill):
 
 ## Backend overview
 
-- **Tables** (`send2u_*`): `profiles` (immutable role per `auth.uid()`),
+- **Tables** (`send2u_*`): `profiles` (immutable role per `auth.uid()` +
+  `is_verified_helper` capability flag for Helper Portal access, granted
+  out-of-band and guarded server-side),
   `vendors`, `menu_items`, `orders`, `order_items` (immutable purchase
   snapshots), `delivery_locations`, `notifications` (outbox + in-app
   center), `push_tokens`, `payments` (external-receipt records),

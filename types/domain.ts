@@ -25,6 +25,9 @@ export interface Profile {
   availabilityUpdatedAt: string | null;
   /** Linked stall for vendor accounts (service-role provisioned); null otherwise. */
   vendorId: string | null;
+  /** Helper Portal capability for requesters. Granted manually out-of-band;
+   * never settable from the app (guarded server-side like is_dev_account). */
+  isVerifiedHelper: boolean;
   /** Admin-flagged development/test account. Never settable from the app. */
   isDevAccount: boolean;
   /** Optional dev label (seeded out-of-band). Never PII or auth data. */
@@ -58,6 +61,8 @@ export interface AppUser {
   email: string | null;
   role: UserRole | null;
   isAnonymous: boolean;
+  /** Verified Helper Portal capability (requester + flag). Never mutually exclusive with requester. */
+  isVerifiedHelper: boolean;
   displayName?: string | null;
   universityId?: string | null;
 }

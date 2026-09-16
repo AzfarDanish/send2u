@@ -23,7 +23,7 @@ const MENU_ROWS = [
 ] as const;
 
 export default function RequesterProfileScreen() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, isVerifiedHelper, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
@@ -68,6 +68,23 @@ export default function RequesterProfileScreen() {
         ))}
       </Card>
 
+      {isVerifiedHelper ? (
+        <View style={styles.helperSection}>
+          <Text variant="subtitle">Helper</Text>
+          <Text variant="caption" color="secondary">
+            Your delivery capability — queue, active jobs, and payment QR.
+          </Text>
+          <Card style={styles.section}>
+            <ListRow
+              icon="delivery-dining"
+              title="Helper Portal"
+              subtitle="Available jobs and your deliveries"
+              onPress={() => router.push('/(requester)/helper-portal')}
+            />
+          </Card>
+        </View>
+      ) : null}
+
       <DevProfileSwitcher />
 
       {signOutError ? (
@@ -106,6 +123,7 @@ const styles = StyleSheet.create({
   },
   name: { color: colors.text, textAlign: 'center' },
   section: { gap: 0 },
+  helperSection: { gap: spacing.xs },
   logOut: {
     flexDirection: 'row',
     alignItems: 'center',

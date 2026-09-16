@@ -10,6 +10,106 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-16 — Helper Portal UI/UX redesign (task-first, fee-first, state-aware Maps)
+
+- Changed (presentation only; no RPC/query/realtime/state-machine
+  changes): Portal home leads with the delivery fee (`+RM fee` in
+  success green, food subtotal demoted to a muted fronted-cost line),
+  compact offline note instead of the medallion empty state, and
+  accept-race errors anchored to the failing job. Active section
+  retitled "Continue working" with fee context. Workspace restructured
+  task-first (state badge + date, 22px task title per status, actions
+  immediately below), free pre-purchase Release demoted to tertiary
+  (dispute-causing actions stay danger), at_vendor keeps all three
+  paths with subordinate styling, location emphasis tracks state (one
+  Open Maps max; text-only when navigation is irrelevant), order
+  breakdown is state-aware collapsible (open pre-purchase, closed
+  after), accepted state is a quiet confirmation line (removed the
+  mislabeled button that routed away). Deliveries rows single-encode
+  status (badge only); history empty copy covers disputed. History
+  detail flattened from five cards to divider groups with Maps
+  restored, "reviewed" copy corrected to "recorded" (no review step
+  exists), literal `&apos;` entities fixed (reworded, per repo rule).
+  Profile Helper entry is a distinct section with purpose caption. QR
+  preview width-constrained. Push taps resolve helper-assigned orders
+  to the portal workspace (own requests keep requester context).
+  `config/app.ts` `helperHome` renamed `helperPortal` (unused key).
+  Docs: `design.md` §2.3/§3.2/§3.3/§8 route-noted to the portal,
+  `helper-ui-audit.md` marked superseded.
+- Reason: audit-driven redesign — task ("what do I do next") and
+  earning ("what do I earn") lead; secondary info (bill, idle
+  location, payment card) follows; red reserved for the primary
+  action per viewport.
+- Details: all fulfilment branches/RPC verbs/release/abandon/report
+  paths preserved 1:1; queue/accept/realtime/QR/push-fallback
+  semantics unchanged; no new dependencies, tables, or states.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0 (one
+  self-made apostrophe-entity error fixed by rewording),
+  `expo export -p web --clear` — pass (portal routes bundled);
+  `expo-doctor` 19/21 — same 2 pre-existing environmental failures
+  (`.expo` gitignore, android prebuild sync). Device Maps-open,
+  push-tap, and interactive delivery flows pending manual
+  verification.
+- Limits/decisions: no live job/fee badge on the Profile entry (avoids
+  a new realtime subscription on Profile); pre-dispatch `info`-tone
+  pills stay deep red (shared tone map with requester — untouched);
+  requester icon colors and `NotificationCenter` helper branch left as
+  compatibility surface, not wired anew.
+
+## 2026-09-16 — Helper Portal: requester + verified-capability migration (main app + portal)
+
+- Changed: Helper is no longer a mutually exclusive app role. New
+  `send2u_profiles.is_verified_helper` (NOT NULL DEFAULT false) marks
+  requesters with Helper capability (migrations
+  `add_helper_portal_capability`, `authorize_verified_helper_rpcs`,
+  `expose_verified_helper_in_dev_list`); 3 existing `role='helper'`
+  accounts migrated to `role='requester'` + flag (3 requesters, 6 vendors
+  untouched). Guard trigger blocks client self-elevation of the flag
+  (mirrors `is_dev_account`) and forces false on INSERT; signup trigger
+  maps legacy `helper` to `requester` and accepts requester-only.
+  Queue/item RLS and `send2u_accept_order` /
+  `send2u_set_helper_availability` / `send2u_payment_context` now
+  authorize `role='helper'` (legacy) OR `is_verified_helper=true`;
+  delivery state machine, payment self-attestation (`verified_by =
+  requester`, no approval), hard-delete cancel semantics, and realtime
+  publication untouched.
+- Changed (app): `AuthContext`/`Profile` expose `isVerifiedHelper`;
+  root gate sends all non-vendors to the single `/(requester)` main app
+  (Home/Requests/Profile); signup and role-recovery are requester-only;
+  shared Profile shows a `Helper Portal` row for verified helpers only.
+  New `app/(requester)/helper-portal/` (guarded by
+  `HelperPortalGuard`): queue home (availability + active delivery +
+  available jobs, same queries/atomic accept/realtime), delivery
+  workspace (same fulfilment branches + read-only payment card/history
+  detail, compact sections, `Open Maps` external handoff via new
+  `lib/maps.ts` universal URL + copy fallback), My Deliveries
+  (single-badge rows), Payment QR (same bucket/staged upload/cleanup).
+  Deleted the obsolete `app/(helper)` tab group; push/notification
+  helper branches repointed to the portal; dev switcher groups verified
+  requesters under Helpers; `README` route map updated.
+- Reason: requester-first product (verified Helpers keep full requester
+  functionality; Helper is an additional portal under Profile, not a
+  second bottom-tab app); no verification workflow, admin UI, approval
+  flow, or in-app map per direction.
+- Details: no offer-system, status-machine, fee (RM2.00 server-side), or
+  storage-convention changes; `send2u_job_offers` legacy branch left
+  compatible; dead `submitted`/`rejected` payment labels and legacy
+  statuses left reserved, not wired.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass (portal routes bundled:
+  helper-portal, jobs/[id], deliveries, payment-qr); RLS/RPC capability
+  presence SQL-verified (5 functions + 3 policies reference the flag);
+  profile group-by confirms 3 verified + 3 plain requesters + 6 vendors.
+  `expo-doctor` 19/21 — the 2 failures are pre-existing environmental
+  (`.expo` gitignore, android prebuild sync), untouched by this change.
+  Device Maps-open, push-tap, and interactive accept→deliver→pay
+  flows pending manual verification.
+- Limits/decisions: helper job push taps land on requester detail when
+  the order is the user's own request (portal realtime covers job
+  updates); notification center stays requester-routed; `role='helper'`
+  remains in the DB CHECK/types for legacy compatibility, never
+  assigned to new accounts.
+
 ## 2026-09-09 — Skeleton: MVP app foundation
 
 - Changed: Expo template replaced with the Send2U skeleton (SDK 54, Expo
@@ -1760,3 +1860,15 @@ only. No secrets are ever recorded here.
   `@/components/DownloadableQR` after recent profile/payment commit.
 - Validation: `tsc --noEmit` (0 errors), `npm run lint` (`expo lint`, 0
   problems), `npx expo export -p web` (64 static routes bundled cleanly).
+
+## 2026-09-16 — Documentation: Helper role UI structure audit report
+
+- Change: created `docs/helper-ui-audit.md` containing a comprehensive,
+  11-section structural audit report of the Helper role frontend experience
+  (screen inventory, navigation architecture, screen-by-screen breakdown,
+  13-step delivery workflow, component architecture, design system usage,
+  UI inconsistencies, task-oriented assessment, and missing/incomplete areas).
+- Reason: document existing Helper UI architecture and usability observations
+  for subsequent redesign discussions without altering code or logic.
+- Validation: `tsc --noEmit` (0 errors), `npm run lint` (`expo lint`, 0
+  problems) — pass.

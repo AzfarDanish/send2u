@@ -101,9 +101,10 @@ export function DevProfileSwitcher() {
   }
 
   const activeTab: UserRole =
-    roleTab ?? (profile?.role === 'helper' ? 'helper' : profile?.role === 'vendor' ? 'vendor' : 'requester');
-  const requesters = profiles.filter((item) => item.role === 'requester');
-  const helpers = profiles.filter((item) => item.role === 'helper');
+    roleTab ?? (profile?.role === 'vendor' ? 'vendor' : 'requester');
+  const requesters = profiles.filter((item) => item.role === 'requester' && !item.isVerifiedHelper);
+  // Helpers = verified requesters (plus any legacy role='helper' rows).
+  const helpers = profiles.filter((item) => item.role === 'helper' || item.isVerifiedHelper);
   const vendors = profiles.filter((item) => item.role === 'vendor');
   const visible = activeTab === 'helper' ? helpers : activeTab === 'vendor' ? vendors : requesters;
 

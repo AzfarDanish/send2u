@@ -11,12 +11,13 @@ import type { UserRole } from '@/types/domain';
  */
 export function HeaderBell({ role }: { role: UserRole }) {
   const unreadCount = useSharedUnreadCount();
+  // Helper Portal shares the main notification center; there is no separate
+  // helper notifications route anymore.
+  void role;
   return (
     <NotificationBell
       unreadCount={unreadCount}
-      onPress={() =>
-        router.push(role === 'helper' ? '/(helper)/notifications' : '/(requester)/notifications')
-      }
+      onPress={() => router.push('/(requester)/notifications')}
     />
   );
 }

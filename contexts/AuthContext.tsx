@@ -22,6 +22,8 @@ interface AuthContextValue {
   profile: Profile | null;
   /** App-routing role, derived from the Supabase profile row. */
   role: UserRole | null;
+  /** Verified Helper Portal capability (requester + flag). Independent of role. */
+  isVerifiedHelper: boolean;
   /** True until the initial session + profile restore completes. */
   isLoading: boolean;
   isSupabaseEnabled: boolean;
@@ -62,6 +64,7 @@ function toAppUser(user: User, profile: Profile | null): AppUser {
     email: user.email ?? null,
     role,
     isAnonymous: (user.is_anonymous ?? false) === true,
+    isVerifiedHelper: profile?.isVerifiedHelper ?? false,
   };
 }
 
@@ -198,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       role: user?.role ?? null,
+      isVerifiedHelper: profile?.isVerifiedHelper ?? false,
       isLoading,
       // Pure env check (no client creation) so render/SSR stays side-effect free.
       isSupabaseEnabled: isSupabaseConfigured(),

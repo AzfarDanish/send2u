@@ -21,7 +21,8 @@ export default function RequesterLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
-  if (role === 'helper') return <Redirect href="/(helper)" />;
+  // Verified helpers use this same main app (Helper Portal is nested under
+  // Profile). Only vendors leave for their own experience.
   if (role === 'vendor') return <Redirect href="/(vendor)" />;
 
   // The bar floats over scrolled content (which slides behind it) while
@@ -267,6 +268,44 @@ export default function RequesterLayout() {
         options={{
           href: null,
           title: 'Drop-off Location',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      {/* Helper Portal (verified helpers only; guarded per-screen). Nested
+        under the main app and entered from Profile — never a bottom tab. */}
+      <Tabs.Screen
+        name="helper-portal/index"
+        options={{
+          href: null,
+          title: 'Helper Portal',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="helper-portal/jobs/[id]"
+        options={{
+          href: null,
+          title: 'Delivery',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="helper-portal/deliveries"
+        options={{
+          href: null,
+          title: 'My Deliveries',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="helper-portal/payment-qr"
+        options={{
+          href: null,
+          title: 'Payment QR',
           tabBarStyle: { display: 'none' },
           headerShown: false,
         }}

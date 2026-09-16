@@ -101,7 +101,7 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
       if (!notification.orderId) return;
       router.push(
         role === 'helper'
-          ? { pathname: '/(helper)/jobs/[id]', params: { id: notification.orderId } }
+          ? { pathname: '/(requester)/helper-portal/jobs/[id]', params: { id: notification.orderId } }
           : { pathname: '/(requester)/orders/[id]', params: { id: notification.orderId } },
       );
     },
@@ -144,7 +144,7 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
     header === 'custom' ? (
       <GlassHeader
         title="Notifications"
-        fallbackHref={role === 'helper' ? '/(helper)' : '/(requester)'}
+        fallbackHref={role === 'helper' ? '/(requester)/helper-portal' : '/(requester)'}
         right={markAllAction}
       />
     ) : null;

@@ -10,35 +10,65 @@ import {
   registerForPushToken,
 } from '@/lib/push';
 import { registerPushToken, removePushToken } from '@/services/pushTokens';
+import { getJobDetail, getOrderDetail } from '@/services/orders';
 
 /**
  * Device push lifecycle, mounted once at the app root while signed in:
  * permission → Expo push token → server registration; token refresh
- * re-registration; notification tap → the relevant order detail for the
- * current role. Everything is best-effort: push is an enhancement over the
- * realtime + notification-center baseline, never a requirement. Sign-out
- * removal is attempted but may already be sessionless — stale tokens are
- * harmless server-side (failed deliveries never break order operations).
+ * re-registration; notification tap → the relevant detail screen: the
+ * requester detail for the user's own requests, the Helper Portal
+ * workspace for deliveries assigned to a verified helper. Everything is
+ * best-effort: push is an enhancement over the realtime +
+ * notification-center baseline, never a requirement. Sign-out removal is
+ * attempted but may already be sessionless — stale tokens are harmless
+ * server-side (failed deliveries never break order operations).
  */
 export function usePushNotifications(): void {
-  const { user, role } = useAuth();
+  const { user, role, isVerifiedHelper } = useAuth();
   const roleRef = useRef(role);
   roleRef.current = role;
+  const userRef = useRef(user);
+  userRef.current = user;
+  const helperRef = useRef(isVerifiedHelper);
+  helperRef.current = isVerifiedHelper;
   const currentToken = useRef<string | null>(null);
 
   useEffect(() => {
     initForegroundPolicy();
     const subscription = addPushResponseListener((orderId) => {
       if (!orderId) return;
-      if (roleRef.current === 'helper') {
-        router.replace({ pathname: '/(helper)/jobs/[id]', params: { id: orderId } });
-      } else if (roleRef.current === 'vendor') {
+      if (roleRef.current === 'vendor') {
         // Vendors receive no order notifications by design; a stale tap
         // lands on the vendor home instead of a requester screen.
         router.replace('/(vendor)');
-      } else {
-        router.replace({ pathname: '/(requester)/orders/[id]', params: { id: orderId } });
+        return;
       }
+      void (async () => {
+        // Own request first: verified helpers are requesters too, and
+        // their own orders must keep requester context.
+        try {
+          const order = await getOrderDetail(orderId);
+          if (order) {
+            router.replace({ pathname: '/(requester)/orders/[id]', params: { id: orderId } });
+            return;
+          }
+        } catch {
+          // Fall through to the helper check below.
+        }
+        // Delivery assigned to this helper → portal workspace.
+        if (helperRef.current) {
+          try {
+            const job = await getJobDetail(orderId);
+            if (job && job.helperId === userRef.current?.id) {
+              router.replace({ pathname: '/(requester)/helper-portal/jobs/[id]', params: { id: orderId } });
+              return;
+            }
+          } catch {
+            // Fall through to the requester fallback below.
+          }
+        }
+        router.replace({ pathname: '/(requester)/orders/[id]', params: { id: orderId } });
+      })();
     });
     return () => subscription.remove();
   }, []);

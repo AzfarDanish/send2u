@@ -2,10 +2,6 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Badge } from '@/components/ui/Badge';
-<<<<<<< HEAD
-=======
-import { Card } from '@/components/ui/Card';
->>>>>>> parent of 9dd0d80 (refactor: standardize headers, backgrounds, and cardless UI)
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { formatMYR } from '@/lib/money';
@@ -58,49 +54,39 @@ export function RequestCard({
       accessibilityRole="button"
       accessibilityLabel={`Request #${order.id.slice(0, 8)} from ${order.vendor.name}, ${statusMessage}, ${age}`}
       onPress={() => onPress(order)}
-      style={({ pressed }) => [pressed && styles.pressed]}>
-<<<<<<< HEAD
-      <View style={styles.row}>
-=======
-      <Card style={styles.card}>
->>>>>>> parent of 9dd0d80 (refactor: standardize headers, backgrounds, and cardless UI)
-        <View style={styles.thumb}>
-          <MaterialIcons name="receipt-long" size={26} color={colors.primary} />
-        </View>
-        <View style={styles.middle}>
-          <Text variant="caption" color="secondary" numberOfLines={1}>
-            #{order.id.slice(0, 8)}
-          </Text>
-          <Text variant="secondary" style={styles.vendor} numberOfLines={1}>
-            {order.vendor.name}
-          </Text>
-          <Text variant="caption" color="secondary" numberOfLines={2}>
-            {orderItemsTitle(order.items)}
-          </Text>
-          {hint ? (
-            <Text variant="caption" color="primary">
-              {hint}
-            </Text>
-          ) : null}
-        </View>
-        <View style={styles.right}>
-          {/* Badge carries alignSelf flex-start; the wrapper re-anchors it. */}
-          <View>
-            <Badge label={statusMessage} tone={orderStatusTone(order.status)} />
-          </View>
-          <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
-          <Text variant="price" color="primary" style={styles.amount}>
-            {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
-          </Text>
-          <Text variant="caption" color="secondary" numberOfLines={1}>
-            {age}
-          </Text>
-        </View>
-<<<<<<< HEAD
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      <View style={styles.thumb}>
+        <MaterialIcons name="receipt-long" size={26} color={colors.primary} />
       </View>
-=======
-      </Card>
->>>>>>> parent of 9dd0d80 (refactor: standardize headers, backgrounds, and cardless UI)
+      <View style={styles.middle}>
+        <Text variant="caption" color="secondary" numberOfLines={1}>
+          #{order.id.slice(0, 8)}
+        </Text>
+        <Text variant="secondary" style={styles.vendor} numberOfLines={1}>
+          {order.vendor.name}
+        </Text>
+        <Text variant="caption" color="secondary" numberOfLines={2}>
+          {orderItemsTitle(order.items)}
+        </Text>
+        {hint ? (
+          <Text variant="caption" color="primary">
+            {hint}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.right}>
+        {/* Badge carries alignSelf flex-start; the wrapper re-anchors it. */}
+        <View>
+          <Badge label={statusMessage} tone={orderStatusTone(order.status)} />
+        </View>
+        <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
+        <Text variant="price" color="primary" style={styles.amount}>
+          {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
+        </Text>
+        <Text variant="caption" color="secondary" numberOfLines={1}>
+          {age}
+        </Text>
+      </View>
     </Pressable>
   );
 }

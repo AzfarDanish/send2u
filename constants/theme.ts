@@ -20,7 +20,7 @@ export const colors = {
   /** Tinted surfaces for highlights, icon chips, selected states. */
   primarySoft: '#FBE7E9',
 
-  background: '#F6F4F2',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
   /** Slightly elevated surface for cards/tips/tooltips — subtle lift over background. */
   surfaceElevated: '#FDFCFC',

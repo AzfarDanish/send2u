@@ -1,3 +1,4 @@
+import { GlassHeader } from '@/components/GlassHeader';
 import { NotificationCenter } from '@/components/NotificationCenter';
 
 /**

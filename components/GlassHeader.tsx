@@ -28,6 +28,9 @@ interface GlassHeaderProps {
  * chevron, absolutely-centered title, optional right action. Screens using
  * it hide the native header and render `Screen beneathHeader` so content
  * starts below the glass and slides behind it on scroll.
+ * 
+ * Updated: Soft, faded background treatment with minimal blur for a cleaner look.
+ * The header blends naturally into the white app background without visible boundaries.
  */
 export function GlassHeader({
   title,
@@ -49,10 +52,18 @@ export function GlassHeader({
       // underneath (e.g. a pinned filter bar stays usable under the blur).
       pointerEvents="box-none">
       <BlurView
-        intensity={85}
+        intensity={15}
         tint={dark ? 'dark' : 'light'}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
+      />
+      {/* Soft faded background overlay - subtle white tint that blends with app background */}
+      <View 
+        style={[
+          styles.backgroundOverlay,
+          dark && styles.backgroundOverlayDark
+        ]} 
+        pointerEvents="none" 
       />
       <View style={[styles.row, { paddingTop: insets.top }]}>
         <View style={styles.side}>
@@ -73,7 +84,7 @@ export function GlassHeader({
         </View>
         <View style={[styles.side, styles.right]}>{right}</View>
       </View>
-      {dark ? null : <View style={styles.hairline} pointerEvents="none" />}
+      {/* Subtle separator at bottom edge - removed for cleaner floating appearance */}
     </View>
   );
 }
@@ -102,8 +113,15 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text },
   titleDark: { color: colors.onPrimary },
-  hairline: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.divider,
+  backgroundOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+  },
+  backgroundOverlayDark: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
 });

@@ -80,6 +80,8 @@ export function Screen({ children, scrollable = true, contentStyle, refreshContr
           {children}
         </View>
       )}
+      {/* Subtle separator line between content and bottom tab bar */}
+      {underTabs && <View style={styles.tabSeparator} pointerEvents="none" />}
     </SafeAreaView>
   );
 }
@@ -96,4 +98,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   tabsClearance: { paddingBottom: spacing.xxxl + touchTargets.tabBar },
+  tabSeparator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.divider,
+  },
 });

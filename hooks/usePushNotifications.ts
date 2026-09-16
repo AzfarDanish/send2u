@@ -44,22 +44,31 @@ export function usePushNotifications(): void {
         return;
       }
       void (async () => {
+        const myUid = userRef.current?.id ?? null;
         // Own request first: verified helpers are requesters too, and
-        // their own orders must keep requester context.
+        // their own orders must keep requester context. (Ownership is
+        // checked on the row — assigned helpers can also SELECT the
+        // order, so visibility alone must not decide the destination.)
         try {
           const order = await getOrderDetail(orderId);
-          if (order) {
+          if (order && order.requesterId === myUid) {
             router.replace({ pathname: '/(requester)/orders/[id]', params: { id: orderId } });
             return;
           }
+          // Delivery assigned to this helper → portal workspace.
+          if (helperRef.current && order && order.helperId === myUid) {
+            router.replace({ pathname: '/(requester)/helper-portal/jobs/[id]', params: { id: orderId } });
+            return;
+          }
         } catch {
-          // Fall through to the helper check below.
+          // Fall through to the fallbacks below.
         }
-        // Delivery assigned to this helper → portal workspace.
-        if (helperRef.current) {
+        // Not mine as a requester delivery: re-check as a helper job
+        // (queue-visible rows carry no assignment yet).
+        if (helperRef.current && myUid) {
           try {
             const job = await getJobDetail(orderId);
-            if (job && job.helperId === userRef.current?.id) {
+            if (job && job.helperId === myUid) {
               router.replace({ pathname: '/(requester)/helper-portal/jobs/[id]', params: { id: orderId } });
               return;
             }

@@ -100,7 +100,7 @@ export default function PortalPaymentQrScreen() {
 
   return (
     <HelperPortalGuard title="Payment QR">
-      <GlassHeader title="Payment QR" fallbackHref="/(requester)/helper-portal" />
+      <GlassHeader title="Payment QR" fallbackHref="/(requester)/helper-portal/profile" />
       <Screen beneathHeader>
         <Text variant="subtitle">Your payment QR</Text>
         <Text color="secondary">Requesters use this to repay you after delivery.</Text>

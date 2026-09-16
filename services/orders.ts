@@ -419,6 +419,8 @@ function friendlyAcceptError(message: string): string {
     return 'Your session expired. Sign in again and retry.';
   if (/only helpers/i.test(message))
     return 'Only verified helpers can accept jobs.';
+  if (/active job limit|limit reached/i.test(message))
+    return 'You have 3 active jobs. Finish one to take another.';
   if (/no longer available/i.test(message))
     return 'Someone just took this job. Pick another open request.';
   return message ? `Could not accept the job: ${message}` : 'Could not accept the job.';

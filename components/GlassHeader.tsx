@@ -18,6 +18,8 @@ interface GlassHeaderProps {
   accessibilityLabel?: string;
   /** Back chevron label (e.g. "Back to Home" over a hero). */
   backLabel?: string;
+  /** Hides the back chevron (primary tab destinations inside a navigator). */
+  hideBack?: boolean;
   /** `dark` renders white content over imagery (vendor hero). */
   tone?: 'light' | 'dark';
 }
@@ -38,6 +40,7 @@ export function GlassHeader({
   right,
   accessibilityLabel,
   backLabel,
+  hideBack = false,
   tone = 'light',
 }: GlassHeaderProps) {
   const insets = useSafeAreaInsets();
@@ -67,11 +70,13 @@ export function GlassHeader({
       />
       <View style={[styles.row, { paddingTop: insets.top }]}>
         <View style={styles.side}>
-          <HeaderBack
-            fallbackHref={fallbackHref}
-            color={dark ? colors.onPrimary : undefined}
-            accessibilityLabel={backLabel}
-          />
+          {hideBack ? null : (
+            <HeaderBack
+              fallbackHref={fallbackHref}
+              color={dark ? colors.onPrimary : undefined}
+              accessibilityLabel={backLabel}
+            />
+          )}
         </View>
         <View style={styles.titleWrap} pointerEvents="none">
           <Text

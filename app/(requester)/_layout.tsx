@@ -272,40 +272,14 @@ export default function RequesterLayout() {
           headerShown: false,
         }}
       />
-      {/* Helper Portal (verified helpers only; guarded per-screen). Nested
-        under the main app and entered from Profile — never a bottom tab. */}
+      {/* Helper Portal (verified helpers only; guarded per-screen) owns its
+        own Jobs/Deliveries/Profile bottom navigation inside this hidden
+        slot, entered from Profile — never a main-app tab. */}
       <Tabs.Screen
-        name="helper-portal/index"
+        name="helper-portal"
         options={{
           href: null,
           title: 'Helper Portal',
-          tabBarStyle: { display: 'none' },
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="helper-portal/jobs/[id]"
-        options={{
-          href: null,
-          title: 'Delivery',
-          tabBarStyle: { display: 'none' },
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="helper-portal/deliveries"
-        options={{
-          href: null,
-          title: 'My Deliveries',
-          tabBarStyle: { display: 'none' },
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="helper-portal/payment-qr"
-        options={{
-          href: null,
-          title: 'Payment QR',
           tabBarStyle: { display: 'none' },
           headerShown: false,
         }}

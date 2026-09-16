@@ -13,13 +13,15 @@ import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
+import { SlideToConfirm } from '@/components/ui/SlideToConfirm';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
+import { useMyDeliveries } from '@/hooks/useMyDeliveries';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { openMapsLocation } from '@/lib/maps';
 import { formatMYR } from '@/lib/money';
 import { emitOrderChanged } from '@/lib/orderEvents';
-import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone, orderTotalCents } from '@/lib/orders';
+import { formatOrderDate, isTerminalOrderStatus, orderStatusLabel, orderStatusTone, orderTotalCents, MAX_ACTIVE_JOBS_PER_HELPER } from '@/lib/orders';
 import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
 import type { OrderStatus, OrderWithDetails } from '@/types/domain';
 
@@ -69,6 +71,12 @@ export default function PortalJobDetailScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [mapsBusy, setMapsBusy] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState<boolean | null>(null);
+  // Active-delivery count gates acceptance at the 3-job capacity (the
+  // server enforces the same cap race-safely; this only shapes the UI).
+  const myDeliveries = useMyDeliveries();
+  const activeCount =
+    myDeliveries.status === 'ready' ? myDeliveries.deliveries.length : 0;
+  const atCapacity = activeCount >= MAX_ACTIVE_JOBS_PER_HELPER;
 
   const reload = useCallback(async () => {
     try {
@@ -272,12 +280,23 @@ export default function PortalJobDetailScreen() {
             {acceptError ? (
               <ErrorState title="Could not accept" message={acceptError} retryTitle="Try again" onRetry={() => void handleAccept()} />
             ) : null}
-            <Button
-              title={accepting ? 'Accepting…' : `Accept · +${formatMYR(job.deliveryFeeCents)} fee`}
-              onPress={() => void handleAccept()}
-              disabled={accepting}
-              loading={accepting}
+            <SlideToConfirm
+              label="Slide to accept"
+              busyLabel="Accepting…"
+              disabledLabel={`Full — ${activeCount}/${MAX_ACTIVE_JOBS_PER_HELPER} active`}
+              disabled={atCapacity}
+              busy={accepting}
+              onConfirm={() => void handleAccept()}
             />
+            {atCapacity ? (
+              <Text variant="caption" color="secondary">
+                You have {MAX_ACTIVE_JOBS_PER_HELPER} active jobs — finish one to take another.
+              </Text>
+            ) : (
+              <Text variant="caption" color="muted">
+                Fee {formatMYR(job.deliveryFeeCents)} · food {formatMYR(job.subtotalCents)} fronted by you
+              </Text>
+            )}
           </View>
         ) : null}
 

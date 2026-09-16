@@ -53,6 +53,44 @@ export function isActiveOrderStatus(status: OrderStatus): boolean {
   return !TERMINAL_SET.has(status);
 }
 
+/**
+ * Maximum concurrent active deliveries per helper, enforced server-side
+ * in `send2u_accept_order` (race-safe) and mirrored in UI gating. Keep
+ * the two in agreement if this ever changes.
+ */
+export const MAX_ACTIVE_JOBS_PER_HELPER = 3;
+
+/**
+ * Short human status for a helper's own active job rows. Plain words,
+ * never raw state keys — e.g. "At vendor", "Picked up".
+ */
+export function helperStatusLabel(status: OrderStatus): string {
+  switch (status) {
+    case 'assigned':
+      return 'Assigned';
+    case 'going_to_vendor':
+      return 'Going to vendor';
+    case 'at_vendor':
+      return 'At vendor';
+    case 'food_available':
+      return 'Food available';
+    case 'food_purchased':
+      return 'Purchased';
+    case 'picked_up':
+      return 'Picked up';
+    case 'out_for_delivery':
+    case 'delivering':
+      return 'On the way';
+    case 'delivered':
+      return 'Delivered';
+    case 'confirmed':
+    case 'awaiting_requester_payment':
+      return 'Confirmed';
+    default:
+      return orderStatusLabel(status);
+  }
+}
+
 /** Badge tone per status across the fulfilment lifecycle. */
 export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
   switch (status) {

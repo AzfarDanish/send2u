@@ -10,6 +10,128 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-16 — Helper Portal Jobs tab from approved reference (portal bottom nav + slider accept)
+
+- Changed (backend, migration `limit_helper_active_jobs`):
+  `send2u_accept_order` caps concurrent active deliveries at 3 per
+  helper (terminal states excluded), serialized per helper with
+  `pg_advisory_xact_lock` so simultaneous claims cannot both pass;
+  friendly `You have 3 active jobs…` mapping in `friendlyAcceptError`;
+  UI/server share `MAX_ACTIVE_JOBS_PER_HELPER` (`lib/orders.ts`, plus
+  `helperStatusLabel` for plain-word active statuses).
+- Changed (app): portal owns a nested Jobs/Deliveries/Profile bottom
+  tab navigator (`helper-portal/_layout.tsx`, same bar tokens as the
+  main app; parent keeps one hidden `helper-portal` slot); new portal
+  Profile (identity + Payment QR row, no sign-out); Jobs rewritten to
+  the reference (glass header with back + centered title + bell,
+  56pt circular `VendorMark` initials rows with vendor/items/
+  pickup→drop-off/status + chevron at fixed geometry, `Active jobs
+  (n/3)` plain-text capacity, no amounts/ETAs/estimates on rows, rows
+  navigate only, geometry-matched skeletons); acceptance moved to Job
+  Detail behind new `SlideToConfirm` (70% drag threshold, spring-back,
+  busy/disabled states, screen-reader tap equivalent), disabled with
+  reason at capacity; `GlassHeader` gains `hideBack` for tab roots;
+  `HeaderBell` role prop optional; stale queue Accept/fee/subtotal
+  presentation removed.
+- Reason: approved Jobs reference + `design.md` portal shape; one
+  obvious interaction hierarchy per row; consequential claim behind a
+  deliberate gesture; no new data invented (initials/fee/counts derive
+  from real rows).
+- Details: realtime/queue/accept-atomicity/RPC verbs/payment/QR
+  flows untouched; nested-tabs deep links (`helper-portal/jobs/[id]`,
+  notification/push targets) unchanged; no new dependencies.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0 (one
+  self-made `react-hooks/refs` violation in the slider fixed by
+  state-held Animated value + memoized responder),
+  `expo export -p web --clear` — pass (all portal routes incl. new
+  profile bundled); live H1-vs-H2 accept race still single-winner and
+  full place→completed regression 25/25 post-migration; cap proven
+  live (3 accepts, 4th rejected `Active job limit reached (3)`, row
+  stays pending-unassigned); all controlled orders cleaned up.
+- Limits/decisions: no browser/device lab — drag gesture and 320pt
+  rendering verified by code review only, pending on-device check;
+  `info`-tone pills, requester icon colors, and remaining §20 rows
+  untouched; `docs/design.md` §11/§19/§20 updated to match.
+- Note: live fixtures hold pre-existing actives (Helper 1 ×3,
+  Helper 3 ×1, one other-helper delivery) and Requester 1 holds 13
+  pre-existing pendings — all left untouched; cap tests ran on
+  Helper 2 (zero actives) with full cleanup.
+
+## 2026-09-16 — Docs: design-system rewrite (`docs/design.md` as visual source of truth)
+
+- Changed: rewrote `docs/design.md` (21 sections) from direct source
+  inspection (`constants/theme.ts`, `components/ui/*`, all route
+  groups, `lib/orders.ts`): identity, prohibited-patterns list,
+  header/bottom-nav/white/list/action/slider-language/typography/
+  colour/icon/spacing/copy/mobile/role rules, prescribed Helper Portal
+  shape (Jobs/Deliveries/Profile bottom nav, no portal sign-out,
+  actionable-only jobs, max 3 active, fixed RM2 fee, acceptance on Job
+  Detail), inconsistency audit, and a pre-ship checklist. Prior
+  redesign-spec revision superseded (noted in-document); no app,
+  schema, or backend code touched.
+- Reason: single authoritative visual reference for Helper Portal and
+  future mockup work, with patterns, inconsistencies, and future-only
+  prescriptions (sliders, portal bottom nav, 3-job cap) clearly
+  separated.
+- Details: slider interaction, portal bottom nav, and job cap are
+  documented as prescribed-but-unbuilt; `helper-ui-audit.md` stays
+  marked superseded.
+- Validation: `tsc --noEmit` clean (docs-only change; no sources
+  touched).
+- Known limitation: rendered-UI screenshots not captured (no device
+  lab); values verified from source tokens and layout code.
+
+## 2026-09-16 — Verification: portal E2E + dispatch capability fix + push ownership routing
+
+- Fixed (backend, migration `authorize_verified_helper_dispatch`):
+  `send2u_dispatch_next` counted available helpers by legacy
+  `role='helper'` only, so every placement wrote a spurious
+  `order.dispatch_failed` ("No helpers online") notice despite verified
+  helpers being online; same stale predicate in retired
+  `send2u_respond_to_offer`. Both now use the migration capability
+  predicate (`role='helper'` OR `is_verified_helper`). Live re-scan
+  confirms zero functions gate on the legacy role alone. No
+  state-machine, amount, or routing changes.
+- Fixed (app): push-tap routing resolved destinations by row
+  *visibility*, but assigned helpers can SELECT their orders — so a
+  helper tapping a job push would have landed on the requester detail.
+  `usePushNotifications` now compares `requesterId`/`helperId` against
+  the session (`hooks/usePushNotifications.ts`); verified live at the
+  data level for both directions.
+- Verified live (dev sessions as Requester 1, Helper 1, Helper 2 via
+  dev-switch; all controlled orders + storage objects cleaned up,
+  baseline 19 orders / 3 payments / 3 ratings / 12 profiles restored,
+  zero orphans/residue): capability distribution 3 verified + 3 plain
+  + 6 vendors; unverified queue/select/accept/availability/self-
+  elevation denials (5/5) + cross-user pending invisibility; race
+  accept H1-vs-H2 single winner; full chain
+  pending→completed with per-state checks, food-cost snapshot (750),
+  invalid-transition + helper-confirm rejections; receipt upload +
+  verified payment (950 = 750 + 200, `verified_by` = requester);
+  double-submit + duplicate-rating rejections; release→pending,
+  food-unavailable→row deleted, abandon→disputed(`helper_unable`,
+  cost kept), report_failed→disputed(`delivery_failed`),
+  clean-cancel→row deleted, delivered→dispute→withdraw→delivered→
+  confirm→pay→completed, cancel-after-complete rejected;
+  availability off/on round-trip; realtime INSERT received by helper
+  channel; QR replace cycle with byte-identical restore; Maps URL
+  construction + empty-label guard (universal Google URL, no SDK);
+  no `(helper)` routes/imports in live code; portal routes bundled
+  and served HTTP 200.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass (58 routes incl. all portal
+  routes); `expo-doctor` 19/21 — same 2 pre-existing environmental
+  failures. 25/25 happy-path, 13/13 exception, 9/9 QR, 4/4 push,
+  realtime 1/1 checks pass (one initial realtime timeout was a
+  harness race with SUBSCRIBED, not an app defect — passes on retry
+  with explicit subscribe confirmation).
+- Limits/decisions: physical push delivery, Maps-app open, and
+  on-device interaction remain device-only (routing/URL/fallback
+  verified at code + data level); vendor sign-in not exercised
+  (passwords unknown — vendor code paths untouched by either commit,
+  accounts/RLS intact); Requester 1 carries 13 pre-existing pending
+  orders left untouched (not this task's data).
+
 ## 2026-09-16 — Helper Portal UI/UX redesign (task-first, fee-first, state-aware Maps)
 
 - Changed (presentation only; no RPC/query/realtime/state-machine

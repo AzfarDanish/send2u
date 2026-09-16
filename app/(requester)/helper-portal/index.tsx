@@ -1,50 +1,106 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshControl, StyleSheet, Switch, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Pressable, RefreshControl, StyleSheet, Switch, View } from 'react-native';
 
 import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBell } from '@/components/HeaderBell';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
-import { Button } from '@/components/ui/Button';
+import { VendorMark } from '@/components/VendorMark';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { ListRow } from '@/components/ui/ListRow';
-import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { useAvailableJobs } from '@/hooks/useAvailableJobs';
 import { useHelperAvailability } from '@/hooks/useHelperAvailability';
 import { useMyDeliveries } from '@/hooks/useMyDeliveries';
-import { formatMYR } from '@/lib/money';
-import { formatOrderDate, orderStatusLabel } from '@/lib/orders';
-import { acceptOrder } from '@/services/orders';
+import { helperStatusLabel, MAX_ACTIVE_JOBS_PER_HELPER } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
-function jobItemSummary(job: OrderWithDetails): string {
+function itemCountLabel(job: OrderWithDetails): string {
   const count = job.items.reduce((sum, item) => sum + item.quantity, 0);
-  const first = job.items[0];
-  if (!first) return 'No items';
-  const rest = count - first.quantity;
-  return rest > 0
-    ? `${first.quantity} × ${first.itemName} + ${rest} more`
-    : `${first.quantity} × ${first.itemName}`;
+  return count === 1 ? '1 item' : `${count} items`;
+}
+
+function availabilityLabel(job: OrderWithDetails): string {
+  const pickup = job.vendor.locationHint ?? job.vendor.name;
+  return `${pickup} → ${job.location.name}`;
+}
+
+interface JobRowProps {
+  job: OrderWithDetails;
+  status?: string;
+  onPress: (jobId: string) => void;
 }
 
 /**
- * Helper Portal home / Job Queue. Verified helpers only (guarded).
- * Reuses the broadcast queue (pending + unassigned, oldest first),
- * atomic first-wins acceptance, realtime + focus refresh, and the
- * availability gate — presentation only is new: the helper's delivery
- * fee leads each job (not the food subtotal), the row is plain
- * navigation while Accept is the sole filled action, and accept
- * failures anchor to the job that failed.
+ * Visual-first job row: vendor mark, name, item count, location, and an
+ * optional status word with a navigation chevron. Fixed geometry — every
+ * row is the same height. Rows only navigate; claiming happens on Job
+ * Detail. No amounts, ETAs, or estimates: the fee is fixed context for
+ * the detail and payment screens.
  */
-export default function HelperPortalScreen() {
+function JobRow({ job, status, onPress }: JobRowProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${job.vendor.name}, ${itemCountLabel(job)}`}
+      onPress={() => onPress(job.id)}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      <VendorMark name={job.vendor.name} size={56} />
+      <View style={styles.rowText}>
+        <Text variant="subtitle" numberOfLines={1}>
+          {job.vendor.name}
+        </Text>
+        <Text color="secondary" numberOfLines={1}>
+          {itemCountLabel(job)}
+        </Text>
+        <View style={styles.locationLine}>
+          <MaterialIcons name="place" size={14} color={colors.primary} />
+          <Text variant="caption" color="secondary" numberOfLines={1} style={styles.locationText}>
+            {availabilityLabel(job)}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.rowRight}>
+        {status ? (
+          <Text variant="caption" color="secondary" numberOfLines={1}>
+            {status}
+          </Text>
+        ) : null}
+        <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
+      </View>
+    </Pressable>
+  );
+}
+
+function JobRowSkeleton() {
+  return (
+    <View style={styles.row} accessibilityRole="progressbar" accessibilityLabel="Loading jobs">
+      <Skeleton width={56} height={56} radius={radii.full} />
+      <View style={styles.rowText}>
+        <Skeleton width="60%" height={18} />
+        <Skeleton width="40%" height={16} />
+        <Skeleton width="75%" height={14} />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Helper Portal Jobs tab. Verified helpers only (guarded). Answers one
+ * question — what can I do right now: active workload with its 3-job
+ * capacity, then genuinely available opportunities. Rows identify and
+ * navigate; Job Detail decides and claims. Broadcast queue, atomic
+ * first-wins acceptance, realtime, and the availability gate are
+ * unchanged — only this presentation is new.
+ */
+export default function HelperJobsScreen() {
   const { isAvailable, updating, error: availabilityError, setAvailable } = useHelperAvailability();
   const { jobs, status, error, refreshing, retry, refresh } = useAvailableJobs();
   const active = useMyDeliveries();
-  const [failedJob, setFailedJob] = useState<{ id: string; message: string } | null>(null);
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const firstAvailabilityRun = useRef(true);
   useEffect(() => {
@@ -66,38 +122,23 @@ export default function HelperPortalScreen() {
     [setAvailable],
   );
 
-  const handleAccept = useCallback(
-    async (jobId: string) => {
-      if (acceptingId) return;
-      setAcceptingId(jobId);
-      setFailedJob(null);
-      try {
-        await acceptOrder(jobId);
-        router.push({ pathname: '/(requester)/helper-portal/jobs/[id]', params: { id: jobId } });
-      } catch (err) {
-        setFailedJob({
-          id: jobId,
-          message: err instanceof Error ? err.message : 'Could not accept the job.',
-        });
-        await refresh();
-      } finally {
-        setAcceptingId(null);
-      }
-    },
-    [acceptingId, refresh],
-  );
-
   const openJob = useCallback((jobId: string) => {
     router.push({ pathname: '/(requester)/helper-portal/jobs/[id]', params: { id: jobId } });
   }, []);
 
   const activeDeliveries = active.status === 'ready' ? active.deliveries : [];
+  const atCapacity = activeDeliveries.length >= MAX_ACTIVE_JOBS_PER_HELPER;
 
   return (
-    <HelperPortalGuard title="Helper Portal">
-      <GlassHeader title="Helper Portal" fallbackHref="/(requester)/profile" />
+    <HelperPortalGuard title="Jobs">
+      <GlassHeader
+        title="Jobs"
+        fallbackHref="/(requester)/profile"
+        right={<HeaderBell />}
+      />
       <Screen
         beneathHeader
+        underTabs
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.primary} />
         }>
@@ -124,42 +165,42 @@ export default function HelperPortalScreen() {
 
         {activeDeliveries.length > 0 ? (
           <View style={styles.section}>
-            <Text variant="subtitle">Continue working</Text>
-            {activeDeliveries.slice(0, 1).map((delivery) => (
-              <View key={delivery.id} style={styles.rowWrap}>
-                <ListRow
-                  icon="delivery-dining"
-                  title={delivery.vendor.name}
-                  subtitle={`${orderStatusLabel(delivery.status)} · ${delivery.location.name} · fee ${formatMYR(delivery.deliveryFeeCents)}`}
-                  onPress={() => openJob(delivery.id)}
-                />
-              </View>
-            ))}
-            {activeDeliveries.length > 1 ? (
-              <Button
-                title={`View all ${activeDeliveries.length} active`}
-                variant="secondary"
-                onPress={() => router.push('/(requester)/helper-portal/deliveries')}
+            <Text variant="title">
+              Active jobs ({activeDeliveries.length}/{MAX_ACTIVE_JOBS_PER_HELPER})
+            </Text>
+            {activeDeliveries.map((delivery) => (
+              <JobRow
+                key={delivery.id}
+                job={delivery}
+                status={helperStatusLabel(delivery.status)}
+                onPress={openJob}
               />
-            ) : null}
+            ))}
           </View>
         ) : null}
 
         <View style={styles.section}>
-          <Text variant="subtitle">
-            Available jobs{isAvailable && status === 'ready' ? ` · ${jobs.length}` : ''}
-          </Text>
+          <Text variant="title">Available jobs</Text>
+          {atCapacity ? (
+            <Text variant="caption" color="secondary">
+              You have {MAX_ACTIVE_JOBS_PER_HELPER} active jobs — finish one to take another.
+            </Text>
+          ) : null}
           {!isAvailable ? (
             <View style={styles.offlineNote}>
               <Text variant="secondary" style={styles.offlineTitle}>
                 You are offline
               </Text>
               <Text variant="caption" color="secondary">
-                Go available above to see open requests. Your portal stays accessible.
+                Go available above to see open requests.
               </Text>
             </View>
           ) : status === 'loading' ? (
-            <LoadingState message="Finding open jobs…" />
+            <>
+              <JobRowSkeleton />
+              <JobRowSkeleton />
+              <JobRowSkeleton />
+            </>
           ) : status === 'error' ? (
             <ErrorState
               title="Couldn't load open jobs"
@@ -171,60 +212,11 @@ export default function HelperPortalScreen() {
             <EmptyState icon="work-outline" title="No open requests" message="Pull to refresh." />
           ) : (
             <>
-              {jobs.map((job) => {
-                const isAccepting = acceptingId === job.id;
-                return (
-                  <View key={job.id} style={styles.jobRow}>
-                    <ListRow
-                      icon="delivery-dining"
-                      title={job.vendor.name}
-                      subtitle={`${jobItemSummary(job)} · ${job.location.name} · ${formatOrderDate(job.createdAt)}`}
-                      onPress={() => openJob(job.id)}
-                    />
-                    <View style={styles.earningRow}>
-                      <Text variant="secondary" style={styles.fee}>
-                        +{formatMYR(job.deliveryFeeCents)} fee
-                      </Text>
-                      <Text variant="caption" color="muted">
-                        Food {formatMYR(job.subtotalCents)} · you front this
-                      </Text>
-                    </View>
-                    <Button
-                      title={isAccepting ? 'Accepting…' : 'Accept'}
-                      onPress={() => void handleAccept(job.id)}
-                      disabled={isAccepting}
-                      loading={isAccepting}
-                    />
-                    {failedJob?.id === job.id ? (
-                      <ErrorState
-                        title="Could not accept"
-                        message={failedJob.message}
-                        retryTitle="Dismiss"
-                        onRetry={() => setFailedJob(null)}
-                      />
-                    ) : null}
-                  </View>
-                );
-              })}
+              {jobs.map((job) => (
+                <JobRow key={job.id} job={job} onPress={openJob} />
+              ))}
             </>
           )}
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.rowWrap}>
-            <ListRow
-              icon="history"
-              title="My Deliveries"
-              onPress={() => router.push('/(requester)/helper-portal/deliveries')}
-            />
-          </View>
-          <View style={styles.rowWrap}>
-            <ListRow
-              icon="qr-code"
-              title="Payment QR"
-              onPress={() => router.push('/(requester)/helper-portal/payment-qr')}
-            />
-          </View>
         </View>
       </Screen>
     </HelperPortalGuard>
@@ -242,11 +234,19 @@ const styles = StyleSheet.create({
   },
   availabilityText: { flex: 1, gap: spacing.xs },
   availabilityTitle: { fontWeight: '600', color: colors.text },
-  section: { gap: spacing.sm, paddingTop: spacing.md },
-  rowWrap: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  jobRow: { gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  section: { gap: spacing.md, paddingTop: spacing.md },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: 76,
+    paddingVertical: spacing.sm,
+  },
+  pressed: { opacity: 0.7 },
+  rowText: { flex: 1, gap: 2, minWidth: 0 },
+  locationLine: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  locationText: { flex: 1 },
+  rowRight: { alignItems: 'flex-end', justifyContent: 'center', gap: 2, maxWidth: 110 },
   offlineNote: { gap: spacing.xs, paddingVertical: spacing.md, alignItems: 'center' },
   offlineTitle: { fontWeight: '600', color: colors.text },
-  earningRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
-  fee: { fontWeight: '700', color: colors.success },
 });

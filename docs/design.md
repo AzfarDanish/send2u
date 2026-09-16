@@ -1,574 +1,480 @@
-# Send2U Frontend Redesign — Design Specification (`design.md`)
+# Send2U Design System (`design.md`)
 
-- **Status:** implementation-ready design reference for a future frontend redesign.
-- **Source of truth basis:** inspected against the actual codebase (Expo SDK 57, Expo Router, TypeScript, Supabase) — every "Current" statement below was read from source, not assumed.
-- **Brand anchor:** Send2U icon red `#DA0A1B` (sampled from the shipped app-icon artwork; currently used only as the Android adaptive-icon background).
-- **Scope rule:** the redesign changes presentation and information architecture only. Backend statuses, permissions, validation, RPC transaction semantics, and role routing are preserved unless a separate product decision changes them.
-- **Roles served by the app:** requester, helper, vendor. `admin` is a database-only role with no UI. A lecturer role does not exist anywhere in the implementation.
+Authoritative visual and UX reference for the Send2U Expo React Native
+application. It documents the design language **as established by the
+current implementation** (`constants/theme.ts`, `components/ui/*`,
+existing screens), states binding rules for future work, and lists known
+inconsistencies to avoid repeating.
 
----
+Conventions used throughout:
 
-## Section 1: Executive summary
+- **Established pattern** — what the code does today; follow it.
+- **Inconsistency** — where the code deviates from its own pattern; do
+  not copy it (each names the direction to follow instead).
+- **Rule** — binding for new screens and mockups.
+- **Future** — prescribed but not yet implemented; do not treat as
+  existing behavior.
 
-### 1.1 What Send2U currently is (frontend perspective)
-
-Send2U is an Expo React Native app (single codebase, Expo Router file-based navigation) with three role-grouped experiences behind one email/password auth gate:
-
-- **Requester** (campus food ordering): Home discovery with vendor sections, item detail, in-memory cart, Review Request with predefined drop-off selection, stateless confirmation, Active/History orders, state-driven Request Detail, external-QR payment with receipt-evidence upload, delivered-confirmation, delivered-only issue reporting with withdrawal, and two-sided ratings on completed/paid orders.
-- **Helper** (delivery work): availability-gated open job queue with atomic first-claim accept, a per-status fulfilment stepper (go-to-vendor → purchase → pickup → deliver), fee-only earnings, payment-QR management, read-only payment inspection, and the same history/rating primitives as the requester.
-- **Vendor** (stall operations only): open/closed switch, stall-detail editing, menu CRUD with availability toggles. Deliberately no orders, preparation, verification, notification, or payment UI.
-
-The shared foundation is a light-only teal design system (`constants/theme.ts`), ~12 shared `ui/` primitives plus domain components, MaterialIcons exclusively, SafeArea-plus-scroll page shells, and inline loading/empty/error states everywhere. There are no modals, bottom sheets, toasts, dialogs, drawers, gradients, food/vendor photography, maps, GPS, chat, or in-app payment processing. The single production dialog is a vendor delete-confirm `Alert`.
-
-### 1.2 Overall design direction
-
-Evolve the calm, light, native-feeling foundation into a **minimalist red-and-white, Apple-inspired** Send2U identity: clarity first, generous spacing, one primary action per screen, progressive disclosure of operational detail (statuses, fees, evidence), deference to content (food, prices, statuses), and honest transaction communication. More visual, less text-heavy — larger touch targets, status pills with icon+label pairs, and restrained motion. Red is the brand accent (actions, active states, brand surfaces); semantic success/warning/error keep their own non-red treatments.
-
-### 1.3 Primary usability goals
-
-1. A first-time student can discover food and submit a first request without instructions.
-2. At any moment, the requester can answer "what is happening with my request and what must I do?" within five seconds of opening Request Detail.
-3. Payment-required and receipt-submitted states are unmistakable and never confused with in-app payment.
-4. Helpers can work one-handed through the fulfilment stepper; vendors can open/close and edit menus in seconds.
-5. Every state (loading, empty, error, cancelled, disputed, completed) is explicit and actionable.
-
-### 1.4 Major problems the redesign should solve
-
-- **Teal-vs-red brand split:** the launcher icon is red while the entire UI is teal; the product reads as two brands.
-- **Text-heavy operational screens:** Request Detail, payment, and history lean on paragraphs where hierarchy, pills, and progressive disclosure would scan faster.
-- **No shared Input component:** 11 raw `TextInput`s with slightly different borders (auth uses `border`, detail forms use 1.5px `primary`).
-- **Verified micro-defects:** notification-dot radii hardcodes (fixed), `&apos;` literals rendering literally on native (requester fixed; 4 helper strings remain), helper `picked_up` error-retry refiring the action, helper dead-end card for 5 legacy statuses, hardcoded rating title for helper viewers.
-- **Missing confirm-first patterns in vendor forms** (vendor stall/item forms save directly, unlike the receipt flow).
-- **No empty/error/loading gaps, but no skeletons:** lists jump from spinner to content; no toast system for transient confirmations (currently inline only).
-
-### 1.5 What the redesign must not change
-
-Backend enum values and RPC semantics; role model and immutability; split-per-vendor order creation; server-derived prices, snapshots, and the RM2.00-per-order fee; external-QR payment with self-attesting receipt submit; delivered-only confirm/dispute gates; dispute categories; rating eligibility/immutability; RLS ownership; realtime-as-enhancement (fully usable offline-from-realtime) architecture; the vendor operations-only scope; the absence of maps/chat/photo-proof/gateways.
+No section of this document authorizes backend, product-scope, or
+navigation-architecture changes on its own. Status vocabulary in §12
+mirrors `lib/orders.ts`, which remains the runtime source of truth.
 
 ---
 
-## Section 2: Current frontend inventory
+## 1. Product and navigation overview
 
-Conventions: **Route** as declared in Expo Router. **Redesign?** = Yes where presentation rework is warranted (functionality preserved regardless).
+Send2U has one main requester application with three bottom-navigation
+destinations — **Home**, **Requests**, **Profile** (`app/(requester)/`).
+A verified Helper (`role = requester` + `is_verified_helper = true`) uses
+the same app and additionally enters the **Helper Portal** from Profile.
+Vendors use a separate three-tab application (Stall / Menu / Profile).
+There is no admin UI.
 
-### 2.1 Shared / Authentication
-
-| Screen | Route | Purpose | Layout / components / actions | States | Data | Destinations | Usability problems | Redesign? |
-|---|---|---|---|---|---|---|---|---|
-| App launch router | `/` (`app/index.tsx`) | Auth/role gate, no UI decisions | Full-screen `LoadingState` ("Getting Send2U ready…") or instant `Redirect` | loading → sign-in / setup-fix / role home | session + role | `(auth)/sign-in`, `/select-role`, role groups | None (correctly invisible) | No (keep) |
-| Sign in | `/(auth)/sign-in` | Email/password entry | `BrandHeader` (teal rounded square + "send" glyph + wordmark), `SectionHeader`, email + password `TextInput`s, primary submit, tertiary mode-switch | setup-missing card, session-restore notice, inline form errors, email-confirmation card, loading/disabled buttons | auth session, config flags | role home via `/`; toggles sign-up mode | Role picker only on sign-up (correct); no password reset (backend gap, not UI) | Yes (rebrand, shared Input) |
-| Create account | `/(auth)/sign-in` mode | Signup + permanent role pick | Same inputs + two `OptionCard`s (ordering / helping), "role is permanent" note | confirmation-required branch, validation + inline errors | signup result | sign-in mode; role home | Copy accurate; visual weight of role cards good | Yes (rebrand only) |
-| Finish account setup | `/select-role` | Recovery for role-less accounts | Role cards + Confirm (permanent) + check-again + sign out; unsupported-role error branch | loading, claim error, refresh states | profile row presence | `/` on success | Rare path; copy good | Light touch only |
-| Not found | `+not-found` | Dead-link fallback | Standard Expo Router not-found | static | none | back/home | None | No |
-
-### 2.2 Requester
-
-| Screen | Route | Purpose | Layout / components / actions | States | Data | Destinations | Usability problems | Redesign? |
-|---|---|---|---|---|---|---|---|---|
-| Home | `/(requester)` (tab Home) | Discovery + live status | Header ("Today on campus" / "Good food, carried by students", item-count badge); dynamic active-request preview (status pill, dish title, vendor, total, View request; "View all N" when multiple); cart shortcut row; vendor sections (name, location hint, hours, Closed pill) with compact item rows (price, description, Unavailable pill) | menu loading/empty/error; orders-preview loading (silent on error); pull-to-refresh both | menu sections, active orders (newest first), cart count | item detail, Review Request, order detail, orders list | Preview shows newest only (mitigated by View-all); dense but consistent | Yes (priority: §7.6) |
-| Food detail | `/(requester)/menu/[id]` (hidden) | Inspect + add to cart | Icon placeholder panel; title + large teal price; description; vendor card (hours, Available/Unavailable pill, closed note); quantity stepper + live total + Add to cart; added-state (View cart / Add more) | loading, missing-item error, just-added confirmation, disabled CTA | item + vendor snapshot | Review Request (View cart), back | Copy good; placeholder panel plain but honest | Yes (§7.7) |
-| Review Request | `/(requester)/create` (hidden tab) | Cart review + submit | Title + count badge; vendor-grouped lines with steppers (0 removes); subtotal / est. fee / est. total breakdown; radio drop-off list; split-vendor notice; Submit Request (est. total) + Clear cart | empty cart, locations loading/empty/error, submit loading/error (cart preserved) | cart lines, locations, fee estimate | confirmation (params), menu | Fee is estimate until server confirms (labelled) | Yes (§7.8) |
-| Request created | `/(requester)/orders/confirmation` (hidden) | Post-submit summary | Success visual; "Request created / submitted successfully"; Waiting-for-helper pill; vendors, items, drop-off, subtotal/fee/total; external-pay note | invalid-params fallback; single-order View request | route params (server-recorded fee) | orders list, order detail, menu (all `replace`) | Stateless by design (no refetch) | Yes (§7.9) |
-| My Orders | `/(requester)/orders` (tab) | Active + History | Segmented Active/History; active rows (vendor, dish title, location, badge-first total); history rows (vendor, date, location, final status) | loading/error/empty per tab; lazy history; pull-to-refresh | active-only + terminal-only queries | order detail | None structural | Yes (§7.10) |
-| Request Detail | `/(requester)/orders/[id]` (hidden) | Transaction control centre | Header (vendor, dish title, pill, short ID/date); 6-dot progress strip; location card; itemised breakdown; pending-wait card / transit-info card / Required-action confirm card + 4-category report form; payment card; Other-options cancel card | loading/missing; terminal → read-only history rendering | full order + items + payment context | payment submit (inline), history | Text-heavy; cancel below payment (acceptable) | Yes (priority: §7.11) |
-| Payment required | embedded `RequesterPaymentCard` in detail | External pay + receipt | "Payment required"/Unpaid header; amount-to-pay; 4 numbered steps; helper QR image; Submit → staged review (name/size/preview, confirm/rechoose/cancel); recorded state with viewer/download | QR-missing, submit error (orphan cleanup), recorded | payment context (server totals) | none (inline) | Good; steps could be more visual | Yes (§§7.14–7.15) |
-| Notifications | `/(requester)/notifications` (tab) | Order updates inbox | "Updates for you" + unread badge + Mark-all-read; icon rows with unread dot, body, date | loading/error/empty; pull-to-refresh | notification rows | order detail (mark-read-first) | None | Light touch (§7.18) |
-| Profile | `/(requester)/profile` (tab) | Identity + sign out | Identity card (avatar, display name or fallback, email, short ID, Requester pill); My-orders row; env-gated dev switcher (invisible in prod); Sign out | none (sync context; gate handles loading) | auth user + profile | orders list | Hardcoded fallback name only when no display name | Light touch (§7.19) |
-
-### 2.3 Helper Portal (supersedes the old `(helper)` tab app — see migration note below)
-
-| Screen | Route | Purpose / key behavior | States | Redesign? |
-|---|---|---|---|---|
-| Portal / job queue | `/(requester)/helper-portal` (Profile entry, guarded) | Availability switch gating `pending`-only queue; fee-first rows + atomic Accept (single-winner, loser auto-refreshes); active-delivery section | offline / loading / error / empty; accepting lock | Yes (§8) |
-| Delivery workspace | `/(requester)/helper-portal/jobs/[id]` (guarded) | Task-first per-status actions: go-to-vendor, arrive, food available/unavailable, purchase, confirm pickup, start delivery, mark delivered, release/abandon variants; state-aware external-Maps handoff; collapsible order details; read-only payment inspection; terminal → history | loading/missing; acting locks; update errors | Yes (§8) |
-| My Deliveries | `/(requester)/helper-portal/deliveries` (guarded) | Active / History single-badge rows, same segmented control | loading/error/empty per tab; lazy history | Yes (§8) |
-| Payment QR | `/(requester)/helper-portal/payment-qr` (guarded) | Staged confirm-first QR manager (upload/replace/remove) | QR-local busy/error only | Yes (§8) |
-
-Migration note (2026-09-16): Helper is no longer a mutually exclusive role. Verified helpers are `role = requester` + `is_verified_helper = true` and use the main requester app; the portal above is entered from Profile and guarded per screen. The old `(helper)` tab group (Jobs / My Deliveries / Earnings / Profile tabs) is deleted; Earnings survives as fee-only history rows, and helper notifications share the requester center. Backend capability (RLS/RPC guard) mirrors the UI guard.
-
-Known helper issues (verified): 5 legacy statuses fall through to a dead-end card; `picked_up` error retry refires instead of dismissing; rating title hardcoded for helper viewers; history empty-copy omits disputed; truncated-ID identities; no directions/contact/dispute-appeal (all absent backend support — correctly absent from UI).
-
-### 2.4 Vendor
-
-| Screen | Route | Purpose / key behavior | States | Redesign? |
-|---|---|---|---|---|
-| Stall | `/(vendor)` (tab Stall) | Open/closed switch, stall-detail edit form (name ≤120, description ≤500, location ≤120, hours ≤120); admin-hidden notice when `is_active=false` | loading; unlinked-stall empty; save errors | Yes (§9) |
-| Menu | `/(vendor)/menu` (tab Menu) | Item rows (price, availability switch, edit, delete via `Alert` confirm); add/edit form (name, description ≤500, decimal price pad, available switch); single-flight mutation lock | loading/error/empty; row errors | Yes (§9) |
-| Profile | `/(vendor)/profile` (tab Profile) | Stall-linked identity, role-permanence note, sign out | none | Light touch (§9) |
-
-Vendor scope is operations-only **by construction** (changelog-verified): no orders, preparation states, verification, notifications, or payments exist for vendors. No image upload UI (image columns unused in v1).
-
-### 2.5 Administrator — **Not implemented**
-
-No routes, tabs, screens, or components exist. `admin` is a database-only role (role-less in app routing; explicitly "no admin UI exists" in `AuthContext`). Dispute settlement and vendor provisioning/linking are out-of-band service-role operations. Section 10 of this document is therefore a greenfield proposal with no current behavior to preserve. Lecturer requester: **Not implemented** — no role, screens, or references exist anywhere.
+**Rule.** The Helper Portal is a capability inside Send2U, never a
+second app. Nothing may look or read like "Requester Mode", "Helper
+Mode", "Switch to Helper", or a separate Helper application.
 
 ---
 
-## Section 3: Current navigation architecture
+## 2. Visual identity
 
-### 3.1 Authentication flow
+Send2U is a white, typography-led, calm production interface. Structure
+comes from hierarchy and whitespace, not from surfaces: the `Card`
+primitive is a flat spacing wrapper with no surface, border, radius, or
+shadow, and the theme file states that shadows are intentionally unused
+anywhere. Grey page backgrounds and coloured sections are not used to
+create structure.
 
-`/` (root gate) → loading shell → `/(auth)/sign-in` (unauthenticated) → role home. Sign-up may pause at an email-confirmation card (no session until verified — correct). `select-role` is recovery-only for role-less sessions (one-time profile repair or unsupported-role notice). No password reset exists (backend/product gap, out of redesign scope).
+**Established pattern.** Production polish comes from: consistent 20pt
+horizontal margins with 16pt vertical rhythm; one 22pt title per screen
+at most; 15pt semibold row titles with 13pt secondary subtitles; hairline
+`#E7DFDC` dividers between list content; a single filled red primary
+action where a task exists; honest copy that names real backend states.
+Screens feel complete because every state (loading, empty, error,
+refresh) is designed, not because they are decorated.
 
-### 3.2 Role routing
-
-Root gate redirects by immutable server role: non-vendors → `/(requester)` (verified helpers carry `is_verified_helper = true` on the same requester account and enter the Helper Portal from Profile, guarded per screen); vendor → `/(vendor)`; the requester layout ejects vendors and the vendor layout ejects non-vendors. Vendor accounts are service-provisioned, never self-signed-up. Anonymous sessions are signed out at restore.
-
-### 3.3 Main tab navigation
-
-- Requester (and verified helpers, same app): Home / Requests / Profile (+ in-screen bells on Home and Requests; Profile carries a gear).
-- Helper Portal (verified only, via Profile — never a bottom tab): portal home, delivery workspace, My Deliveries, Payment QR.
-- Vendor: Stall / Menu / Profile (no bell — no vendor notifications exist).
-All tab bars: white, 1px top border, 70pt height, 12pt semibold labels, teal active / muted inactive, full safe-area coverage.
-
-### 3.4 Stack / modal navigation
-
-`Stack` used for: auth group, and per-screen titles on hidden requester/helper routes (`Stack.Screen` titles mirror content, e.g. item name, "Request created"). No modals, sheets, dialogs (except vendor delete `Alert`), or drawers exist. Back behavior is platform-default (header back + `router.back()`), correct everywhere audited.
-
-### 3.5 Deep links, notification routing, cart/order navigation
-
-- Push taps route stale-safe: vendors land on vendor home; requester/helper taps open their own detail route after best-effort mark-read (nav never blocked by mark failure).
-- Cart flow: Home shortcut / item detail / menu CTA → hidden Review Request → confirmation (`push`), then `replace` to orders/detail/menu (cleared cart unreachable — resubmit impossible).
-- Orders/history rows → detail; detail embeds terminal-history rendering on the same route (no route split for closed orders).
-- Sign-out returns to the auth gate via session listener; no manual stack clearing needed.
-
-### 3.6 Navigation inconsistencies & recommendations (functionality unchanged)
-
-1. Header bell duplicates the Notifications tab (both roles) — keep (harmless shortcut), but the redesign should visually subordinate one (e.g. bell without badge-count duplication).
-2. Hidden routes rely on in-app push only — correct, but confirmation's single-order "View request" link should be retained in the redesign (currently the only confirmation→detail path).
-3. Tab order differs by role (Jobs-first vs Home-first) — correct as-is; do not unify.
-4. No screen-restoration edge cases found: all detail screens refetch on mount/focus and reconcile on realtime reconnect.
-
-## Section 4: Proposed design principles
-
-1. **Minimalism.** Every screen answers one question (What's for lunch? What must I do now?). Remove paragraphs that restate what the UI already shows; the current codebase already trended this way (StageLegend/guides deleted) — finish the job.
-2. **Visual hierarchy.** Status first, money second, metadata last. Active order status is always the most prominent element on order surfaces (pill + title size before totals).
-3. **Progressive disclosure.** Show the happy-path minimum (status, total, one action); tuck evidence, timelines, report forms, and settlement notes one tap deeper. The current report-form toggle and read-only history sections are the pattern to extend.
-4. **Content-first layouts.** Food names, prices, and statuses are the content — no hero banners, promo cards, or decorative panels. The current flat tinted panels (icon chips, success wash) are the maximum decoration allowed.
-5. **Touch-friendly interaction.** All targets ≥48pt (buttons 52–56, rows 60, steppers 48, stars 44+hitSlop). One-handed reach: primary actions live in the lower half (full-width buttons, sticky bottom actions on long forms).
-6. **One primary action per screen.** Review Request = Submit; delivered detail = Confirm; payment card = Submit receipt; job step = the single advance verb. Secondary/destructive actions sit below in secondary/danger styles.
-7. **Clear system status.** Every async surface declares loading / empty / error / success explicitly with the shared state components; never a blank screen or a spinner without a label.
-8. **Consistent terminology.** One vocabulary file (§14): "request" (not order) in requester UI, "delivery fee" (never service charge), "Review Request" (never checkout/cart-pay), "Waiting for a helper" (never finding/preparing).
-9. **Accessibility.** Status is never color-only (pill always pairs color + text + optional icon); minimum contrast 4.5:1 body / 3:1 large; roles/labels on all interactive elements (already the codebase norm — keep).
-10. **Responsive design.** Single-column flow layout, `flex:1` text columns, wrapping names, right-aligned values that wrap (§11). No fixed-width assumptions beyond 320pt minimum.
-11. **Restrained motion.** Native stack/tab transitions only; pressed-state opacity; skeleton shimmer only for list loading. No decorative animation, no artificial delays.
-12. **Error prevention.** Destructive or irreversible actions are confirm-first (staged receipt review, delete `Alert`, withdraw is explicit); reason-gated cancel; submit buttons disabled until valid with the blocking reason stated adjacent.
-13. **Honest transaction communication.** Estimates labelled "est."; server-confirmed figures unlabeled; no arrival times, no preparation claims, no refund promises, no payment-success language before backend confirmation.
+**Rule.** New screens must read as finished commercial product on first
+paint: aligned content, resolved hierarchy, designed states, no
+lorem-ipsum spacing, no decorative concept-UI elements.
 
 ---
 
-## Section 5: Send2U visual design system
+## 3. Prohibited UI Patterns
 
-### 5.1 Color palette
+Prohibited unless an exceptionally strong product reason exists. The
+only permitted tab-style navigation is the application's actual bottom
+navigation.
 
-Primary red is the shipped icon red. All tints are derived mechanically (white mixes) so engineering can reproduce them exactly.
+- **Badges / pills.** Permitted only for order/payment status and the
+  notification unread dot. Never for categories, counts-as-decoration,
+  marketing labels, or static information that plain text can carry.
+- **Gradients.** None in the interface. (`expo-linear-gradient` is
+  installed but unimported; the last scrim was removed.)
+- **Cards (visual).** The `Card` component is a spacing wrapper, not a
+  visual container — do not give it surfaces, borders, or shadows, and
+  do not stack bordered boxes to simulate dashboards.
+- **Decorative tabs / segmented controls beyond their two jobs.**
+  `ActiveHistoryToggle` (Active/History lists) and the notification
+  filter are the only segmented controls. No decorative tab bars.
+- **Excessive containers, borders, separators.** One divider system
+  (`border`, hairline) between list content; no boxes around boxes, no
+  separators after every element by default — only where they
+  materially improve readability.
+- **Excessive colour.** White dominates; red is rationed (§8). Status
+  colour must communicate meaning, never decoration.
+- **Decorative illustrations, emojis.** None exist. Empty states use a
+  64pt tinted icon medallion, not artwork.
+- **Oversized headers / hero sections.** Titles cap at 22pt semibold;
+  headers establish context then yield the viewport (§4).
+- **Excessive empty space / dense dumps.** Neither giant blank areas
+  nor crammed screens; lists carry identification-level information,
+  details live on detail pages (§9, §10).
+- **Repeated buttons / duplicate navigation.** One primary action per
+  task; one back control per screen (the header chevron).
+- **Unnecessary confirmation dialogs.** Consequential actions use the
+  slider language in §13; everything else confirms inline or not at all.
+- **Task-competing elements.** Nothing beside the primary action may
+  be equally loud.
 
-| Name | Hex | Purpose | Use | Do not use |
-|---|---|---|---|---|
-| `brand` (Primary red) | `#DA0A1B` | Brand accent: primary buttons, active tab, links, key highlights | Primary CTA fill, active states, brand header tile | Status meaning, large backgrounds, body text |
-| `brandPressed` (Deep red) | `#A80815` | Pressed/active depth for brand surfaces | Button pressed state, selected segmented thumb edge | Text on white (contrast too low for small text) |
-| `brandSoft` (Soft red tint) | `#FBE7E9` | Tinted wash for brand chips, icon tiles, selected states | Icon chips on discovery surfaces, selected option cards, notification dot on light? (see below) | Error semantics — warm but must not read as danger |
-| `surface` (White) | `#FFFFFF` | Cards, headers, tab bar, sheets | All elevated content | Page background |
-| `background` (Page) | `#F6F4F2` | Warm-neutral app background (current `#F5F7F9` shifted warm to sit with red) | Screen base | Text |
-| `surfaceElevated` | `#FDFCFC` | Subtle lift over background | Tips, tooltips, pressed cards | Borders |
-| `surfaceSecondary` | `#F1ECEA` | Muted containers (stepper bg, empty-state wash, doc rows) | Quantity backgrounds, file rows, skeleton base | Primary surfaces |
-| `text` | `#22191B` | Primary text (warm-black for red harmony) | Titles, body, prices | On brand fill (use `onBrand`) |
-| `secondary` | `#5A4E52` | Secondary text | Descriptions, metadata | Small/caption text (use tertiary at ≥12pt only with care) |
-| `muted` | `#8D8287` | Tertiary text | Captions, hints, timestamps | Essential information, interactive labels |
-| `onBrand` | `#FFFFFF` | Text/icons on brand fill | Primary button labels, brand tile glyph | Elsewhere |
-| `border` | `#E7DFDC` | Card/row separators | Card borders, dividers, input borders (rest) | Focus state (use brand) |
-| `success` | `#1D7A4C` | Confirmed/completed/paid states | Completed, Delivered, Recorded, Available pills | Brand actions |
-| `successSoft` | `#E4F3EB` | Success wash | Success icon tiles, completed banners | — |
-| `warning` | `#96590A` | Needs-attention states | Unpaid, Unavailable, Closed, out-for-delivery | Errors |
-| `warningSoft` | `#F9EEDB` | Warning wash | As above, backgrounds | — |
-| `error` | `#BC3A2A` | Destructive + failure states | Cancelled, disputed, destructive buttons, error states, unread dot | Brand accent, success paths |
-| `errorSoft` | `#FAE7E3` | Error wash | Error icon tiles, dev-only accents | — |
-| `info` | `#8A1A24` | Informational (deep red, NOT teal) | In-transit statuses (going-to-vendor…picked-up), neutral highlights | Success/error meaning |
-| `infoSoft` | `#F7E4E5` | Info wash | In-transit icon tiles, "N open" badges | — |
-| `disabled` / `disabledBg` | `#9AA3AB` / `#E9EDF0` | Disabled text/surfaces | Disabled buttons, inputs, steppers | Active content |
+Minimalist here means *restrained and complete*, never empty: whitespace,
+hierarchy, typography, alignment, and density must make each screen feel
+finished.
 
-Rule: red family = brand + in-transit info only. Success/warning/error keep the current (contrast-verified) non-red hues so a red "Delivered" or red "Unpaid" can never occur.
+---
 
-### 5.2 Typography
+## 4. Headers
 
-System-font stack (no custom font assets — preserves native feel, zero download, correct Dynamic Type behavior): iOS San Francisco / Android Roboto via React Native defaults.
+Three header treatments exist, one per screen class:
 
-| Token | Size / line-height / weight | Usage |
+1. **Bottom-tab roots** use the native header or a custom in-screen
+   header: Home and Requests hide the native header and render their
+   own brand/title row; Profile and all vendor tabs use the native
+   centered header.
+2. **Secondary screens** use `GlassHeader`: an absolute
+   48pt + safe-inset overlay (`expo-blur`, intensity 15, near-white
+   veil) with a 44pt back chevron at left, a centered 17pt semibold
+   title (single line), and an optional right action. Content uses
+   `Screen beneathHeader` so it starts below the glass and slides
+   behind it on scroll — the header stays light while scrolling and
+   never grows.
+3. **Dialog-level chrome** (overflow menu, delete confirm) is inline,
+   never a second header.
+
+Back behavior is uniform: `canGoBack() ? back() : replace(fallbackHref)`,
+one chevron per screen, never duplicated. Header actions sit at right:
+notification bell (48pt control, dot iff unread) and the Profile gear.
+Touch targets are 44–48pt with 8pt slop.
+
+**Established pattern.** Compact chrome, centered titles, content-first
+viewport, fading glass over scrolled content.
+
+**Inconsistency.** The bell is not yet present on all three primary
+pages in every role: requester Home and Requests have it, Profile
+carries the gear instead, vendor tabs and Helper Portal screens have no
+header actions at all.
+
+**Rule.** The notification icon must remain available and visible in the
+header of the three primary pages across all roles. Do not add further
+header controls. When adding a bell to a surface that lacks one, reuse
+`HeaderBell`/`NotificationBell` unchanged.
+
+---
+
+## 5. Bottom navigation
+
+Three destinations per application (requester: Home / Requests /
+Profile; vendor: Stall / Menu / Profile). Pure white background, 1px top
+hairline, 70pt height plus bottom safe inset, 12pt semibold labels;
+selected tab is Send2U red with a matching icon, unselected is muted
+grey. The bar floats (`position: absolute`) so scrolled content slides
+behind it; tab roots add one tab-height of bottom clearance
+(`Screen underTabs`). Pushed screens hide the bar entirely rather than
+shrinking content around it.
+
+**Rule.** Navigation background stays purely white. No floating pills,
+containers, gradients, or effects. Labels always accompany icons.
+
+---
+
+## 6. White background treatment
+
+Main content, headers, and bottom navigation are all white (`background`
+/ `surface` = `#FFFFFF`). `surfaceElevated` (`#FDFCFC`) and
+`surfaceSecondary` (`#F1ECEA`) exist only for transient needs
+(skeletons, pressed file rows, segmented containers, icon tiles) — never
+as page backgrounds.
+
+**Rule.** Do not introduce grey page backgrounds or coloured sections to
+manufacture structure. Group with hierarchy and whitespace first,
+hairlines second, tinted tiles last and sparingly.
+
+---
+
+## 7. Lists
+
+The canonical row is `ListRow`: 60pt minimum height, 8pt vertical
+padding, 12pt gaps; a 44pt red-tinted icon chip (22pt red glyph) at
+left; 15pt semibold title with an optional 13pt secondary subtitle;
+optional trailing content; a muted chevron iff the row navigates.
+Tappable rows dim to 70% opacity.
+
+- Rows of the same object share identical dimensions; a row never grows
+  taller to smuggle in more detail — detail belongs on the detail page.
+- Separators are hairlines between content blocks, not automatic rules
+  after every element.
+- A list row identifies and navigates; trailing content is one element
+  (an amount, a status, *or* a chevron-led action — not all three).
+- Loading uses motion-free skeleton rows mirroring real row geometry;
+  empty uses the medallion empty state with at most one action;
+  errors use the error state with retry.
+
+**Inconsistency.** A few rows still pair a status word in the subtitle
+with a status badge on the trailing edge (double encoding). Follow the
+single-encoding direction: badge *or* subtitle, never both.
+
+---
+
+## 8. Colour system
+
+| Token | Value | Use |
 |---|---|---|
-| `display` | 28/34, 700 | Brand wordmark, oversized numerals (earnings total, payable total hero) |
-| `title` | 22/28, 700 | Page titles (SectionHeader), dish names, totals |
-| `subtitle` | 17/24, 600 | Card titles, row titles, item names, amounts-to-pay |
-| `body` | 16/24, 400 | Default text, descriptions, instructions |
-| `secondary` | 15/22, 400 | Row titles in dense lists, metadata lines |
-| `caption` | 13/18, 400 | Hints, timestamps, helper text (never essential-only info) |
-| `eyebrow` | 12/16, 700, +0.8 tracking, uppercase | Section eyebrows ("Today on campus", "Required action") |
-| `button` | 16/24, 600 | All button labels |
-| `price` | 17/24, 700, tabular-nums | Prices/totals in rows (pairs with `subtitle` color-brand for hero totals) |
-| `status` | 13/18, 600 | Pill labels (always sentence-case in UI: "Waiting for a helper") |
+| `primary` (Send2U red) | `#DA0A1B` | Primary actions, selected tab, brand accents, key emphasis only |
+| `primaryPressed` | `#A80815` | Pressed/emphasis red on tinted surfaces |
+| `primarySoft` | `#FBE7E9` | Icon chips, selected option wash |
+| `onPrimary` / white | `#FFFFFF` | Page, header, nav backgrounds; on-red text |
+| `text` | `#22191B` | Primary text |
+| `secondary` | `#5A4E52` | Secondary text, subtitles |
+| `muted` | `#8D8287` | Captions, placeholders, inactive tabs |
+| `border` / `divider` | `#E7DFDC` / `#E9E2E0` | Hairlines, dividers |
+| `surfaceSecondary` | `#F1ECEA` | Skeleton, segmented containers, thumb tiles |
+| `success` | `#1D7A4C` | Genuine success, finalized earnings |
+| `warning` | `#96590A` | Caution states |
+| `error` | `#BC3A2A` | Errors, destructive actions |
+| `info` (deep red) | `#8A1A24` | In-transit order states only |
+| `disabled` | `#9AA3AB` on `#E9EDF0` | Disabled, never by opacity alone |
 
-Numeric emphasis: totals in `title`/`price` weight with `fontVariant: ['tabular-nums']` so amounts don't jitter on update.
-
-### 5.3 Spacing
-
-8-scale retained from current theme (already consistent codebase-wide): `xs 4 · sm 8 · md 12 · lg 16 · xl 20 · xxl 24 · xxxl 32`. Usage: page padding `xl` horizontal / `xl` top / `xxxl` bottom; inter-card gap `lg`; intra-card gap `sm–md`; icon-to-text `sm–md`; section-to-section `xxl`. Never introduce off-scale values (current audit found only three, all fixed to tokens).
-
-### 5.4 Corner radii
-
-`sm 8` (chips, dots are `full`), `md 12` (buttons, inputs, steppers, icon tiles, image frames), `lg 16` (cards, doc rows, file rows), `xl 20` (brand visuals, hero panels), `full 999` (pills, avatars, dots, badges). Dots/progress pips are always `full`, never magic numbers.
-
-### 5.5 Shadows and borders
-
-Borders only: 1px `border` on cards and row separators is the sole separation mechanism on `background`. **Shadows are not used anywhere** (product decision — the `shadows` token was removed; `Card`, `OptionCard`, and brand tiles are flat bordered surfaces). Never add drop shadows, glows, or elevation for decoration. Dark-mode: out of scope (light-only product decision retained).
-
-### 5.6 Icons
-
-Single library retained: **MaterialIcons** (already exclusive). Sizes: nav (system), 20 inline/row glyphs, 22 list chips, 24 chevrons/checks, 26 option/bell, 28 avatars/feature glyphs, 32 empty/error/file glyphs, 48 hero visuals. Rules: every status pill pairs icon+label (never icon-only meaning); nav icons always carry text labels; decorative icon tiles use `brandSoft`/`infoSoft`/semantic washes at 44–64pt; file-type glyphs (`picture-as-pdf`, `insert-drive-file`) stay monochrome semantic colors (no rainbow).
-
-### 5.7 Buttons
-
-| Variant | Visual | Usage |
-|---|---|---|
-| Primary | `brand` fill, `onBrand` label, 52–56pt, `md` radius, full width | The one screen action (Submit, Confirm, Save) |
-| Secondary | white fill, 1.5px `brand` border, brand label | Safe alternatives (View orders, Add more, Back) |
-| Tertiary | transparent, brand label, 48pt min | Inline navigation (mode switch, View-all links) |
-| Destructive | transparent, `error` label (red text, never red fill) | Cancel order, Delete item, Clear cart, Sign out |
-| Disabled | `disabledBg` + `disabled` label | Until valid; blocking reason stated adjacent |
-| Loading | spinner + verb label ("Submitting…") | All async submits; buttons lock concurrent taps |
-| Icon buttons | 48pt, `md` radius, bordered | Steppers (see §5.8), star inputs (44+hitSlop) |
-| Sticky bottom actions | primary pinned above safe-area on long scrolls | New pattern: review/submit screens on small devices |
-
-Pressed: opacity .85 (buttons) / .6–.7 (rows, tiles). No gradients on buttons ever.
-
-### 5.8 Inputs and controls
-
-New: introduce one shared **`Input`** (the current gap — 11 raw `TextInput`s). Spec: 1.5px `border` resting → `brand` focus, `md` radius, 16pt text, `lg` horizontal padding, `muted` placeholder, inline error caption in `error` + `error` border, always `accessibilityLabel`, `maxLength` matching server caps (120 names, 500 free text), `keyboardType` per field (email, decimal-pad for prices), multiline for descriptions/details with the `n/500` counter pattern (already proven in rating input).
-
-- Password: secure entry + show/hide toggle (new, 48pt).
-- Textarea: same Input, multiline, counter.
-- Radio-style selection: `ListRow` + trailing `check-circle` (current drop-off/category pattern — keep exactly).
-- Segmented control: `surfaceSecondary` track, white thumb, brand label (current Active/History toggle — keep).
-- Quantity stepper: 48pt bordered −/+, centered value, disabled states at min/max (current — keep, recolor border to brand).
-- File picker: staged confirm-first card (current `StagedFileCard` — keep flow, rebrand accents): preview, full name, size, confirm/rechoose/cancel; nothing uploads pre-confirm.
-- Confirmation controls: destructive `Alert` for deletes (current vendor pattern — extend to Clear-cart if desired; currently direct — keep direct, note as decision).
+Red must regain meaning with every use: one dominant red per viewport —
+the primary action. Normal in-progress states must not read as errors;
+keep the deep-red `info` pills small and pair them with neutral dates
+and muted copy. Destructive red stays visually subordinate to the
+primary action (borderless text buttons) while remaining unmistakable.
+Disabled states change colour tokens, add borders where the enabled
+variant has them, and never rely on dimming the label alone.
 
 ---
 
-## Section 6: Shared component library
+## 9. Progressive information hierarchy
 
-Each entry: purpose → structure → variants/states → a11y → used-in. All exist today except `Input`, `Skeleton`, `StickyAction`, and `Sheet` (marked NEW where applicable).
+Follow **List → Detail → Decision → Action → Result**:
 
-- **AppHeader** (existing, via Tabs `screenOptions`): white, no shadow, `subtitle`-weight title, `headerText`; right-slot bell. Keep; subordinate bell badge when tab badge present.
-- **TabBar** (existing): white, 1px top border, 70pt, 12pt semibold labels, `brand` active / `muted` inactive, full safe-area. Keep metrics; recolor active to brand.
-- **Screen/Page container** (existing `Screen`): SafeArea all edges, scroll default (`xl`/`xl`/`xxxl` padding, `lg` gaps), `keyboardShouldPersistTaps=handled`, optional refresh slot. Keep; add `KeyboardAvoidingView`-equivalent behavior for input-heavy screens (currently absent — NEW requirement, no library change).
-- **SectionHeader** (existing): eyebrow/title/badge/tertiary-action. Keep API; eyebrow color → brand.
-- **StatusPill** (existing `Badge`, rename recommended): `full` pill, soft wash + colored 600 label + optional icon; tones brand/info/success/warning/error/neutral. Keep; never color-only.
-- **VendorHeader** (existing pattern in Home): name (`subtitle`), locationHint + hours (`caption`), open/Closed pill. Formalize as component (currently inline, duplicated in Review Request groups).
-- **FoodRow** (existing `MenuItemRow`): name + price row, 2-line description, availability pill, chevron; dimmed when unavailable; 60pt min. Keep; price uses `price` token.
-- **DetailHero** (existing placeholder panel): tinted `xl` panel with feature glyph; reserved for future real imagery (image columns exist unused). Keep placeholder honest — no stock photos.
-- **Stepper** (existing `QuantityStepper`): 48pt bordered controls. Keep; recolor to brand.
-- **Money** (formatting helpers, keep): `formatMYR` + `orderTotalCents` as the ONLY total definition; per-order fee derived from server data, never a second constant.
-- **OrderCard** (existing `Card`+`ListRow` composition): badge-first right column (status over total). Formalize the badge-first ordering as the rule.
-- **ActiveRequestCard** (existing Home preview): pill + dish title + vendor·total + primary/tertiary actions. Keep structure; add overflow link when N>1 (already implemented).
-- **CostBreakdown** (existing `OrderBreakdown`): item lines + subtotal + fee + total with dividers, no pills. Reuse everywhere incl. confirmation/payment (currently confirmation duplicates rows — refactor to reuse).
-- **LocationRow** (existing radio `ListRow`): place glyph, name, description, check-circle selected. Keep.
-- **ProgressStrip** (existing 6-dot): numbered `full` dots, done = tinted wash, labels below; purely reflective of timestamps. Keep steps/labels; recolor done-state to brand wash.
-- **StateMessageCard** (existing pending/transit pattern): pill + title + one-line explainer. Extend as the standard for all non-actionable statuses.
-- **EmptyState / ErrorState / LoadingState** (existing): 64pt tinted glyph + title + concise message + optional secondary action; error carries `role=alert`. Keep; add `Skeleton` (NEW) for list loading shimmer.
-- **ConfirmPanel** (existing delivered-confirm pattern): success pill + title + what-happened + primary + attestation caption + secondary toggle. Generalize for confirm/withdraw/accept confirmations.
-- **UploadCard** (existing `StagedFileCard`): keep flow verbatim; show constraints line (types + 10 MB) before picking (already added on payment card — extend to QR manager).
-- **ReceiptView** (existing `ReceiptEvidenceView`): inline image or PDF row + filename + download-with-progress + open + notices/errors. Keep; reuse in all recorded states (already extended to payment card).
-- **RatingControl** (existing `RatingStars`+`RatingInput`): 5-star radio group, 44pt+ targets, counter textarea, immutable submitted rendering. Keep; fix hardcoded viewer copy ("your helper" vs "your requester").
-- **IdentityCard** (existing profile pattern): avatar tile + name + email·short-ID + role pill. Keep; prefer real display names.
-- **NavRow** (existing `ListRow` link rows): icon chip + title + chevron. Keep.
-- **Sheet** (NEW — does not exist): bottom sheet spec reserved for future disclosure needs (report details, filters). Do NOT build until a concrete use case lands; toggles+inline expansion cover current needs.
-- **ConfirmDialog** (existing `Alert.alert` pattern): destructive confirms only (vendor delete — keep; extend to account-danger actions if any appear).
+- Lists identify and navigate (vendor, items summary, location, date).
+- Detail pages explain (breakdown, route, timeline, evidence).
+- Decisions happen where the consequences live (confirm screens state
+  irreversibility; destructive advances carry dispute captions).
+- Actions are single and ordered (primary first, safe exits last).
+- Results confirm inline (success hero + next step, never a dead end).
 
-## Section 7: Requester frontend redesign
+Do not build hide/show or expand/collapse systems merely to fit more
+onto one screen. The single sanctioned exception is the delivery
+workspace's order-details disclosure (open while deciding/buying,
+closed once moving), because the same task needs different detail
+density at different states. When information needs real explanation,
+it gets a page — see the confirm checklist, payment steps, and help
+articles.
 
-Format per screen: purpose → goal → entry/exit → hierarchy → composition/components/type/color → actions → interactions → states → responsive/a11y → issues → changes → **unchanged contract**.
+---
 
-### 7.1 App launch / automatic routing
+## 10. Action hierarchy
 
-Purpose: invisible gate. Goal: zero-tap routing. Entry: cold start / deep link. Exit: sign-in, setup-fix, or role home. Hierarchy: full-screen centered loader ("Getting Send2U ready…") or immediate redirect. Components: `LoadingState` only. Type/color: `body`/`secondary` on `background`. No actions. States: loading vs instant redirect (no error state — failures surface on destination screens). Responsive/a11y: trivially safe; loader has role+label. Issues: none. Changes: none (rebrand loader tint only). **Unchanged:** routing outcomes, no marketing splash (explicitly not required).
+- **Primary** — filled red, 52pt minimum, 12pt radius, white semibold
+  label. Exactly one per task viewport, placed where the task resolves.
+- **Secondary** — white with 1.5pt red border and red label. Safe
+  alternatives and onward navigation.
+- **Tertiary** — borderless red text, 48pt. Harmless exits (release
+  before purchase, back-outs, disclosure toggles).
+- **Destructive** — borderless brick-red text, 48pt. Disputes,
+  deletions, removals. Always reachable, never louder than the primary.
+- **Navigation** — rows with chevrons, header chevron, text links.
+- **Utility/icon** — 44–48pt icon-only controls with 8pt slop where
+  meaning is universal (back, bell, gear, download, copy, close).
 
-### 7.2 Sign in
+Buttons are never placed at the very top of content (header controls
+excepted) and are never made large for emphasis alone — 52pt primary /
+48pt subordinate is the system. During any in-flight mutation, siblings
+disable and only the acting control spins.
 
-Purpose: credential entry. Goal: signed in within 30 seconds. Entry: launch gate, sign-out, session expiry, mode toggle. Exit: role home; sign-up mode; (future) password reset — NOT implemented, do not design. Composition: `BrandHeader` (rebuilt §6 tile in brand red + wordmark, no tagline bloat) → SectionHeader (eyebrow Welcome-back / title) → one `Input` card (Email `email-address` keyboard; Password secure + show/hide) → primary submit (loading "Working…", disabled while busy) → tertiary mode-switch. Type: `title` heading, `subtitle` field labels, `caption` hints. Color: brand primary button; `error` inline form card. Interactions: submit-on-return, persist-taps, no autofocus wars. Loading: button spinner. Empty: n/a. Error: invalid credentials → inline `ErrorState` card naming the problem; backend-missing → Setup-needed card (keep both). Disabled: busy lock. Responsive: single column, full-width buttons already thumb-safe. A11y: labelled inputs, `role=alert` errors, sufficient contrast. Issues: raw `TextInput`s (→ shared `Input`); no password reset (backend gap). Changes: rebrand tile/button, shared `Input`, show/hide password. **Unchanged:** email/password+permanent-role model, confirmation-required pause, error taxonomy.
+Overlays and floating actions are rationed: the sole `Modal` is the
+request-detail overflow menu; the sole `Alert` is the vendor item-delete
+confirm; there are no bottom sheets or snackbars — errors and empty
+states render inline. The sole FAB is the red 60pt cart circle with a
+count badge, bottom-right on Home, item, and vendor screens only, hidden
+when the cart is empty and clearing the tab bar on Home.
 
-### 7.3 Create account
+---
 
-Purpose: signup + one-time role choice. Goal: correct role, first try. Entry: mode toggle. Exit: confirmation card or role home. Composition: same inputs + two large `OptionCard`s (ordering / helping) + permanent-role note + Create-account primary. Type/color as §7.2; selected card = brand border + `brandSoft` wash. Loading: saving lock incl. cards disabled. Validation: email/password rules server-side; role required (default requester preselected — keep). Error: "Could not create account" card verbatim server-friendlies. Empty/disabled: as §7.2. Responsive/a11y: cards 60pt+, `selected` state exposed. Issues: none structural. Changes: rebrand only. **Unchanged:** role written once by server, anonymous excluded, helper vs requester set.
+## 11. Confirmation interaction
 
-### 7.4 Finish account setup
+**Future — not implemented.** No slider, swipe-to-confirm, bottom
+sheet, or snackbar exists in the app today (the only `Modal` is the
+request-detail overflow menu; the only `Alert` is vendor item delete).
+Consequential actions are currently confirmed with explicit full-width
+buttons plus inline consequence copy.
 
-Purpose: recovery for role-less sessions. Goal: repair or exit cleanly. Entry: root gate only. Exit: `/` or sign-in. Composition: SectionHeader (Setup) → missing-profile branch (permanence note + 2 role cards + Confirm-permanent primary + check-again secondary) OR unsupported-role error branch + tertiary Sign out. States: loading / claim error / refresh busy. Issues: none (rare path, copy accurate). Changes: rebrand only. **Unchanged:** INSERT-only repair semantics, no role mutation surface.
+Prescribed language for consequential actions (irreversible
+confirmation, destructive advances, payment submission):
 
-### 7.5 Requester bottom navigation
+- "Slide to accept" — claiming work or starting an irreversible step.
+- "Slide to confirm" — attesting receipt, submitting evidence.
+- "Slide again to cancel" — safe reversal where the backend permits one.
 
-Four tabs — Home (home), My Orders (receipt-long), Notifications (notifications-none), Profile (person-outline) — white bar, 70pt, 12pt semibold labels, brand-active/muted-inactive, full safe-area; header bell retained as shortcut with unread dot. Entry/exit: tab switches preserve per-tab stack; cross-role ejects to root. Active/inactive: color + label weight (never color alone for the dot: dot + "N unread" badge text on Notifications). Unread: bell dot + tab badge text. States: n/a (tabs always rendered post-gate). Responsive: 4 tabs fit 320pt (short labels verified). A11y: native tab roles, labels include unread counts. Issues: bell/tab duplication (accepted; subordinate bell visually). Changes: recolor active to brand; keep order, icons, duplication. **Unchanged:** tab set, guards, hidden-route reachability.
+Implemented for job acceptance (`SlideToConfirm` on Job Detail: drag
+past ~70% to commit, early release springs back, screen-reader tap
+equivalent, disabled state with reason). Other consequential actions
+still use explicit buttons with inline consequence copy — adopt the
+slider there only when a pass touches those flows.
 
-### 7.6 Home / food discovery (priority)
+Never use sliders for ordinary navigation or harmless actions; the
+interaction weight must match the consequence.
 
-Purpose: campus food directory + live status glance. Goal: find food or check request in seconds. Entry: tab, back-from-detail, confirmation "Back to menu". Exit: item detail, Review Request, order detail, orders list. Hierarchy: campus header (eyebrow + title + item-count badge) → active-request card → cart row (conditional) → vendor sections. Composition: `ActiveRequestCard` (pill, dish title `subtitle`, vendor·total `caption`, secondary View-request + tertiary View-all-N); `NavRow` cart shortcut; `VendorHeader` (name, hint, hours, Closed pill) + `Card` of `FoodRow`s. Type: title header → subtitle names → `price` amounts → caption hints. Color: brand accents, semantic pills only. Primary action: none (browse screen; row taps). Secondary: View-request / View-all / Start-a-request (empty state). Interactions: row press → detail; pull-to-refresh reloads menu+orders; realtime silently reconciles. Loading: "Checking your requests…" mini + "Loading today's menu…". Empty: no-active-requests card (with Start-a-request, never stale); "No menu today". Error: menu error card (orders errors stay silent to protect browsing). Disabled: unavailable rows dimmed + pill, still open detail (read-only CTA there). Responsive: rows wrap (`flex:1` columns), prices right-keep with `tabular-nums`. A11y: row labels include price+availability; badges textual. Issues: newest-only preview (View-all mitigates); header copy fixed. Changes: rebrand, `Skeleton` rows for menu loading (NEW), keep all copy/logic. **Unchanged:** vendor-section architecture, active-only newest-first preview source, cart math, no search/GPS/ratings/images/promos.
+---
 
-### 7.7 Food detail
+## 12. Status vocabulary
 
-Purpose: decide + add to cart. Goal: name, price, availability absorbed instantly. Entry: Home/menu rows. Exit: Review Request (View cart), back, add-more (in-place). Composition: hero panel (tinted `xl` tile + restaurant glyph — NO photography; image columns unused by product decision) → name `title` + price `title`-brand → description `body/secondary` → vendor card (hours, Available/Unavailable pill, closed note) → stepper card (48pt stepper, live Total, primary Add-to-cart / disabled Unavailable, cart-flow caption) → added-state (confirmation row, View-cart primary, Add-more secondary). Loading: "Loading item…". Empty: n/a. Error/missing: "Item unavailable" + Back-to-menu. Disabled: CTA disabled with reason. Responsive: hero scales, total row wraps. A11y: stepper labels, disabled announced, live total is plain text. Issues: placeholder panel is plain (honest; keep). Changes: rebrand accents, shared pill/stepper; optional `Skeleton` for loading. **Unchanged:** cart-only writes, quantities, unavailable gating, server-trust-nothing (ids+qty only at submit).
+Order statuses render Title Case from `snake_case` (`lib/orders.ts` is
+authoritative). Tones: pre-dispatch fulfilment is deep-red `info`;
+`out_for_delivery` is `warning`; delivered / confirmed / completed are
+`success`; cancelled / disputed are `error`. Requester-facing wording is
+fixed: "Waiting for a helper", "Helper assigned", "Helper is going to
+the vendor", "Helper is at the vendor", "Food is available", "Food
+purchased", "Request picked up", "On the way", "Delivered", "Payment
+required", "Completed", "Cancelled", "Under review". Payment states:
+"Verification pending" (`submitted`), "Payment verified" (`verified`),
+"Payment rejected" (`rejected`) — `verified` here means the requester's
+submitted receipt closed the order (self-attestation), never an
+approval. The payable total is always food subtotal + the fixed RM2.00
+delivery fee, computed server-side.
 
-### 7.8 Review Request / cart
+**Rule.** Never surface raw status keys, and never invent friendlier
+states that imply tracking, ETAs, preparation, or refunds the backend
+does not have.
 
-Purpose: review-before-submit (NOT checkout). Goal: verify items, fee, drop-off, submit once. Entry: cart shortcut, detail View-cart, Home CTA. Exit: confirmation (push), menu (empty), stays on failure. Composition: title + count badge → vendor-grouped `VendorHeader` + line cards (qty × name, unit×line, stepper, 0-removes) → `CostBreakdown` (subtotal / est. fee `formatMYR × N` / est. Total + fee-confirmed caption) → "Delivery location" header + radio `LocationRow`s → split-vendor notice (conditional) → Submit card (error, primary "Submit Request · RMxx (est.)", drop-off hint, cart-kept caption, danger Clear-cart). Type: title header, subtitle vendors/totals, caption hints. Color: brand primary; danger only for Clear. Interactions: stepper edits instant local; location tap selects; submit locks + spins; failure preserves everything. Loading: locations loader; submit busy. Empty: "Your cart is empty" + Browse-menu. Error: locations error + retry; submit error + retry (same payload). Validation: lines>0 + selected location + ready locations (unchanged rule). Disabled: submit until valid with adjacent hint. Responsive: line rows wrap names; totals `tabular-nums`. A11y: stepper labels, radio semantics on location rows (role + selected), errors as alerts. Issues: fee is estimate pre-submit (correctly labelled). Changes: rebrand; reuse `CostBreakdown` (already shared); optional sticky bottom submit on small screens (NEW pattern). **Unchanged:** "Submit Request" (never Pay Now), estimate labelling, split semantics, validation rule, failure preservation, server-derived charges.
+---
 
-### 7.9 Request created confirmation
+## 13. Typography
 
-Purpose: prove submission + orient next steps. Goal: certainty in one glance. Entry: submit success only (params-carried, stateless). Exit: `replace` to orders / single-order detail / menu (cart unreachable). Composition: success visual (tinted panel + check glyph) → "Request created / submitted successfully" → summary card (Waiting-for-helper pill; vendors; items; drop-off; subtotal/fee/total; external-pay note). Type: title + subtitle + caption. Color: `successSoft` visual + info pill. Interactions: three `replace` buttons (single-order View-request conditional). Loading: none (instant params). Empty: n/a. Error/fallback: "Nothing to confirm" + View-My-Orders for incomplete links. Disabled: n/a. Responsive: value column wraps right. A11y: success announced via heading order. Issues: statelessness means no live status (acceptable — pill states the initial truth). Changes: rebrand; reuse `CostBreakdown` instead of duplicated rows. **Unchanged:** wording bans (no preparing/paid/assigned/ETA claims), `replace` semantics, param contract (+`itemsSummary`).
+The system font stack renders: display 28/700 (rare, celebratory
+headings only), title 22/700 (one per screen at most), subtitle 17/600
+(section labels, row-adjacent headings), body 16/400 (default text),
+secondary 15 (row titles, semibold), caption 13 (metadata, subtitles,
+hints), eyebrow 12/700 uppercase +0.8 tracking (section kickers),
+button 16/600, price 17/700 tabular (money), status 13/600 (badges).
+Hierarchy comes from size/weight pairing, never from cards or pills;
+ practical ceiling is 28pt and only for success/hero moments.
 
-### 7.10 My Orders
+---
 
-Purpose: scan active work; browse record. Goal: status-first scanning. Entry: tab, confirmation, profile row. Exit: detail per row. Composition: eyebrow header ("Your orders") + segmented Active/History → `OrderCard`s: active = vendor, dish title, location, badge-FIRST total column; history = vendor, date, location, final pill. Type:.subtitle vendors, caption metadata, `price` totals. Color: semantic pills; totals brand-adjacent neutral (current primary-bold — shift to text-bold with brand reserved for actions; minor rebrand decision). Interactions: tap → detail; tab switch lazy-loads history; pull-to-refresh visible tab; realtime silent. Loading: per-tab loaders. Empty: differentiated ("No orders yet" vs "No active orders" vs "No history yet"). Error: per-tab retry. Disabled: n/a. Responsive: badge+total stack without clipping at 320pt. A11y: rows labelled vendor+status+total. Issues: none structural. Changes: rebrand, badge-first rule formalized, skeleton rows (NEW). **Unchanged:** Active/History query split, ordering, realtime-focus contract, detail routing (terminal rows render read-only on same route).
+## 14. Icons
 
-### 7.11 Request Detail (operational control centre — priority)
+MaterialIcons throughout, 20–26pt in place (22pt row chips, 24–26pt
+header controls, 32pt state medallions, 40pt upload affordance),
+tinted-chip leading icons in lists, chevron-right for navigation,
+universally understood glyphs for utility actions. Icons never replace
+text on consequential actions; every primary/destructive button carries
+a verb label.
 
-Purpose: the single screen answering "what's happening and what must I do". Goal: 5-second comprehension. Entry: orders rows, notifications, confirmation link, Home preview. Exit: back, payment (inline), history (terminal auto-render). Composition (fixed order): header (vendor `title`, dish `subtitle`, status pill, short-ID · placed-date caption) → `ProgressStrip` → drop-off card → itemised `CostBreakdown` (+ pay-after-hands caption) → state section → payment card → Other-options (cancel, conditional). Type/color: title → subtitle → pill → caption; brand for actions only.
+---
 
-Per-status contract (labels from §14; titles reuse the shared message so all surfaces agree):
+## 15. Spacing and density
 
-| Status | User sees / understands | Action required? | Primary / secondary | Must NOT show |
+Scale: 4 / 8 / 12 / 16 / 20 / 24 / 32. Screen margins 20pt horizontal,
+section gaps 16pt, intra-group gaps 8–12pt, radii 8–16 (999 only for
+pills, icon medallions, and the cart FAB). Rows breathe at 60pt; dense
+metadata sits at 13pt/18pt line-height. A screen is done when scanning
+takes seconds: complete but never crowded, calm but never unfinished.
+
+---
+
+## 16. Production quality principles
+
+Consistency of chrome and components; predictable navigation (same back
+semantics everywhere); hierarchy readable in seconds; stable layouts
+(silent background refresh preserves rows and scroll — skeletons only
+on true first mount); ≥48pt targets; immediate control feedback
+(pressed dimming, spinners, disabled tokens); designed loading, error
+(with retry/dismiss), and empty (with at most one action) states;
+pull-to-refresh on list surfaces; safe-area-aware headers, bars, and
+sheets; honest, state-accurate wording with no backend jargon.
+
+---
+
+## 17. Copy and wording
+
+Short, direct, human, action-led, contextual. Name real states
+("Waiting for a helper", "Food purchased with my money"); state
+consequences plainly ("Stopping here moves the order to dispute",
+"This action cannot be undone", "No QR set yet. Requesters cannot pay
+you without one."); remind of external payment exactly where money
+moves ("Pay only after the food is in your hands"). No paragraphs that
+restate the obvious, no instructions for self-evident controls, no
+filler sentences. Button labels are verbs ("Accept", "Confirm pickup",
+"Mark delivered", "Submit Receipt", "Save Changes").
+
+---
+
+## 18. Mobile layout
+
+320pt must work: flex rows with wrapping text, truncated subtitles,
+self-sizing pills, full-width buttons, no horizontal scroll, no
+clipping. Long vendor/location names truncate in lists and wrap on
+detail. Primary actions sit within reach of the task content, never
+below unrelated sections. Keyboard-bearing screens persist taps and
+keep fields visible. Dynamic content (counts, names, amounts) must not
+break row geometry.
+
+---
+
+## 19. Role consistency and Helper Portal direction
+
+Global across requester, helper capability, and vendor: theme tokens,
+header language, list rows, buttons, state components, copy voice,
+white surfaces, red discipline. Role-specific is only content and
+entry: vendors see stall operations; verified helpers additionally see
+the Helper entry on their normal Profile. The portal reuses portal-wide
+components (`OrderBreakdown`, `OrderTimeline`, evidence views, payment
+cards) with helper-appropriate copy — same shapes, task-led ordering.
+
+**Prescribed Helper Portal shape (future mockups/redesigns).**
+Exactly three bottom-navigation destinations — **Jobs, Deliveries,
+Profile** — with bottom navigation (not tabs elsewhere, not a fourth
+destination). The portal must not contain a sign-out button (the
+account signs out from the main Profile). The portal home/header
+carries a back button with the page title centered; never duplicate
+Back controls. Job lists show **actionable jobs only** — accepted,
+expired, or otherwise unavailable jobs leave the available list
+(realtime removal, no stale rows). Each helper may hold a **maximum of
+three active jobs**; the UI must make the active set continuable at a
+glance without becoming a dashboard. **No estimated revenue**: the fee
+is fixed at RM2 — show it as a plain fact (`+RM2.00 fee`), with richer
+money detail only inside receipt/payment context. Job rows stay lean
+(vendor, items summary, location, date, fee); full order information
+belongs on Job Detail. **Acceptance happens on the Job Detail page**
+via the §11 confirmation interaction, so the queue row itself is never
+the claim control.
+
+**Current deltas (resolved 2026-09-16 except where noted).** Portal
+bottom nav (Jobs/Deliveries/Profile, no portal sign-out) is implemented;
+acceptance lives on Job Detail behind the §11 slider, queue rows
+navigate only; the 3-active-job cap is enforced race-safely in
+`send2u_accept_order` and surfaced as plain "(n/3)" text plus a disabled
+slider reason. Remaining: no slider yet on other consequential actions
+(buttons + consequence copy hold); fee stays factual (`+RM fee` on
+decision surfaces only, never projected).
+
+---
+
+## 20. Current Inconsistencies
+
+| Area | Current behavior | Established pattern | Why inconsistent | Direction |
 |---|---|---|---|---|
-| `pending` | Waiting-for-helper pill + "No action required — notified on accept" | No | None / cancel if allowed | Helper identity, ETA |
-| `assigned` | "Helper assigned — a helper accepted your request" | No | None / cancel if allowed | Location tracking |
-| `going_to_vendor` | "Helper is going to the vendor — …going to collect the items" | No | None / cancel if allowed | "Out for delivery", map, ETA |
-| `at_vendor` | "Helper is at the vendor — at the stall now" | No | None / cancel if allowed | Preparation claims |
-| `food_available` | "Food is available — stall confirmed" | No | None / cancel if allowed | "Preparing" |
-| `food_purchased` | "Food purchased — helper paid at the stall" | No | None / late-cancel path | Refund math |
-| `picked_up` | "Request picked up — helper collected your items" | No | None / late-cancel path | Live tracking |
-| `out_for_delivery` / `delivering` | "On the way — bringing to your drop-off" | No | None / late-cancel path | Time promises |
-| `delivered` | Required-action panel (§7.12) + report toggle (§7.13) | **Yes** | Yes-confirm / Report-issue | Payment UI (gated shut until confirm) |
-| `confirmed` / `awaiting_requester_payment` | Payment card (§7.14) | **Yes** | Submit receipt | Confirm button, cancel |
-| `completed` / `cancelled` / `disputed` | Read-only record rendering (§§7.16–7.17) | No | Withdraw (own unresolved only) | Any mutation CTA |
-
-Loading: "Loading order…". Missing: "Order not found" + back. Terminal: same route, history rendering. Responsive: header wraps; strip compresses (6 dots fit 320pt today — preserve). A11y: pill text carries status; strip decorative (dots) with pill as truth. Issues: previously text-heavy (resolved via state cards); cancel sits last (correct — least common). Changes: rebrand pills/buttons/strip; skeletons for first load (NEW). **Unchanged:** status set, cancel windows, delivered-only gates, terminal routing, realtime+focus reload.
-
-### 7.12 Delivery confirmation
-
-Purpose: attest receipt to unlock payment. Goal: deliberate, unambiguous tap. Entry: delivered detail only. Composition: `ConfirmPanel` — Delivered pill, "Confirm delivery", "The helper marked this request as delivered" (+ delivered date), primary **"Yes, confirm delivery"** (busy "Confirming…", locked), attestation caption ("By confirming, you attest that you received the request"), secondary Report-toggle. Loading: button spinner. Success: status flips to Payment-required (no toast needed — state change IS the feedback; realtime reconciles). Error: inline dismissible "Could not confirm". Already-confirmed: panel disappears (status-gated); double-taps serialize server-side to one winner. Responsive/a11y: full-width primary lower-half; attestation readable (not caption-small — use `secondary`). Issues: none. Changes: rebrand; promote attestation one type-step. **Unchanged:** delivered-only owner-only atomic RPC, no photo proof, no independent verification claims.
-
-### 7.13 Issue reporting
-
-Purpose: file a structured delivery complaint. Goal: category + optional note in under a minute. Entry: delivered-detail toggle only (backend: delivered-only). Composition: "What went wrong?" + 4 fixed radio rows (**Didn't receive it / Wrong or incomplete / Damaged or spoiled / Refused at handover** — the exact server-supported set, never extended in UI) + optional details `Input` (500 cap — add the proven `n/500` counter) + danger Submit + "moves to dispute — no automatic refund" warning. Validation: category required (button disabled until chosen). Loading: "Reporting…" lock. Error: inline dismissible. Success: order becomes disputed (state change feedback). Withdrawal: history-only, own-unresolved, four requester reasons (§7.16). Responsive/a11y: radio semantics + selected checks; warning plain text. Issues: none (copy verified against RPC errors). Changes: rebrand; add counter; keep categories frozen. **Unchanged:** delivered-only gate, 4 categories, no refunds/timelines/chat/compensation.
-
-### 7.14 Payment required
-
-Purpose: collect externally-paid money with proof. Goal: unmistakable "pay outside, prove inside" model. Entry: confirmed/awaiting detail (and only there — earlier stages show truthful "not yet" placeholders). Composition: "Payment required"/Unpaid header → itemised `CostBreakdown` (server figures) → **Amount to pay** hero → 4 numbered steps (banking app → scan QR → complete → save receipt) → helper QR image (signed-URL, loading/error states) → Submit entry → recorded state. QR-missing: explanatory error card ("don't pay anyone outside this QR") with submission disabled. Eligibility: submit UI only when server will accept (confirmed/awaiting); confirmed wording "Payment opens after you confirm…" on violations. Recorded: "Recorded" pill + amount + `ReceiptView` + "nothing left to do". Type/color: amount in `title`-brand; steps as numbered `body`; warning pill for Unpaid (never red). Loading/error/disabled per §7.15 flow. Responsive/a11y: QR `contain` full-width; steps plain text (screen-reader linear). Issues: steps could be more visual (numbered medallions — redesign win). Changes: rebrand; medallion steps; keep all copy semantics. **Unchanged:** external-only model, server-derived amounts, no gateways/wallets/methods, no auto-success/refund, no helper approval step.
-
-### 7.15 Receipt upload and review
-
-Purpose: attach proof that closes the order. Goal: confirm-first, zero false success. Composition: constraints line FIRST ("PDF or photo JPG/PNG/WEBP/HEIC, up to 10 MB") → Submit-receipt primary → `UploadCard` review (preview, full name ≤2 lines, size, note) → Confirm-&-submit (amount) / rechoose / cancel → recorded `ReceiptView` (image inline or PDF row, filename, download-with-progress, open, notices). Validation: MIME + 10 MB enforced pre-pick with friendly rejects; oversize/unsupported never leaves the picker. Loading: choosing → uploading → submitting messages on the locked button. Failure: inline error + orphan-upload cleanup (server row never created) — success UI appears ONLY after RPC confirmation. Duplicates: staged cleared + order completes (terminal routing) + server rejects resubmits. Recorded: viewer/download/share (proven pattern). Responsive: preview 1:1 `contain`; long filenames ellipsis. A11y: labelled picker button, progress announced, errors as alerts. Issues: none (audited exemplary). Changes: rebrand accents only. **Unchanged:** confirm-first pipeline, constraints, cleanup, no rejection/resubmit states (none exist server-side).
-
-### 7.16 Disputes
-
-Purpose: transparent holding state. Goal: "under review, here's what happens next (nothing automatic)". Entry: terminal rendering of disputed orders. Composition: "Under review" pill + "Issue under review" → category sentence (7 mapped reasons incl. helper-side late-cancel/delivery-failed/unable with fronted-cost wording) + flagged date + own report text + resolution note when present → conditional Withdraw (secondary, own-unresolved-requester-reasons only, busy lock, dismissible error) → settlement explainer ("settle directly", "manual settlement outside Send2U"). Read-only otherwise. Loading/error: withdraw-local only. Responsive/a11y: standard cards. Issues: none. Changes: rebrand. **Unchanged:** withdraw rules, no refunds/timelines/chat, admin resolution stays out-of-band (Section 10 proposal may add it later — product decision required).
-
-### 7.17 Rating
-
-Purpose: close the trust loop on completed+paid orders. Goal: rate in 30 seconds or skip knowingly. Entry: completed history record (eligibility: participant + completed + verified payment + unresolved + helper assigned — all server-enforced). Composition: "Rate your helper" + helper short-ID caption → 5-star radio group (44pt+, selected states) → optional feedback `Input` with `n/500` counter → Submit (locked until a star chosen) → immutable submitted rendering (stars, comment, date, "cannot be changed") + counterpart state ("Waiting for the helper/requester rating"). Loading/error: submit lock + dismissible error (incl. "already rated"). Responsive: stars fit 320pt. A11y: radiogroup/radio roles, per-star labels, text-paired stars. Issues: viewer copy must switch helper/requester correctly (one historical bug — fixed for requester, verify helper side in §8 build). Changes: rebrand stars (selected = brand? NO — keep warm amber `warning` for stars; brand is for actions, §5.1 rule). **Unchanged:** eligibility, 1–5, 500 cap, immutability, no feeds/aggregates/leaderboards/vendor ratings.
-
-### 7.18 Notifications
-
-Purpose: order-update inbox. Goal: triage unread in seconds. Entry: tab or header bell. Exit: order detail per row (mark-read-first, nav never blocked). Composition: "Updates for you" + unread-count badge + Mark-all-read (conditional) → icon rows (per-kind glyph, headline, detail, date, unread dot). Type/color: headline `secondary`-semibold, dot brand/info (keep primary-dot? recolor to brand — decision: unread dot = brand red, consistent with brand-as-attention). Loading/empty/error: standard trio + pull-to-refresh. Disabled: n/a. Responsive: title row wraps, dot pinned. A11y: rows labelled headline+body; unread exposed in label. Issues: bell/tab duplication (accepted). Changes: rebrand dot/accents; keep routing contract. **Unchanged:** milestone-only triggers, payload hygiene, mark semantics, realtime+refresh.
-
-### 7.19 Profile
-
-Purpose: identity + exit. Goal: confirm account, leave safely. Entry: tab. Exit: orders list, sign-out → auth gate. Composition: `IdentityCard` (avatar tile, display name w/ fallback, email · short ID, role pill) → My-orders `NavRow` → env-gated dev switcher (invisible in prod — keep gate, never restyle as feature) → danger Sign out. States: none (sync; gate covers loading). Responsive/a11y: trivial. Issues: none. Changes: rebrand only. **Unchanged:** exposed fields; NO wallet/payments/addresses/favorites/loyalty/promo/referral/subscription/settings — the redesign must not add any.
-
-## Section 8: Helper frontend redesign
-
-Route note (2026-09-16): the `/(helper)` paths below are the pre-migration locations. The current implementation lives at `/(requester)/helper-portal/` (index), `/(requester)/helper-portal/jobs/[id]`, `/(requester)/helper-portal/deliveries`, and `/(requester)/helper-portal/payment-qr`, following the same per-status behavior with a task-first presentation (fee-first queue rows, state-aware Maps emphasis, collapsible order details). Read route names below as their portal equivalents.
-
-Design posture: same system, operational tone — verbs first ("Go to the vendor", "Food purchased"), money framed as fronted-cost vs fee-earning, one action per step. All behaviors below are implemented today; "Proposed" marks pure presentation changes.
-
-### 8.1 Home / job queue (`/(helper)`, tab Jobs)
-
-Header ("Helper hub" / "Delivery jobs" + "N open" badge) → availability card (status line + Switch: `brandSoft` track when on, locked while updating, inline error) → offline empty ("You're offline — go available…") / loading / error / rows. Rows: vendor, item summary ("2 × Nasi Ayam + 1 more"), location · date, bold subtotal, preview-tap + **Accept job** (locked while accepting; loser sees friendly taken-message + auto-refresh). Redesign: rebrand; skeleton rows; keep atomic-accept semantics, pending-only query, offline-hides-queue.
-
-### 8.2 Job detail (`/(helper)/jobs/[id]`, hidden)
-
-Header (vendor + status pill + requested date) → pickup/drop-off card → itemised breakdown + fronted-cost caption → per-status action card → read-only payment card. Per-status cards (keep verbs, rebrand): assigned→"Go to the vendor"+Release; going→"I'm at the vendor"+Release; at-vendor→Food-available/unavailable (+Release); food-available→"Food purchased with my money"+Release (+nothing-spent caption); food-purchased→"Confirm pickup"+"Can't complete"(dispute warning); picked-up→"Start delivery"+abandon; out-for-delivery→"Mark delivered"+"Requester unavailable"; delivered→waiting-for-requester text; confirmed→pay-via-QR text. Missing: "Job not available" + back. **Fix in redesign:** (a) legacy `delivering`/`awaiting_requester_payment`/`accepted`/`preparing`/`ready_for_pickup` currently dead-end — map to nearest real card; (b) `picked_up` error-retry must dismiss, not refire. **Unchanged:** advance RPC verbs, release/abandon/dispute routing, terminal→history.
-
-### 8.3 Deliveries, Earnings, Notifications, Profile
-
-- **Deliveries** (`/deliveries`): same segmented control; active rows add a payment-status badge (Unpaid/recorded — keep, it prevents unpaid-work confusion); history rows fee-focused without payment badge. Fix empty-copy to include disputed.
-- **Earnings** (`/earnings`): finalized fee-only total + per-trip fee rows with fronted-food caption. No withdrawal rail exists — do not design one without a product decision.
-- **Notifications**: same center, helper detail routing. Rebrand only.
-- **Profile**: identity (hardcoded "Student helper" — prefer display name when present), My-deliveries/Payouts rows, confirm-first QR manager (staged review, replace/remove guards, orphan cleanup — exemplary, rebrand only), sign out.
-
-### 8.4 Helper states, payment inspection, history, rating
-
-Payment card stays read-only (submitted → "Verification pending", verified → earning-finalized + evidence viewer/download, rejected shown honestly). History stays read-only with settlement explainer + fronted-cost record. Rating reuses §7.17 control with viewer-correct copy (fix hardcoded title). Loading/empty/error already complete; add skeletons for queue/deliveries. **Unchanged:** no maps/directions/contact/photo-proof/dispute-appeal (no backend support — correctly absent).
-
-## Section 9: Vendor frontend redesign
-
-Design posture: operational tool, not a storefront — density over delight, same tokens. Vendor scope stays operations-only (no orders/payments/notifications — verified by construction).
-
-### 9.1 Stall dashboard (`/(vendor)`, tab Stall)
-
-"Your stall" header → status card (Open/Closed pill + honest state line + admin-hidden notice when `is_active=false`) → details-or-form card. Open-switch: immediate, locked while saving, errors dismissible. Edit form: name (≤120), description (≤500), location (≤120), hours (≤120); Save (locked, client-validated non-empty name) + Cancel. Unlinked account: "No stall linked — ask your administrator" empty state (keep — it names the real human process). Redesign: rebrand; consider confirm-first for the open-switch? NO — switch must stay instant (day-to-day tool); keep direct-save for stall form but add inline success confirmation (currently silent — small NEW feedback affordance, no behavior change).
-
-### 9.2 Menu management (`/(vendor)/menu`, tab Menu)
-
-"Your menu" header → rows (name, price · availability caption, availability switch, Edit secondary, Delete danger w/ `Alert` double-confirm — keep, it's the sole production dialog) → Add-item primary / inline form (name, description ≤500, decimal-pad price with live RM formatting, available switch; client-validated; single-flight lock across rows). Loading/error/empty ("No items yet") complete. Redesign: rebrand; keep Alert pattern; snapshots protect history (say so in a caption? already implied — add one line "Past orders keep their records" near delete — display-only honesty win). **Unchanged:** RPC-only writes, validation caps, no image upload (columns unused in v1 — do not design imagery until the bucket product decision lands).
-
-### 9.3 Vendor profile, states, anti-patterns
-
-Identity (stall name or fallback, email, short ID, permanence note) + sign out. No loading states needed (sync). Must NOT inherit requester patterns: no timelines, no payment cards, no ratings, no notification bell (none exist). Keep the tab set (Stall/Menu/Profile) and cross-eject guards.
-
-## Section 10: Administrator frontend redesign (greenfield proposal)
-
-Status: **nothing exists** — no routes, no components, no behavior to preserve. What follows is proposed purely from backend capabilities discovered in code (admin-only `send2u_resolve_dispute`, `is_active` kill-switch, service-role provisioning/linking, `disputeNote`/`resolution` columns, ownership-pinned RLS). Building any of this requires a product decision + backend access story (currently service-role SQL); the redesign must not assume admin auth exists in-app.
-
-- **Dashboard (proposed):** counts by status (pending/disputed/unresolved), unlinked-vendor-account flags, recent settlements — dense table style (§11), info-density over cards.
-- **Dispute queue (proposed):** filterable list (reason, age, amounts, parties) → detail (both histories, evidence links, report text) → resolve action writing `resolution`+`disputeNote` via the existing RPC shape. Never promise requesters timelines (see §7.16 constraint).
-- **Vendor management (proposed):** stall list with `is_active` toggle (the existing kill-switch), link-account action (currently manual SQL), hours/menu read-only preview.
-- **User monitoring (proposed, read-only):** role/dev-flag visibility; no in-app role mutation (immutability is a security property — admin hatch stays out-of-band).
-- **Design rules:** same tokens/components (tables added per §11); destructive admin actions confirm-first; every mutation shows actor + timestamp (no silent writes); empty/error/loading per table.
-
-## Section 11: Responsive design specification
-
-Baseline truth: the current app is single-column flow layout on every screen — no grids, no breakpoints, no landscape optimization. The redesign keeps that (it is correct for this product) and formalizes the rules.
-
-- **320pt small phones:** page padding drops to `lg` horizontal (keep `xl` top / `xxl` bottom); segmented controls and 6-dot strip verified to fit (strip: reduce dot to 26pt + 10pt labels under 360pt); badge+total stacks never clip (right column wraps); star row fits (5×44 = 220 + gaps < 320 − padding).
-- **375–430pt standard:** reference canvas — `xl` page padding, all specs in §§5–7 composed here.
-- **Large phones / tablets:** cap content width at **560pt centered** (readability + thumb reach); tab bar caps identically; do NOT stretch rows edge-to-edge. No multi-column (unnecessary for these flows); admin tables (§10) scroll horizontally inside the cap with sticky first column.
-- **Text wrapping:** names/descriptions/filenames wrap (`flex:1` columns, `numberOfLines` only on filenames 1–2 + descriptions 2); right-aligned values (`textAlign:right`, wrap allowed); pills never wrap mid-label (allow horizontal scroll of pill rows if ever crowded — currently none crowd).
-- **Buttons:** full-width primaries everywhere; side-by-side only for View-cart/Add-more class pairs (stack under 360pt).
-- **Sticky actions:** submit/confirm primaries may pin above the safe-area on Review Request, report, and rating screens (NEW pattern; currently end-of-scroll — acceptable fallback).
-- **Sheets (future):** 90% height max, grabber, scrim dismiss, safe-area bottom.
-- **Keyboard:** no `KeyboardAvoidingView` exists — add platform behavior (iOS `padding`, Android `adjustResize` via config) + keep persist-taps + scroll; inputs must scroll above keyboard on 320pt screens (verify on stall/item forms, dispute details, rating comment).
-- **Safe areas:** all edges on every screen (current norm); sticky actions sit inside bottom inset; tab bar respects home indicator.
-- **Horizontal scrolling rules:** forbidden except admin tables and (if ever needed) image carousels. No horizontal food rails (directory, not marketplace).
-
-## Section 12: Accessibility specification
-
-Current baseline is strong (roles/labels on interactive elements, alert-role errors, labelled steppers/stars/switches, text-paired badges) — the redesign must not regress it.
-
-- **Contrast:** body ≥4.5:1, large/disabled ≥3:1. Note: `muted` on white is decorative-only; the new `brand` `#DA0A1B` on white passes for large/bold (buttons use white-on-brand — verify at build; darken to `brandPressed` for text if audit fails).
-- **Touch targets:** ≥48pt everywhere (buttons 52–56, rows 60, steppers 48, stars 44+4 hitSlop, switches native, dots non-interactive). Bell 48 + hitSlop 8 (keep).
-- **Text scaling:** layouts must survive 200% Dynamic Type (wrapping columns already do; verify pill rows and strip labels under scaling — allow strip labels to truncate, never overlap).
-- **Screen readers:** tab roles with unread counts; rows announce name+status+price; steppers announce value changes; stars radiogroup/radio; timelines `summary`; upload progress + errors announced; success conveyed by heading/state change, not color.
-- **Status communication:** never color-only — pill = wash + 600-label + optional icon (current rule, keep). Red-green pairs never adjacent without labels.
-- **Form errors:** inline, `role=alert`, adjacent to field, naming the fix ("Tell us briefly why…" pattern — keep).
-- **Focus/keyboard (web/next):** visible focus rings on web builds; logical order preserved (no positive tabIndex).
-- **Reduced motion:** respect `prefers-reduced-motion` / `AccessibilityInfo.reduceMotion` — disable shimmer and transitions (NEW requirement; currently no motion to gate, keep it that way).
-- **Icons/files:** functional glyphs always labelled or text-paired; upload button states announced ("Choosing…/Uploading…/Submitting…" pattern — keep).
-
-## Section 13: Motion and interaction specification
-
-Principle: motion reports state changes; it never decorates. The current app has effectively zero custom motion — preserve that discipline.
-
-- **Navigation:** platform-default stack/tab transitions only. No custom screen animations.
-- **Cart updates:** stepper value changes instantly; totals update with `tabular-nums` (no jitter, no animation needed).
-- **Loading completion:** content cross-fades or simply appears; skeleton shimmer (NEW) at low amplitude, motion-gated.
-- **Status changes:** confirm/submit/accept transitions render the new state (pill + card swap); no celebratory animation beyond the existing static success panels.
-- **Confirmation:** static success visual (current check panels — keep). No confetti/progress-theater.
-- **Sheets (future):** native spring up / scrim fade, swipe-to-dismiss, motion-gated.
-- **Upload states:** button-label progression (Choosing→Uploading→Submitting) + determinate progress on downloads (current — keep). No indeterminate-plus-success inventing.
-- Forbidden: staggered list entrances, parallax heroes, animated counters, skeleton-to-content layout shift (reserve space), any delay inserted for effect.
-
-## Section 14: State and status vocabulary
-
-Single source for all user-facing status language. Backend values are NEVER renamed; only labels/presentation are specified. Facing: R=requester, H=helper, V=vendor, A=admin(future).
-
-### 14.1 Order lifecycle (backend `OrderStatus`)
-
-| Internal value | User label | Meaning | Color / icon | Allowed requester actions | Read-only? | Facing |
-|---|---|---|---|---|---|---|
-| `pending` | Waiting for a helper | No helper yet | info pill / schedule | Cancel (clean window) | No | R, H(queue) |
-| `assigned` | Helper assigned | Helper claimed, not moving yet | info / person | Cancel (clean window) | No | R, H |
-| `going_to_vendor` | Helper is going to the vendor | En route to stall | info / navigation | Cancel (clean window) | No | R, H |
-| `at_vendor` | Helper is at the vendor | At stall | info / storefront | Cancel (clean window) | No | R, H |
-| `food_available` | Food is available | Stall confirmed items | info / check | Cancel (clean window — nothing spent) | No | R, H |
-| `food_purchased` | Food purchased | Helper paid at stall | info / payments | Cancel→dispute path | No | R, H |
-| `picked_up` | Request picked up | Helper has the food | info / shopping-bag | Cancel→dispute path | No | R, H |
-| `out_for_delivery` | On the way | Heading to drop-off | warning / delivery-dining | Cancel→dispute path | No | R, H |
-| `delivering` (legacy) | On the way | Same as above | warning / delivery-dining | None in UI (map to card — §8 fix) | No | R, H |
-| `delivered` | Delivered | Helper marked arrival | success / check | Confirm delivery; Report issue | No | R, H |
-| `confirmed` | Payment required | Receipt attested, pay now | warning / payments | Submit receipt | No | R, H |
-| `awaiting_requester_payment` | Payment required | Same gate, later hook | warning / payments | Submit receipt | No | R, H |
-| `completed` | Completed | Paid + closed | success / check-circle | Rate (if eligible) | Yes (+rating) | R, H |
-| `cancelled` | Cancelled | Closed without fulfilment | error / cancel | None | Yes | R, H |
-| `disputed` | Under review | Needs settlement | error / report-problem | Withdraw (own unresolved only) | Yes (+withdraw) | R, H |
-| `accepted` / `preparing` / `ready_for_pickup` (legacy) | Mapped to nearest real label (never surfaced raw) | Reserved, unused by flows | info | None (map to card — §8 fix) | No | H |
-
-Terminology fixes locked: never "Preparing/Finding/Out-for-delivery(for going_to_vendor)/Track". Requester says "request"; helper says "job/delivery"; vendor says "stall/menu" (never sees these).
-
-### 14.2 Payment (`PaymentStatus`) and misc
-
-| Value | Label | Color | Rule |
-|---|---|---|---|
-| `submitted` | Verification pending | info | Display-only (no helper review exists) |
-| `verified` | Payment verified | success | Closes order; enables rating |
-| `rejected` | Payment rejected | error | Display-only; no resubmit path exists (do not design one without backend) |
-| Unpaid (null row) | Unpaid | warning | Submit entry when eligible |
-| Recorded (requester) | Recorded | success | Viewer + download |
-| Notification unread | Dot + "N unread" | brand dot | Text-paired, never dot-only meaning |
-| Open / Closed (vendor) | Open / Closed | success / warning | Day-to-day switch state |
-| Available / Unavailable (item) | Available / Unavailable | success / warning | Purchasability gate |
-| Settled (dispute resolution) | Settled · {resolution} | neutral/error wash | Read-only record |
-
-## Section 15: UX issues and redesign priorities
-
-- **Critical 1 — Helper dead-end on 5 legacy statuses.** Current: generic "no longer open" card with no action if backend ever emits them for an assigned helper. Fix: map to nearest real action card (§8.2). Risk: stranded paid orders. Screens: job detail.
-- **Critical 2 — `picked_up` error retry refires the action.** Current: `onRetry` re-calls advance instead of dismissing (all sibling cards dismiss). Fix: dismiss + manual retry button. Risk: accidental double-advance (server serializes, but UX lies). Screens: job detail.
-- **High 1 — Teal/red brand split.** Current: red icon, teal UI. Fix: §5.1 migration (button/border/active-token sweep; snapshot-test every screen). Risk: brand confusion. Screens: all.
-- **High 2 — Text-heavy operational cards.** Current: paragraphs in payment/history/cancel. Fix: medallion steps, key-value rows, progressive disclosure (§§7.11/7.14). Risk: missed required actions. Screens: detail, payment, history.
-- **High 3 — No shared Input.** Current: 11 raw inputs, two border styles. Fix: §5.8 `Input` + migrate. Risk: inconsistent validation display. Screens: auth, vendor forms, dispute, rating.
-- **Medium 1 — Rating viewer copy.** Current: hardcoded "your helper" caption for helper viewers. Fix: viewer-conditional copy. Screens: rating section.
-- **Medium 2 — History copy omits disputed.** Current: "Completed and cancelled…" while disputed lives there (both roles). Fix: "Completed, cancelled and settled…". Screens: 4 history lists.
-- **Medium 3 — Vendor saves are silent.** Current: no success feedback on stall/menu saves. Fix: inline saved-confirmation (no behavior change). Screens: vendor stall/menu.
-- **Medium 4 — No skeletons/toasts.** Current: spinner→content jumps; inline-only feedback. Fix: `Skeleton` rows + keep inline (do not add toast library until a transient-only need proves it).
-- **Low 1 — Bell/tab duplication.** Accepted; subordinate bell visually. Low 2 — Confirmation duplicates breakdown rows; reuse `CostBreakdown`. Low 3 — Stepper/docs use `surfaceSecondary` inconsistently with new warm neutrals; re-token.
-
-## Section 16: Implementation strategy
-
-Dependency order: tokens → primitives → shells → requester journey → transactions → inbox/profile → other roles. (Matches the recommended order; inspection confirms no better sequence — requester detail depends on payment/upload/rating components, helper reuses them.)
-
-- **Phase 1 — Tokens, type, primitives, shell.** Scope: §5 tokens, `Input`, `Skeleton`, recolor Button/Badge/TabBar/Screen headers, sticky-action pattern. Affects: all screens visually, none functionally. Risks: token sweep misses (mitigate: grep each old hex). Acceptance: every screen renders with zero old-teal references; tsc/lint/doctor/export green.
-- **Phase 2 — Home, Food Detail, Review Request.** Scope: §§7.6–7.8 + `VendorHeader`/`FoodRow`/`Stepper` formalization. Dependencies: Phase 1. Risks: cart math untouched (verify with multi-vendor × multi-qty matrix). Acceptance: discovery→submit flow pixel-complete; fee/estimate labelling intact.
-- **Phase 3 — Confirmation, Orders, Detail, status system.** Scope: §§7.9–7.11 + §14 vocabulary enforcement (single shared message helper). Dependencies: Phase 2. Risks: status-label drift across surfaces (mitigate: one helper, snapshot tests). Acceptance: all 9 statuses render specified labels/actions; terminal routing intact.
-- **Phase 4 — Confirm, report, payment, receipt, rating.** Scope: §§7.12–7.17 + `ConfirmPanel`/`UploadCard`/`ReceiptView`/`RatingControl` generalization. Dependencies: Phase 3. Risks: payment-semantics drift (mitigate: no service changes; receipt matrix re-run). Acceptance: confirm-first everywhere; no success-before-RPC.
-- **Phase 5 — Notifications, Profile, auth polish.** Scope: §§7.18–7.19, 7.2–7.4 + unread-dot recolor + password show/hide. Dependencies: Phase 1 only (parallelizable after). Risks: low. Acceptance: auth flows + inbox + profile complete.
-- **Phase 6 — Helper, vendor, admin-future.** Scope: §§8–10 + legacy-status mapping + retry/copy fixes (§15 Critical/Mediums). Dependencies: Phases 1–4 components. Risks: helper stepper regression (mitigate: per-status action matrix test). Acceptance: fulfilment matrix green; vendor CRUD intact; admin clearly flagged future-gated.
-
-Each phase: implement → `tsc` + `expo lint` + `expo-doctor` + `expo export -p web` → changelog entry → report (the repo's send2u-dev workflow).
-
-## Section 17: Design acceptance checklist
-
-- [ ] Zero old-teal references; red used for brand/actions only, never success/error meaning
-- [ ] Type scale, spacing scale, radii applied from tokens (no magic numbers)
-- [ ] Tabs: correct set/order/icons/labels per role; hidden routes reachable; bell duplication subordinated
-- [ ] Touch targets ≥48pt; sticky actions inside safe-area; 320pt layouts don't clip
-- [ ] Loading/empty/error/disabled on every async surface; skeletons where specified
-- [ ] §14 labels exact on all surfaces; no preparing/ETA/tracking/rating-of-food copy
-- [ ] Cart integrity: multi-vendor math, estimate labelling, failure preservation, no-resubmit
-- [ ] Submit/confirm/report buttons appear only at valid stages; reason/category gates intact
-- [ ] External-payment clarity: steps, QR states, receipt confirm-first, recorded viewer, no gateway implication
-- [ ] Dispute: 4 categories frozen, no refund/timeline promises, withdraw rules intact
-- [ ] Rating: eligibility, 5 stars, 500-cap counter, immutability, viewer-correct copy
-- [ ] Contrast ≥4.5:1 body; status never color-only; screen-reader labels on interactive/status/upload elements
-- [ ] No unsupported features (search/GPS/chat/photo-proof/gateway/wallet/promos/favorites/aggregates)
-- [ ] No broken navigation, no dead controls, no misleading labels, no functional diffs vs backend contracts
-- [ ] Validation suite green; changelog updated; device smoke completed (see Limitations)
-
-## Inspection limitations (could not be verified from code)
-
-1. **On-device behavior:** touch feel, keyboard overlap on small screens, Dynamic Type extremes, camera/file-picker native sheets, share-sheet flow, push delivery to physical devices — all need a device build (last-mile push explicitly unvalidated in project history).
-2. **Real backend data shapes at runtime:** RLS/role matrices, legacy-status emission frequency, and volume/edge rows (e.g. 50-item carts) were read from code/migrations, not exercised live.
-3. **Admin needs:** no admin users or workflows were observable; Section 10 requirements should be validated with stakeholders before build.
-4. **Brand red rendering:** `#DA0A1B` sampled from icon pixels; on-screen contrast audit (especially white-on-brand at small sizes) must be re-verified at implementation and adjusted toward `brandPressed` for text if it fails.
-5. **Pricing/fee policy:** RM2.00-per-order fee and external-QR model taken as fixed product facts; any policy change invalidates §§7.8/7.14 figures.
-
-
-
-
-
-
+| Header bells | Bells on Home/Requests only; gear on Profile; none on vendor tabs or portal | Bell available on primary pages (§4) | Helpers/vendors lack ambient update signal | Add `HeaderBell` to missing primary headers; no new controls |
+| Portal navigation | Bottom tabs Jobs/Deliveries/Profile since 2026-09-16 | §19 three-destination bottom nav | Resolved — keep tab roots chrome-free of extra actions |
+| Queue accept control | Rows navigate; claim via Job Detail slider | §19 acceptance on Job Detail via §11 | Resolved — do not re-add row-level claim controls |
+| Active-job cap | Enforced race-safely server-side, displayed as "(n/3)" text | Max three active jobs (§19) | Resolved — keep UI and RPC limit in agreement (`MAX_ACTIVE_JOBS_PER_HELPER`) |
+| Sliders | Built for job acceptance; other flows use buttons | §11 confirmation language | Partially resolved — extend only when touching those flows |
+| Status double-encoding | Some rows pair status subtitle + badge | Single encoding (§7) | Redundant, noisy | Badge *or* subtitle |
+| Place-icon color | Drop-off red in portal, brick elsewhere | One color per concept | Same meaning, two colors | Unify on the portal treatment |
+| Sign-out treatments | Outlined / danger / tertiary across roles | One account, one pattern | Three patterns for one action | Unify on the requester outlined treatment |
+| `info` red breadth | All pre-dispatch pills deep red | Red rationed (§8) | Normal work reads alarming | Demote to neutral/info treatment when pills diversify |
+| Redundant titles | Glass title + in-content title duplication on some secondaries | Compact chrome (§4) | Header repeats content | Keep chrome title; drop in-content repeat |
+| Text-button `Mark all read` | Bare pressable, sub-48pt target | ≥48pt controls | Smallest text action | Give it a 48pt row like `SectionHeader` actions |
+| Stale inventory docs | Old audit described the deleted tab app | This document as source of truth | Misleads future implementers | That audit is marked superseded; do not revive it |
+
+---
+
+## 21. Send2U Design Rules
+
+Before shipping any screen, check:
+
+- [ ] Does this screen feel like Send2U (white, calm, one red)?
+- [ ] Is the hierarchy clear in seconds (state → task → detail)?
+- [ ] Is the page too crowded — or unfinished-empty?
+- [ ] Is there information the next page should carry instead?
+- [ ] Can secondary content collapse or move below the action?
+- [ ] Is there exactly one competing-free primary action?
+- [ ] Is any card/bordered box earning its existence?
+- [ ] Is any badge/pill carrying what plain text could?
+- [ ] Is colour meaning, not decoration?
+- [ ] Is whitespace balanced (no dead zones, no cram)?
+- [ ] Is the header compact with a single back control?
+- [ ] Is navigation (tabs, bell, gear) consistent with sibling screens?
+- [ ] Is every sentence purposeful, human, and state-accurate?
+- [ ] Would this pass as finished product on a 320pt phone?
+- [ ] Do consequential actions resist accidents (slider where §11 applies)?
+- [ ] Does it work with red removed — then re-add red once, deliberately?
+
+---
+
+*Document status: rewritten 2026-09-16 from direct source inspection
+(`constants/theme.ts`, `components/ui/*`, all route groups, `lib/orders.ts`).
+Supersedes the prior redesign-spec revision as the visual source of truth;
+behavioral contracts (roles, statuses, RPCs) remain with code and migrations.*

@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 
 export type StatusCardTone = 'info' | 'success' | 'warning' | 'error';
 
@@ -21,10 +21,10 @@ const toneAccent: Record<StatusCardTone, string> = {
 };
 
 /**
- * Contextual status card: tinted surface, leading icon chip, title, and a
+ * Contextual status banner: tinted surface, leading icon chip, title, and a
  * plain-language description of what the status means and what happens
  * next. Copy always comes from the caller (per-status content), so the
- * card never hardcodes one message for every request.
+ * component never hardcodes one message for every request.
  */
 export function RequestStatusCard({
   tone,
@@ -38,8 +38,8 @@ export function RequestStatusCard({
   description: string;
 }) {
   return (
-    <View style={[styles.card, { backgroundColor: toneSurface[tone] }]}>
-      <View style={[styles.iconChip, { backgroundColor: colors.surface }]}>
+    <View style={[styles.banner, { backgroundColor: toneSurface[tone] }]}>
+      <View style={styles.iconChip}>
         <MaterialIcons name={icon} size={28} color={toneAccent[tone]} />
       </View>
       <View style={styles.textBlock}>
@@ -53,19 +53,19 @@ export function RequestStatusCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
+  banner: {
     flexDirection: 'row',
     gap: spacing.md,
     alignItems: 'flex-start',
-    borderRadius: radii.lg,
     padding: spacing.lg,
   },
   iconChip: {
     width: 52,
     height: 52,
-    borderRadius: radii.full,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
   textBlock: { flex: 1, gap: spacing.xs },
 });

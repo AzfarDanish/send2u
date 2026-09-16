@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View, type PressableProps } from 'react-native';
 
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { Text } from '@/components/ui/Text';
 
 interface OptionCardProps extends Omit<PressableProps, 'style'> {
@@ -12,7 +12,7 @@ interface OptionCardProps extends Omit<PressableProps, 'style'> {
   loading?: boolean;
 }
 
-/** Large tappable choice card (role picker, request type, etc.). */
+/** Large tappable choice row (role picker, request type, etc.). Flat layout with clear selection state. */
 export function OptionCard({ icon, title, description, selected = false, loading = false, ...rest }: OptionCardProps) {
   return (
     <Pressable
@@ -49,18 +49,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1.5,
-    borderColor: colors.divider,
-    padding: spacing.lg,
+    paddingVertical: spacing.lg,
   },
-  selected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  selected: { backgroundColor: colors.primarySoft },
   pressed: { opacity: 0.85 },
   iconWrap: {
     width: 52,
     height: 52,
-    borderRadius: radii.lg,
+    borderRadius: 12,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',

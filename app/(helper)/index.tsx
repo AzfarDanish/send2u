@@ -147,7 +147,7 @@ export default function HelperJobsScreen() {
           {jobs.map((job) => {
             const isAccepting = acceptingId === job.id;
             return (
-              <Card key={job.id} testID={`open-job-${job.id}`} style={styles.jobCard}>
+              <Card key={job.id} style={styles.jobCard}>
                 <ListRow
                   icon="delivery-dining"
                   title={job.vendor.name}

@@ -1748,3 +1748,34 @@ only. No secrets are ever recorded here.
   `expo export -p web` pass; 12 scrolled screenshots inspected, no
   clipping/overlap/unreadable text; temp probes removed, no test
   residue (read-only validation, dev passwords unchanged).
+
+## 2026-09-09 — Profile screens: minimalist development section UI
+
+- Changed: All three profile screens (requester, helper, vendor) redesigned with compact, centered header layout removing SectionHeader component and adopting consistent avatar/icon + title + email + badge structure
+- Changed: DevProfileSwitcher component simplified—removed verbose labels, reduced tab/button sizes, trimmed row content to essentials (count + role name, ID only), removed redundant badges and timestamps
+- Changed: Card sections use consistent `gap: 0` for tighter ListRow grouping; header padding standardized across roles
+- Fixed: VendorCard closed state color reference (textSecondary → secondary)
+- Validation: TypeScript compilation passes; all profile screens render minimal, uncluttered layouts
+
+### Summary of changes
+
+**Files modified:**
+- `app/(requester)/profile.tsx` — Compact header (72px avatar), removed roleLabel helper, simplified menu rows, added underTabs prop
+- `app/(helper)/profile.tsx` — Replaced SectionHeader with inline header, unified card spacing, removed identity wrapper styles
+- `app/(vendor)/profile.tsx` — Same SectionHeader removal, compact header structure
+- `components/DevProfileSwitcher.tsx` — Minimalist tabs (count + role), trimmed row content, reduced icon/text sizes, removed verbose titles and descriptions
+- `components/VendorCard.tsx` — Fixed color token reference
+- `app/(helper)/index.tsx` — Removed unused testID prop
+
+**Root causes addressed:**
+- Oversized SectionHeader components creating unnecessary vertical space
+- Verbose dev switcher with redundant text (titles, descriptions, counts repeated)
+- Inconsistent card spacing and padding across profile screens
+- Overcrowded dev switcher rows with multiple badges, long IDs, timestamps
+
+**Design improvements:**
+- Centered, compact headers with consistent spacing (spacing.lg top, spacing.md bottom)
+- Reduced avatar sizes (96→72px requester, 52→64px helper/vendor)
+- Simplified dev switcher tabs showing only count + role
+- Cleaner account rows: icon, name, short ID, single chevron/current badge
+- Consistent section gaps (gap: 0) for grouped list items

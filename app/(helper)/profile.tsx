@@ -4,19 +4,17 @@ import { router } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
-import { PrivateImage } from '@/components/PrivateImage';
+import { DownloadableQR } from '@/components/DownloadableQR';
 import { StagedFileCard } from '@/components/StagedFileCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { setPaymentQrPath } from '@/services/auth';
 import {
-  displayFileName,
   pickPaymentImage,
   qrPathFor,
   removeObject,
@@ -29,8 +27,6 @@ export default function HelperProfileScreen() {
   const [qrBusy, setQrBusy] = useState(false);
   const [qrBusyMessage, setQrBusyMessage] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
-  // Picked-but-not-uploaded QR awaiting explicit confirmation. Nothing
-  // reaches Storage or the profile until the user confirms.
   const [stagedQr, setStagedQr] = useState<PickedImage | null>(null);
 
   const handleQrChoose = useCallback(async () => {
@@ -107,23 +103,20 @@ export default function HelperProfileScreen() {
   }, [user, qrBusy, profile?.paymentQrPath, refreshProfile]);
 
   return (
-    <Screen>
-      <SectionHeader eyebrow="Profile" title="Your account" />
-      <Card>
-        <View style={styles.identity}>
-          <View style={styles.avatar}>
-            <MaterialIcons name="delivery-dining" size={28} color={colors.primary} />
-          </View>
-          <View style={styles.identityText}>
-            <Text variant="subtitle">Student helper</Text>
-            <Text variant="caption" color="secondary">
-              {user?.email ?? 'Signed in'} · ID {user?.id.slice(0, 8)}…
-            </Text>
-          </View>
+    <Screen underTabs>
+      <View style={styles.header}>
+        <View style={styles.avatar}>
+          <MaterialIcons name="delivery-dining" size={28} color={colors.primary} />
         </View>
-      </Card>
+        <Text variant="subtitle">Student helper</Text>
+        {user?.email && (
+          <Text variant="caption" color="secondary" numberOfLines={1}>
+            {user.email}
+          </Text>
+        )}
+      </View>
 
-      <Card>
+      <Card style={styles.section}>
         <ListRow
           icon="delivery-dining"
           title="My deliveries"
@@ -136,18 +129,13 @@ export default function HelperProfileScreen() {
         />
       </Card>
 
-      <Card>
+      <Card style={styles.section}>
         <Text variant="subtitle">Payment QR</Text>
-        <Text variant="caption" color="muted">
-          {profile?.paymentQrPath ? 'QR set' : 'No QR set'}
-        </Text>
         {profile?.paymentQrPath ? (
-          <>
-            <PrivateImage path={profile.paymentQrPath} accessibilityLabel="Your payment QR code" />
-            <Text variant="caption" color="muted">
-              {displayFileName(profile.paymentQrPath)}
-            </Text>
-          </>
+          <DownloadableQR
+            path={profile.paymentQrPath}
+            accessibilityLabel="Your payment QR code"
+          />
         ) : (
           <Text variant="caption" color="muted">
             Requesters can&apos;t pay you without one.
@@ -196,14 +184,20 @@ export default function HelperProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  header: { 
+    alignItems: 'center', 
+    gap: spacing.sm, 
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+  },
   avatar: {
-    width: 52,
-    height: 52,
+    width: 64,
+    height: 64,
     borderRadius: radii.full,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
-  identityText: { flex: 1, gap: spacing.xs },
+  section: { gap: 0 },
 });

@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { PrivateImage } from '@/components/PrivateImage';
+import { DownloadableQR } from '@/components/DownloadableQR';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { StagedFileCard } from '@/components/StagedFileCard';
@@ -158,13 +158,10 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
             <Text color="secondary">4. Save the payment receipt.</Text>
           </View>
           {context.helperQrPath ? (
-            <>
-              <PrivateImage path={context.helperQrPath} accessibilityLabel="Helper payment QR code" />
-              <Text color="secondary">
-                Pay {formatMYR(context.totalCents)} externally using this QR, then attach your
-                receipt below.
-              </Text>
-            </>
+            <DownloadableQR
+              path={context.helperQrPath}
+              accessibilityLabel="Helper payment QR code"
+            />
           ) : (
             <ErrorState
               title="Payment unavailable"

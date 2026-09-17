@@ -90,6 +90,11 @@ pkg/
 # Java (if applicable)
 *.class
 *.jar
+# Gradle wrapper must ship to EAS: the local upload path (requireCommit=false,
+# vcs/local.js) filters through .gitignore with no tracked-file exemption, so
+# `*.jar` silently drops android/gradle/wrapper/gradle-wrapper.jar and gradlew
+# then dies with "Unable to access jarfile".
+!android/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.ear
 .classpath
@@ -429,6 +434,11 @@ DerivedData/
 .gradle/
 local.properties
 *.keystore
+# android/app/build.gradle's release build type uses signingConfigs.debug ->
+# storeFile file('debug.keystore'). Same local-upload filter as the wrapper jar,
+# so `*.keystore` drops it and assembleRelease fails at signing. The RN debug
+# keystore is not a secret (storePassword/keyPassword 'android').
+!android/app/debug.keystore
 *.jks
 captures/
 .externalNativeBuild

@@ -2629,3 +2629,48 @@ only. No secrets are ever recorded here.
   for subsequent redesign discussions without altering code or logic.
 - Validation: `tsc --noEmit` (0 errors), `npm run lint` (`expo lint`, 0
   problems) — pass.
+
+## 2026-09-17 — config/eas: fix Android Gradle wrapper missing on EAS builder
+
+- Change: added two negation rules to `.gitignore` —
+  `!android/gradle/wrapper/gradle-wrapper.jar` (after `*.jar`) and
+  `!android/app/debug.keystore` (after `*.keystore`). Untracked `.expo/`
+  (`git rm -r --cached .expo`; files remain on disk).
+- Reason: EAS build `5a891df2` (profile `preview`, commit `d6abdcfa`) failed in
+  the `RUN_GRADLEW` phase with
+  `Unable to access jarfile .../android/gradle/wrapper/gradle-wrapper.jar`.
+  Root cause: with `requireCommit` unset, EAS CLI selects the **local** upload
+  client (`build/vcs/local.js`), which tars the working tree filtered by every
+  `.gitignore` via the `ignore` npm package. That path has **no tracked-file
+  exemption** — the exemption exists only in the git client
+  (`build/vcs/clients/git.js`: "Tracked files aren't ignored even if they match
+  ignore patterns"). So `*.jar` silently dropped the committed Gradle wrapper
+  from the upload and `gradlew` could not start. `expo prebuild` on the builder
+  runs in sync mode over the existing `android/` tree and does not restore it.
+  The same filter also dropped `android/app/debug.keystore`, which
+  `android/app/build.gradle`'s **release** build type needs
+  (`release { signingConfig signingConfigs.debug }` → `file('debug.keystore')`),
+  i.e. a second failure queued immediately behind the first.
+- Details: 8 tracked-file groups were being dropped from the upload
+  (`*.jar`, `*.keystore`, `.expo/`, `supabase/`, `.gitignore`, `.vscode/`,
+  `.ENV.*`, `expo-env.d.ts`); only the wrapper jar and the debug keystore are
+  build-critical. The other groups are intentionally excluded and were left
+  alone. Verified with a harness that replicates `vcs/ignore.js` (same `ignore`
+  package, one mapping per `.gitignore`, root + `android/` prefixes): the jar
+  and keystore now upload while `.expo/`, `build/` outputs and `.env.example`
+  stay excluded.
+- Validation: `tsc --noEmit` (exit 0), `npm run lint` (exit 0),
+  `npx expo-doctor` 20/21 (the `.expo/` tracked-files check now passes),
+  EAS-upload-filter simulation harness (8/8 assertions passed).
+- Known limitation: `expo-doctor` still reports "native project folders but
+  also native configuration properties in app.json" (non-CNG project). The
+  committed `android/` currently agrees with `app.json` (app name, package,
+  orientation, scheme, splash assets), so there is no active inconsistency, but
+  future `app.json` changes (`android`/`ios`/`icon`/`scheme`/`plugins`) will NOT
+  reach the build because EAS skips prebuild sync when `android/` is present.
+  Decide one way: keep `android/` committed and treat it as authoritative, or
+  add `/android` to `.gitignore` and let EAS prebuild from `app.json`.
+- Known limitation: `eas.json` leaves `requireCommit` unset. Setting
+  `requireCommit: true` would switch EAS to the git upload client, which does
+  not apply `.gitignore` rules to tracked files, fixing this whole class at
+  once — at the cost of requiring a clean, committed tree for every build.

@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { HeaderBell } from '@/components/HeaderBell';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { MainHeader } from '@/components/MainHeader';
+import { SearchBar, matchesSearch } from '@/components/SearchBar';
 import { CartFab } from '@/components/CartFab';
 import { VendorCard } from '@/components/VendorCard';
 import { Card } from '@/components/ui/Card';
@@ -15,27 +16,38 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
-import { useAuth } from '@/hooks/useAuth';
 import { useMenu } from '@/hooks/useMenu';
 import type { Vendor } from '@/types/domain';
 
-/** Time-based greeting from the device clock; never hardcoded per user. */
-function greetingForHour(hour: number): string {
-  if (hour < 12) return 'Good morning.';
-  if (hour < 18) return 'Good afternoon.';
-  return 'Good evening.';
-}
-
 export default function RequesterHomeScreen() {
   const { sections, status, error, refreshing, retry, refresh } = useMenu();
-  const { profile } = useAuth();
+  const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
+  const isSearching = deferredQuery.trim().length > 0;
 
   const openVendor = useCallback((vendor: Vendor) => {
     router.push({ pathname: '/(requester)/vendors/[id]', params: { id: vendor.id } });
   }, []);
 
-  const greeting = greetingForHour(new Date().getHours());
-  const greetedName = profile?.displayName ? `, ${profile.displayName}` : '';
+  // Client-side search over loaded menu data (no new queries): a vendor
+  // stays visible when the vendor itself matches or when any of its items
+  // match, so a dish search always leads somewhere tappable.
+  const visibleSections = useMemo(() => {
+    if (!isSearching) return sections;
+    return sections.filter(
+      (section) =>
+        matchesSearch(
+          deferredQuery,
+          section.vendor.name,
+          section.vendor.locationHint,
+          section.vendor.operatingHours,
+          section.vendor.description,
+        ) ||
+        section.items.some((item) =>
+          matchesSearch(deferredQuery, item.name, item.description, section.vendor.name),
+        ),
+    );
+  }, [sections, deferredQuery, isSearching]);
 
   return (
     <>
@@ -48,34 +60,37 @@ export default function RequesterHomeScreen() {
             tintColor={colors.primary}
           />
         }>
-        <View style={styles.brandRow}>
-          <View style={styles.logoTile}>
-            <MaterialIcons name="send" size={22} color={colors.secondary} />
-          </View>
-          <Text variant="title">Send2U</Text>
-          <View style={styles.brandSpacer} />
-          <HeaderBell role="requester" />
-        </View>
+        <MainHeader
+          title="Send2U"
+          leading={
+            <View style={styles.logoTile}>
+              <MaterialIcons name="send" size={22} color={colors.secondary} />
+            </View>
+          }
+        />
 
-        <View style={styles.greeting}>
-          <Text color="secondary">
-            {greeting}
-            {greetedName}
-          </Text>
-          <Text variant="title">What would you like to eat today?</Text>
-        </View>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search vendors or dishes"
+          accessibilityLabel="Search vendors or dishes"
+        />
 
-        <View style={styles.banner}>
-          <View style={styles.bannerText}>
-            <Text variant="title" style={styles.bannerTitle}>
-              Good Food,{'\n'}Brighter Days
-            </Text>
-            <Text style={styles.bannerSubtitle}>From our campus vendors to you</Text>
+        <Text variant="title">What would you like to eat today?</Text>
+
+        {!isSearching ? (
+          <View style={styles.banner}>
+            <View style={styles.bannerText}>
+              <Text variant="title" style={styles.bannerTitle}>
+                Good Food,{'\n'}Brighter Days
+              </Text>
+              <Text style={styles.bannerSubtitle}>From our campus vendors to you</Text>
+            </View>
+            <View style={styles.bannerTile}>
+              <PlaceholderImage style={styles.bannerImage} />
+            </View>
           </View>
-          <View style={styles.bannerTile}>
-            <PlaceholderImage style={styles.bannerImage} />
-          </View>
-        </View>
+        ) : null}
 
         <SectionHeader title="Available Vendors" />
         {status === 'loading' ? (
@@ -109,8 +124,15 @@ export default function RequesterHomeScreen() {
             message="Pull down to check again."
           />
         ) : null}
+        {status === 'ready' && isSearching && visibleSections.length === 0 ? (
+          <EmptyState
+            icon="search"
+            title="No matches"
+            message="Try a different vendor or dish."
+          />
+        ) : null}
         {status === 'ready'
-          ? sections.map((section) => (
+          ? visibleSections.map((section) => (
               <VendorCard
                 key={section.vendor.id}
                 vendor={section.vendor}
@@ -126,7 +148,6 @@ export default function RequesterHomeScreen() {
 
 const styles = StyleSheet.create({
   stateCard: { minHeight: 200, justifyContent: 'center' },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   logoTile: {
     width: 40,
     height: 40,
@@ -135,8 +156,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandSpacer: { flex: 1 },
-  greeting: { gap: spacing.xs },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

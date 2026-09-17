@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
-import { Badge } from '@/components/ui/Badge';
+import { MainHeader } from '@/components/MainHeader';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
@@ -44,6 +44,7 @@ export default function RequesterProfileScreen() {
 
   return (
     <Screen underTabs>
+      <MainHeader title="Profile" showSettings />
       <View style={styles.header}>
         <Avatar name={displayName} path={profile?.avatarPath} size={72} />
         <Text variant="subtitle" style={styles.name} numberOfLines={2}>
@@ -54,7 +55,6 @@ export default function RequesterProfileScreen() {
             {user.email}
           </Text>
         ) : null}
-        <Badge label={profile?.role ?? 'requester'} tone="primary" />
       </View>
 
       <Card style={styles.section}>
@@ -115,13 +115,12 @@ export default function RequesterProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { 
-    alignItems: 'center', 
-    gap: spacing.sm, 
-    paddingTop: spacing.lg,
+  header: {
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingBottom: spacing.md,
   },
-  name: { color: colors.text, textAlign: 'center' },
+  name: { textAlign: 'center' },
   section: { gap: 0 },
   helperSection: { gap: spacing.xs },
   logOut: {

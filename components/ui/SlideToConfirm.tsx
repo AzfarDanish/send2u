@@ -17,6 +17,13 @@ interface SlideToConfirmProps {
   busyLabel?: string;
   /** Label shown when disabled, e.g. a capacity explanation. */
   disabledLabel?: string;
+  /**
+   * Visual weight. `default` is a quiet grey track with a red thumb;
+   * `filled` is a full red track with a white thumb for the single
+   * consequential commitment on a decision screen; `soft` is a tinted
+   * track with a red thumb for in-flow confirmations.
+   */
+  tone?: 'default' | 'filled' | 'soft';
   disabled?: boolean;
   busy?: boolean;
   onConfirm: () => void;
@@ -32,6 +39,7 @@ export function SlideToConfirm({
   label,
   busyLabel = 'Working…',
   disabledLabel,
+  tone = 'default',
   disabled = false,
   busy = false,
   onConfirm,
@@ -77,6 +85,9 @@ export function SlideToConfirm({
   );
 
   const shownLabel = busy ? busyLabel : disabled && disabledLabel ? disabledLabel : label;
+  const filled = tone === 'filled';
+  const soft = tone === 'soft';
+  const idle = !disabled && !busy;
 
   return (
     <View
@@ -88,24 +99,34 @@ export function SlideToConfirm({
         if (!locked) onConfirm();
       }}
       onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
-      style={[styles.track, (disabled || busy) && styles.trackDisabled]}
+      style={[styles.track, filled && styles.trackFilled, soft && styles.trackSoft, (disabled || busy) && styles.trackDisabled]}
       {...panResponder.panHandlers}>
       <Text
         variant="secondary"
-        style={[styles.label, disabled && !busy && styles.labelDisabled]}
+        style={[
+          styles.label,
+          filled && styles.labelFilled,
+          soft && styles.labelSoft,
+          disabled && !busy && styles.labelDisabled,
+        ]}
         numberOfLines={1}>
         {shownLabel}
       </Text>
       <Animated.View
         style={[
           styles.thumb,
+          filled && styles.thumbFilled,
           { transform: [{ translateX: Animated.add(TRACK_PADDING, slide) }] },
           disabled && !busy && styles.thumbDisabled,
         ]}>
         {busy ? (
-          <ActivityIndicator color={colors.onPrimary} />
+          <ActivityIndicator color={filled || idle ? colors.onPrimary : colors.primary} />
         ) : (
-          <MaterialIcons name="chevron-right" size={28} color={colors.onPrimary} />
+          <MaterialIcons
+            name="chevron-right"
+            size={28}
+            color={filled && idle ? colors.primary : colors.onPrimary}
+          />
         )}
       </Animated.View>
     </View>
@@ -124,7 +145,15 @@ const styles = StyleSheet.create({
   trackDisabled: {
     backgroundColor: colors.disabledBackground,
   },
+  trackFilled: {
+    backgroundColor: colors.primary,
+  },
+  trackSoft: {
+    backgroundColor: colors.primarySoft,
+  },
   label: { fontWeight: '600', color: colors.secondary, paddingHorizontal: spacing.xxxl },
+  labelFilled: { color: colors.onPrimary },
+  labelSoft: { color: colors.primary },
   labelDisabled: { color: colors.muted },
   thumb: {
     position: 'absolute',
@@ -137,5 +166,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  thumbFilled: { backgroundColor: colors.surface },
   thumbDisabled: { backgroundColor: colors.muted },
 });

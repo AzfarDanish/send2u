@@ -84,7 +84,7 @@ interface OrderRow {
   created_at: string;
   updated_at: string;
   vendor: { id: string; name: string; location_hint: string | null } | null;
-  delivery_location: { id: string; name: string } | null;
+  delivery_location: { id: string; name: string; description: string | null } | null;
   send2u_order_items: OrderItemRow[] | null;
   // To-one (UNIQUE order_id) embeds decode as a single object, not an array.
   send2u_payments: PaymentRow | PaymentRow[] | null;
@@ -156,7 +156,7 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
       name: row.vendor.name,
       locationHint: row.vendor.location_hint,
     },
-    location: { id: row.delivery_location.id, name: row.delivery_location.name },
+    location: { id: row.delivery_location.id, name: row.delivery_location.name, description: row.delivery_location.description },
     items: (row.send2u_order_items ?? []).map(toOrderItem),
     payment: normalizePayments(row.send2u_payments).slice(0, 1).map((p) => toPayment(row.id, p))[0] ?? null,
   };
@@ -204,7 +204,7 @@ const ORDER_SELECT =
   ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, dispute_details, dispute_note, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint),' +
-  ' delivery_location:send2u_delivery_locations!inner(id, name),' +
+  ' delivery_location:send2u_delivery_locations!inner(id, name, description),' +
   ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at),' +
   ' send2u_payments(order_id, amount_cents, evidence_path, status, submitted_at, verified_at)';
 
@@ -440,20 +440,32 @@ export type FulfilmentAction =
   | 'release';
 
 /**
+ * Result of a fulfilment advance. Pre-purchase `report_food_unavailable`
+ * permanently deletes the order row (no money spent, nothing to settle),
+ * so the RPC returns `{ deleted: true }` with no status — every other
+ * action returns the new status.
+ */
+export type FulfilmentResult = { status: OrderStatus } | { deleted: true };
+
+/**
  * Advances fulfilment for the assigned helper. The database validates the
  * current state atomically; only valid transitions succeed.
  */
 export async function advanceFulfilment(
   orderId: string,
   action: FulfilmentAction,
-): Promise<{ status: OrderStatus }> {
+): Promise<FulfilmentResult> {
   const supabase = requireClient();
   const { data, error } = await supabase.rpc('send2u_helper_advance', {
     p_order_id: orderId,
     p_action: action,
   });
   if (error) throw new Error(friendlyFulfilmentError(error.message));
-  if (!isRecord(data) || typeof data.status !== 'string') {
+  if (!isRecord(data)) {
+    throw new Error('The update came back in an unexpected shape.');
+  }
+  if (data.deleted === true) return { deleted: true };
+  if (typeof data.status !== 'string') {
     throw new Error('The update came back in an unexpected shape.');
   }
   return { status: data.status as OrderStatus };

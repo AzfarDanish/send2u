@@ -8,13 +8,11 @@ import { OrderRatingSection } from '@/components/OrderRatingSection';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { RequestProgress } from '@/components/RequestProgress';
-import { RequestStatusCard, type StatusCardTone } from '@/components/RequestStatusCard';
+import type { StatusCardTone } from '@/components/RequestStatusCard';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { SettlementRecord } from '@/components/SettlementRecord';
 import { GlassHeader } from '@/components/GlassHeader';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -27,10 +25,7 @@ import { emitOrderChanged } from '@/lib/orderEvents';
 import {
   formatOrderDate,
   isTerminalOrderStatus,
-  orderStatusTone,
   orderTotalCents,
-  paymentStatusLabel,
-  paymentStatusTone,
   requesterStatusMessage,
 } from '@/lib/orders';
 import { cancelOrder, getOrderDetail, openDispute, withdrawDispute } from '@/services/orders';
@@ -217,6 +212,14 @@ function disputeDescription(order: OrderWithDetails): string {
       return `This request is under review.${flagged}${settled}`;
   }
 }
+
+/** Title color per status tone: meaning carried by labeled text, never a badge. */
+const STATUS_TONE_COLOR: Record<StatusCardTone, string> = {
+  info: colors.info,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
+};
 
 /**
  * Request Detail: the requester's single view of one request — header,
@@ -467,19 +470,11 @@ export default function OrderDetailScreen() {
     !!order.disputeReason &&
     WITHDRAWABLE_REASONS.has(order.disputeReason);
 
+  // Note: no "Report an issue" overflow item — the delivered section owns
+  // the inline report toggle, so a menu duplicate would be a second path to
+  // the same form.
   const menuItems: { key: string; icon: keyof typeof MaterialIcons.glyphMap; title: string; onPress: () => void }[] =
     [];
-  if (isDelivered) {
-    menuItems.push({
-      key: 'report',
-      icon: 'report-problem',
-      title: 'Report an issue',
-      onPress: () => {
-        setMenuOpen(false);
-        setReportOpen(true);
-      },
-    });
-  }
   menuItems.push({
     key: 'help',
     icon: 'help-outline',
@@ -510,48 +505,43 @@ export default function OrderDetailScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
         }>
         <View style={styles.headerRow}>
-          <Text variant="title" style={styles.requestId} numberOfLines={1} ellipsizeMode="tail">
-            #{order.id.slice(0, 8)}
-          </Text>
-          <View style={styles.headerRight}>
-            <Badge label={requesterStatusMessage(order.status)} tone={orderStatusTone(order.status)} />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="More actions"
-              onPress={() => setMenuOpen((open) => !open)}
-              style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
-              hitSlop={8}>
-              <MaterialIcons name="more-vert" size={22} color={colors.text} />
-            </Pressable>
+          <View style={styles.headerText}>
+            <Text variant="title" numberOfLines={2}>
+              {order.vendor.name}
+            </Text>
+            <Text variant="caption" color="secondary">
+              #{order.id.slice(0, 8)} · Placed {formatOrderDate(order.createdAt)}
+              {order.helperId
+                ? ` · ${helperLabel(helperIdentity, order.helperId)}${order.acceptedAt ? ` accepted ${formatOrderDate(order.acceptedAt)}` : ''}`
+                : ''}
+            </Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="More actions"
+            onPress={() => setMenuOpen((open) => !open)}
+            style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
+            hitSlop={8}>
+            <MaterialIcons name="more-vert" size={22} color={colors.text} />
+          </Pressable>
         </View>
-        <Text variant="caption" color="secondary">
-          Placed {formatOrderDate(order.createdAt)}
-          {order.helperId
-            ? ` · ${helperLabel(helperIdentity, order.helperId)}${order.acceptedAt ? ` accepted ${formatOrderDate(order.acceptedAt)}` : ''}`
-            : ''}
-        </Text>
 
         <RequestProgress order={order} />
 
-        <RequestStatusCard tone={card.tone} icon={card.icon} title={card.title} description={card.description} />
+        <View style={styles.statusBlock}>
+          <Text variant="subtitle" style={{ color: STATUS_TONE_COLOR[card.tone] }}>
+            {card.title}
+          </Text>
+          <Text color="secondary">{card.description}</Text>
+        </View>
 
-        <Text variant="subtitle">Order Summary</Text>
-        <Card>
-          <View style={styles.row}>
-            <MaterialIcons name="storefront" size={20} color={colors.primary} />
-            <View style={styles.rowText}>
-              <Text variant="secondary" style={styles.vendorName} numberOfLines={2}>
-                {order.vendor.name}
-              </Text>
-              {order.vendor.locationHint ? (
-                <Text variant="caption" color="secondary" numberOfLines={2}>
-                  {order.vendor.locationHint}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.divider} />
+        <View style={styles.section}>
+          <Text variant="subtitle">Order Summary</Text>
+          {order.vendor.locationHint ? (
+            <Text variant="caption" color="secondary" numberOfLines={2}>
+              {order.vendor.locationHint}
+            </Text>
+          ) : null}
           <OrderBreakdown
             items={order.items}
             subtotalCents={order.subtotalCents}
@@ -560,21 +550,17 @@ export default function OrderDetailScreen() {
           <Text variant="caption" color="muted">
             Pay only after the food is in your hands.
           </Text>
-        </Card>
+        </View>
 
-        <Text variant="subtitle">Drop-off Location</Text>
-        <Card>
-          <View style={styles.row}>
-            <MaterialIcons name="place" size={20} color={colors.error} />
-            <Text variant="secondary" style={styles.rowText} numberOfLines={2}>
-              {order.location.name}
-            </Text>
-          </View>
-        </Card>
+        <View style={styles.section}>
+          <Text variant="subtitle">Drop-off Location</Text>
+          <Text variant="secondary" numberOfLines={2}>
+            {order.location.name}
+          </Text>
+        </View>
 
         {isDelivered ? (
-          <Card>
-            <Badge label="Delivered" tone="success" />
+          <View style={styles.section}>
             <Text variant="subtitle">Confirm receipt</Text>
             <Text color="secondary">Did you receive your items?</Text>
             <Button
@@ -637,7 +623,7 @@ export default function OrderDetailScreen() {
                 </Text>
               </View>
             ) : null}
-          </Card>
+          </View>
         ) : null}
 
         {!terminal ? <RequesterPaymentCard orderId={order.id} refreshToken={paymentTick} /> : null}
@@ -655,7 +641,7 @@ export default function OrderDetailScreen() {
         ) : null}
 
         {showCancel ? (
-          <Card>
+          <View style={styles.dangerSection}>
             <Text variant="subtitle">Cancel this request</Text>
             {lateCancellable ? (
               <Text color="secondary">
@@ -685,7 +671,7 @@ export default function OrderDetailScreen() {
               disabled={cancelling || reason.trim().length === 0}
               loading={cancelling}
             />
-          </Card>
+          </View>
         ) : null}
 
         {terminal ? (
@@ -697,13 +683,13 @@ export default function OrderDetailScreen() {
               <OrderRatingSection order={order} refreshToken={paymentTick} />
             ) : null}
             {order.status === 'cancelled' || order.status === 'disputed' ? (
-              <Card>
+              <View style={styles.section}>
                 <Text variant="subtitle">What happened</Text>
                 <OrderTimeline order={order} />
-              </Card>
+              </View>
             ) : null}
             {order.disputeDetails ? (
-              <Card>
+              <View style={styles.section}>
                 <Text variant="subtitle">Your report</Text>
                 <Text color="secondary">{order.disputeDetails}</Text>
                 {order.disputeNote ? (
@@ -711,10 +697,10 @@ export default function OrderDetailScreen() {
                     Resolution note: {order.disputeNote}
                   </Text>
                 ) : null}
-              </Card>
+              </View>
             ) : null}
             {canWithdraw ? (
-              <Card>
+              <View style={styles.section}>
                 {withdrawError ? (
                   <ErrorState title="Could not withdraw" message={withdrawError} retryTitle="Dismiss" onRetry={() => setWithdrawError(null)} />
                 ) : null}
@@ -725,19 +711,19 @@ export default function OrderDetailScreen() {
                   disabled={withdrawing}
                   loading={withdrawing}
                 />
-              </Card>
-            ) : null}
-            <Card>
-              <View style={styles.moneyRow}>
-                <Text variant="subtitle">Payment record</Text>
-                {order.payment ? (
-                  <Badge label={paymentStatusLabel(order.payment.status)} tone={paymentStatusTone(order.payment.status)} />
-                ) : (
-                  <Badge label="No payment" tone="neutral" />
-                )}
               </View>
+            ) : null}
+            <View style={styles.section}>
+              <Text variant="subtitle">Payment record</Text>
               {order.payment ? (
                 <>
+                  <Text variant="caption" color="secondary">
+                    {order.payment.status === 'verified'
+                      ? 'Verified'
+                      : order.payment.status === 'rejected'
+                        ? 'Needs a new receipt'
+                        : 'Submitted'}
+                  </Text>
                   <Text color="secondary">
                     {formatMYR(order.payment.amountCents)} · submitted{' '}
                     {formatOrderDate(order.payment.submittedAt)}
@@ -760,7 +746,7 @@ export default function OrderDetailScreen() {
                   No payment was due.
                 </Text>
               ) : null}
-            </Card>
+            </View>
             <View style={styles.actionRow}>
               <View style={styles.actionFill}>
                 <Button title="Browse menu" onPress={() => router.push('/(requester)')} />
@@ -797,9 +783,16 @@ export default function OrderDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  requestId: { flex: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  headerText: { flex: 1, gap: spacing.xs },
+  statusBlock: { gap: spacing.xs },
+  section: { gap: spacing.sm },
+  dangerSection: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   menuButton: {
     width: 44,
     height: 44,
@@ -829,10 +822,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowText: { flex: 1, fontWeight: '600', color: colors.text },
-  vendorName: { fontWeight: '600', color: colors.text },
-  divider: { borderTopWidth: 1, borderTopColor: colors.divider },
   reasonInput: {
     borderWidth: 1.5,
     borderColor: colors.primary,
@@ -844,7 +833,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   reportForm: { gap: spacing.md },
-  moneyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   actionRow: { flexDirection: 'row', gap: spacing.sm },
   actionFill: { flex: 1 },
 });

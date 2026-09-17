@@ -106,18 +106,62 @@ export default function EditProfileScreen() {
     if (!picked) return; // User cancelled.
     setPreview(picked);
     setUploadingPhoto(true);
+    const previous = profile?.avatarPath ?? null;
+    let removedPrevious = false;
+    let uploadedPath: string | null = null;
+    let pointerUpdated = false;
     try {
-      const path = avatarPathFor(user.id, picked.extension);
-      await uploadObject(path, picked);
-      const next = await setAvatarPath(path);
-      const previous = profile?.avatarPath;
-      updateProfile(next);
-      // Replacement means a new object; drop the old one best-effort.
-      if (previous && previous !== path) {
-        removeObject(previous).catch(() => {});
+      // Replace means remove-first: the old object goes before the new one
+      // is saved, so a change never leaves two live photos behind.
+      if (previous) {
+        try {
+          await removeObject(previous);
+        } catch {
+          throw new Error('Could not remove the old photo. Nothing was changed. Try again.');
+        }
+        removedPrevious = true;
       }
+      const path = avatarPathFor(user.id, picked.extension);
+      try {
+        await uploadObject(path, picked);
+      } catch {
+        throw new Error(
+          removedPrevious
+            ? 'The old photo was removed but the new upload failed. Tap to try again.'
+            : 'Could not upload your photo. Try again.',
+        );
+      }
+      uploadedPath = path;
+      let next;
+      try {
+        next = await setAvatarPath(path);
+      } catch {
+        throw new Error(
+          removedPrevious
+            ? 'The old photo was removed but the new one could not be saved. Tap to try again.'
+            : 'Could not update your photo. Try again.',
+        );
+      }
+      pointerUpdated = true;
+      updateProfile(next);
       setPreview(null);
     } catch (err) {
+      if (uploadedPath && !pointerUpdated) {
+        try {
+          await removeObject(uploadedPath);
+        } catch {
+          // Orphaned upload without a pointer; retrying the change covers it.
+        }
+      }
+      if (removedPrevious && !pointerUpdated) {
+        // The profile may still reference the deleted file: clear it so the
+        // UI falls back to initials instead of a broken image.
+        try {
+          await setAvatarPath(null);
+        } catch {
+          // Reported below; retrying the change clears it.
+        }
+      }
       setPreview(null);
       setPhotoError(err instanceof Error ? err.message : 'Could not update your photo. Try again.');
     } finally {

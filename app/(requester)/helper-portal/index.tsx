@@ -32,23 +32,25 @@ function availabilityLabel(job: OrderWithDetails): string {
 interface JobRowProps {
   job: OrderWithDetails;
   status?: string;
+  /** Last row in its list: no divider underneath. */
+  isLast?: boolean;
   onPress: (jobId: string) => void;
 }
 
 /**
- * Visual-first job row: vendor mark, name, item count, location, and an
+ * Visual-first job row: vendor mark, name, item count, route, and an
  * optional status word with a navigation chevron. Fixed geometry — every
- * row is the same height. Rows only navigate; claiming happens on Job
- * Detail. No amounts, ETAs, or estimates: the fee is fixed context for
- * the detail and payment screens.
+ * row is the same height, separated by hairlines. Rows only navigate;
+ * claiming happens on Job Detail. No amounts, ETAs, estimates, badges,
+ * pills, or cards: plain type hierarchy only.
  */
-function JobRow({ job, status, onPress }: JobRowProps) {
+function JobRow({ job, status, isLast = false, onPress }: JobRowProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${job.vendor.name}, ${itemCountLabel(job)}`}
       onPress={() => onPress(job.id)}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.row, !isLast && styles.rowDivider, pressed && styles.pressed]}>
       <VendorMark name={job.vendor.name} size={56} />
       <View style={styles.rowText}>
         <Text variant="subtitle" numberOfLines={1}>
@@ -57,12 +59,9 @@ function JobRow({ job, status, onPress }: JobRowProps) {
         <Text color="secondary" numberOfLines={1}>
           {itemCountLabel(job)}
         </Text>
-        <View style={styles.locationLine}>
-          <MaterialIcons name="place" size={14} color={colors.primary} />
-          <Text variant="caption" color="secondary" numberOfLines={1} style={styles.locationText}>
-            {availabilityLabel(job)}
-          </Text>
-        </View>
+        <Text variant="caption" color="secondary" numberOfLines={1}>
+          {availabilityLabel(job)}
+        </Text>
       </View>
       <View style={styles.rowRight}>
         {status ? (
@@ -133,7 +132,7 @@ export default function HelperJobsScreen() {
     <HelperPortalGuard title="Jobs">
       <GlassHeader
         title="Jobs"
-        fallbackHref="/(requester)/profile"
+        fallbackHref="/(requester)"
         right={<HeaderBell />}
       />
       <Screen
@@ -165,14 +164,15 @@ export default function HelperJobsScreen() {
 
         {activeDeliveries.length > 0 ? (
           <View style={styles.section}>
-            <Text variant="title">
-              Active jobs ({activeDeliveries.length}/{MAX_ACTIVE_JOBS_PER_HELPER})
+            <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
+              {`Active jobs · ${activeDeliveries.length}/${MAX_ACTIVE_JOBS_PER_HELPER}`.toUpperCase()}
             </Text>
-            {activeDeliveries.map((delivery) => (
+            {activeDeliveries.map((delivery, index) => (
               <JobRow
                 key={delivery.id}
                 job={delivery}
                 status={helperStatusLabel(delivery.status)}
+                isLast={index === activeDeliveries.length - 1}
                 onPress={openJob}
               />
             ))}
@@ -180,7 +180,9 @@ export default function HelperJobsScreen() {
         ) : null}
 
         <View style={styles.section}>
-          <Text variant="title">Available jobs</Text>
+          <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
+            AVAILABLE JOBS
+          </Text>
           {atCapacity ? (
             <Text variant="caption" color="secondary">
               You have {MAX_ACTIVE_JOBS_PER_HELPER} active jobs — finish one to take another.
@@ -212,8 +214,8 @@ export default function HelperJobsScreen() {
             <EmptyState icon="work-outline" title="No open requests" message="Pull to refresh." />
           ) : (
             <>
-              {jobs.map((job) => (
-                <JobRow key={job.id} job={job} onPress={openJob} />
+              {jobs.map((job, index) => (
+                <JobRow key={job.id} job={job} isLast={index === jobs.length - 1} onPress={openJob} />
               ))}
             </>
           )}
@@ -228,24 +230,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   availabilityText: { flex: 1, gap: spacing.xs },
   availabilityTitle: { fontWeight: '600', color: colors.text },
-  section: { gap: spacing.md, paddingTop: spacing.md },
+  section: { paddingTop: spacing.xl },
+  sectionHead: { marginBottom: spacing.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     minHeight: 76,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  rowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
   },
   pressed: { opacity: 0.7 },
   rowText: { flex: 1, gap: 2, minWidth: 0 },
-  locationLine: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  locationText: { flex: 1 },
   rowRight: { alignItems: 'flex-end', justifyContent: 'center', gap: 2, maxWidth: 110 },
   offlineNote: { gap: spacing.xs, paddingVertical: spacing.md, alignItems: 'center' },
   offlineTitle: { fontWeight: '600', color: colors.text },

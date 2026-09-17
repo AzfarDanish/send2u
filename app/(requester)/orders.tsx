@@ -1,9 +1,8 @@
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
-import { ActiveHistoryToggle, type HistoryTab } from '@/components/ActiveHistoryToggle';
-import { HeaderBell } from '@/components/HeaderBell';
+import { MainHeader } from '@/components/MainHeader';
 import { RequestCard } from '@/components/RequestCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -37,23 +36,17 @@ function LoadingSkeletons() {
 }
 
 export default function RequesterOrdersScreen() {
-  const [tab, setTab] = useState<HistoryTab>('active');
   const active = useMyOrders();
-  // History loads only when visible — except when Active is empty, where the
-  // count decides the empty-state copy ("No active orders" vs "No orders yet").
-  const history = useMyOrderHistory(tab === 'history' || active.status === 'empty');
+  const history = useMyOrderHistory();
 
   const openOrder = useCallback((order: OrderWithDetails) => {
     router.push({ pathname: '/(requester)/orders/[id]', params: { id: order.id } });
   }, []);
 
-  const refreshing = active.refreshing || (tab === 'history' && history.refreshing);
+  const refreshing = active.refreshing || history.refreshing;
   const handleRefresh = useCallback(async () => {
-    // Refresh the visible list; the hidden one loads (or reloads) on visit.
-    await Promise.all([active.refresh(), tab === 'history' ? history.refresh() : Promise.resolve()]);
-  }, [active, history, tab]);
-
-  const list = tab === 'active' ? active : history;
+    await Promise.all([active.refresh(), history.refresh()]);
+  }, [active, history]);
 
   return (
     <>
@@ -62,65 +55,83 @@ export default function RequesterOrdersScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
         }>
-        <View style={styles.headerRow}>
-          <View style={styles.headings}>
-            <Text variant="title">Requests</Text>
-            <Text color="secondary">Keep track of your submitted requests.</Text>
-          </View>
-          <HeaderBell role="requester" />
+        <MainHeader title="Requests" />
+        <View style={styles.section}>
+          <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
+            ACTIVE REQUESTS
+          </Text>
+          {active.status === 'loading' ? <LoadingSkeletons /> : null}
+          {active.status === 'error' ? (
+            <ErrorState
+              title="Couldn't load orders"
+              message={active.error ?? 'Check your connection and try again.'}
+              retryTitle="Try again"
+              onRetry={active.retry}
+            />
+          ) : null}
+          {active.status === 'empty' ? (
+            <EmptyState
+              icon="receipt-long"
+              title={history.orders.length > 0 ? 'No active requests' : 'No orders yet'}
+              message={
+                history.orders.length > 0
+                  ? 'Your active requests will appear here after you submit one.'
+                  : 'New orders appear here.'
+              }
+              actionTitle="Browse menu"
+              onAction={() => router.push('/(requester)')}
+            />
+          ) : null}
+          {active.status === 'ready'
+            ? active.orders.map((order, index) => (
+                <RequestCard
+                  key={order.id}
+                  order={order}
+                  isLast={index === active.orders.length - 1}
+                  onPress={openOrder}
+                />
+              ))
+            : null}
         </View>
-        <ActiveHistoryToggle
-          tab={tab}
-          onChange={setTab}
-          historyLabel="Past"
-          historyCount={history.orders.length}
-        />
-        {list.status === 'loading' ? <LoadingSkeletons /> : null}
-        {list.status === 'error' ? (
-          <ErrorState
-            title={tab === 'active' ? "Couldn't load orders" : "Couldn't load past requests"}
-            message={list.error ?? 'Check your connection and try again.'}
-            retryTitle="Try again"
-            onRetry={list.retry}
-          />
-        ) : null}
-        {list.status === 'empty' && tab === 'active' ? (
-          <EmptyState
-            icon="receipt-long"
-            title={history.orders.length > 0 ? 'No active requests' : 'No orders yet'}
-            message={
-              history.orders.length > 0
-                ? 'Your active requests will appear here after you submit one.'
-                : 'New orders appear here.'
-            }
-            actionTitle="Browse menu"
-            onAction={() => router.push('/(requester)')}
-          />
-        ) : null}
-        {list.status === 'empty' && tab === 'history' ? (
-          <EmptyState
-            icon="history"
-            title="No past requests"
-            message="Completed orders will appear here."
-          />
-        ) : null}
-        {list.status === 'ready'
-          ? list.orders.map((order) => (
-              <RequestCard key={order.id} order={order} onPress={openOrder} />
-            ))
-          : null}
+        <View style={styles.section}>
+          <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
+            HISTORY
+          </Text>
+          {history.status === 'loading' ? <LoadingSkeletons /> : null}
+          {history.status === 'error' ? (
+            <ErrorState
+              title="Couldn't load past requests"
+              message={history.error ?? 'Check your connection and try again.'}
+              retryTitle="Try again"
+              onRetry={history.retry}
+            />
+          ) : null}
+          {history.status === 'empty' ? (
+            <EmptyState
+              icon="history"
+              title="No past requests"
+              message="Completed orders will appear here."
+            />
+          ) : null}
+          {history.status === 'ready'
+            ? history.orders.map((order, index) => (
+                <RequestCard
+                  key={order.id}
+                  order={order}
+                  isLast={index === history.orders.length - 1}
+                  onPress={openOrder}
+                />
+              ))
+            : null}
+        </View>
       </Screen>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  headings: { flex: 1, gap: spacing.xs },
+  section: { paddingTop: spacing.lg },
+  sectionHead: { marginBottom: spacing.sm },
   skeletonCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   skeletonText: { flex: 1, gap: spacing.sm },
   skeletonRight: { alignItems: 'flex-end', gap: spacing.sm },

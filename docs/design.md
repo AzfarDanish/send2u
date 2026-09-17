@@ -419,7 +419,10 @@ money detail only inside receipt/payment context. Job rows stay lean
 (vendor, items summary, location, date, fee); full order information
 belongs on Job Detail. **Acceptance happens on the Job Detail page**
 via the §11 confirmation interaction, so the queue row itself is never
-the claim control.
+the claim control. The decision view follows hero (vendor mark, name,
+context) → "Pick up from" → "Deliver to" (each a Maps-opening row with
+a plain arrow affordance) → "Order (N items)" full item lines →
+factual "Delivery fee" row → filled "Slide to accept".
 
 **Current deltas (resolved 2026-09-16 except where noted).** Portal
 bottom nav (Jobs/Deliveries/Profile, no portal sign-out) is implemented;
@@ -471,6 +474,31 @@ Before shipping any screen, check:
 - [ ] Would this pass as finished product on a 320pt phone?
 - [ ] Do consequential actions resist accidents (slider where §11 applies)?
 - [ ] Does it work with red removed — then re-add red once, deliberately?
+
+---
+
+## 22. Workspace design language
+
+Task-first, single-purpose screens for active flows (established on the
+Helper delivery workspace, 2026-09-17; apply to new screens verbatim).
+
+- One screen, one task: the Title names the real-world job (*Collect
+  the food*), one supporting sentence follows — no paragraphs, no
+  lifecycle explainers, no technical states.
+- Reading order: task → subject → money → action → exceptions.
+  Money shows pay-dark first, fee-green second, plus a one-line
+  explainer; fee meaning is always labeled, never color-only (§8).
+- Exactly one bottom-fixed primary action: the §11 slider when the
+  confirmation is consequential, a button when it is in-flow
+  navigation. Rare/destructive paths sit below a hairline as quiet
+  text and always confirm before changing anything.
+- Chrome: white canvas, hairline grouping, dots-only progress with
+  the current dot active (no step-count text), 44pt inline thumbs,
+  initials marks for row identity only. No badges, pills, cards,
+  heroes, or decorative icons anywhere.
+- Screens inside an active flow: no back chevron, no bell, OS-back
+  held. Result screens: centered emblem → title → facts → one
+  caption stating what happens next.
 
 ---
 

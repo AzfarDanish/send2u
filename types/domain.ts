@@ -230,7 +230,7 @@ export interface OrderItem {
 /** Order with its vendor, location, and item snapshots for requester UI. */
 export interface OrderWithDetails extends Order {
   vendor: Pick<Vendor, 'id' | 'name' | 'locationHint'>;
-  location: Pick<DeliveryLocation, 'id' | 'name'>;
+  location: Pick<DeliveryLocation, 'id' | 'name' | 'description'>;
   items: OrderItem[];
   /** Latest payment row when visible to the caller; null when unpaid/hidden. */
   payment: Payment | null;

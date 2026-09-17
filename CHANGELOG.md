@@ -10,6 +10,534 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-17 — Dev section UI flattened (no backend changes)
+
+- Changed (`DevProfileSwitcher` only): red-bordered tinted card →
+  flat hairline-separated section; "Development" + role + Current
+  badges removed — one restrained red eyebrow
+  (`DEVELOPMENT · n TEST ACCOUNTS`) keeps the dev-only marker;
+  role tabs are underline tabs with counts; rows are flat with
+  hairline dividers, neutral icon tiles, and a plain "Current"
+  word. Roster cache, switching, loading/error/empty states, and
+  guards untouched; still renders only with dev auth enabled.
+- Reason: a routine tool should not read as an error state; no
+  badges, pills, or cards, per the workspace language (§22).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-17 — Headers, tab-less lists, portal exit (no backend changes)
+
+- Changed (`MainHeader` + Home/Requests/Profile): settings gear is
+  now Profile-only (`showSettings`); bell stays right-aligned on all
+  three tabs. Requests header subtitle removed.
+- Changed (Requests `orders.tsx` + `RequestCard`): `ActiveHistoryToggle`
+  removed (component deleted); active requests render first under an
+  `ACTIVE REQUESTS` eyebrow with history below under `HISTORY`, both
+  loaded by default. Rows are minimalist — plain `#id · age ·
+  status` caption, no badges, hairline dividers, roomier rhythm.
+- Changed (portal `deliveries.tsx`): same tab-less pattern —
+  `ACTIVE DELIVERIES` + `HISTORY` sections, inline minimalist rows
+  (vendor, route/fee detail, plain status word, green +fee, chevron),
+  no badges. Queries, realtime, and navigation untouched.
+- Changed (portal back fallbacks): Jobs tab, Payment QR, and all Job
+  Detail headers now fall back to requester Home (`/(requester)`),
+  exiting the portal. Active go/collect/deliver/confirm stages keep
+  their backless, OS-back-held workflow.
+- Reason: one header rule, one scrolling list per screen, one exit.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; grep confirms no toggle
+  usage and no badges in list rows.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-17 — Search on Home and Vendor pages (no backend changes)
+
+- Changed (new `components/SearchBar.tsx`): shared minimalist
+  search field (icon, input, clear-when-typing, hairline border, no
+  card/shadow) plus an exported case-insensitive substring matcher
+  over given text fields. The matcher lives in the component file
+  because `lib/` is gitignored (`.gitignore`) — a new `lib/` file
+  would silently miss normal commits.
+- Changed (Home `index.tsx`): search matches vendor name, location
+  hint, hours, and description, plus item name/description across
+  the whole menu — a dish match keeps its vendor visible so every
+  result stays tappable. Search field sits under the header, banner
+  hides while searching, empty query restores the full list, and a
+  quiet "No matches" state covers zero hits. Removed the
+  time-based `Good morning/afternoon/evening, [name]` greeting line
+  (food prompt kept); all filtering is client-side over loaded
+  `useMenu()` data with `useDeferredValue`.
+- Changed (Vendor `vendors/[id].tsx`): menu search over item name
+  + description, combined with the existing category chips
+  (category AND query), query resets on vendor change, quiet "No
+  matches" state when the combination yields nothing. Sticky/dock
+  filter bar, cart, quick-add, and detail navigation untouched.
+- Reason: find a vendor or a dish without browsing every stall.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: no backend search (6 vendors / 28 items filter
+  instantly on-device); on-device keyboard/scroll check pending.
+
+## 2026-09-17 — Main tabs share one header; Profile double-header fixed
+
+- Audited: Home (custom brand row, bell only), Requests (custom
+  title row, bell only), and Profile (native centered header + gear
+  only, plus a 72pt identity block) were three different
+  constructions — titles, bell, and gear sat in different places at
+  different sizes, and Profile stacked a native header over a padded
+  identity block, squeezing its scroll content.
+- Changed (new `components/MainHeader.tsx`): one in-content header
+  for all three tabs — 22pt title (+ optional subtitle, + optional
+  Home logo tile) with bell + gear at identical 48pt geometry, both
+  always present so nothing jumps between tabs. Home/Requests/
+  Profile all render it with native headers hidden; Profile keeps
+  its gear (moved into the shared row) and gains the bell; Profile
+  identity padding trimmed so all three scroll areas start at the
+  same offset. Tab navigation, routes, and unread plumbing
+  untouched; no migration.
+- Reason: the title, bell, and gear sit in exactly one place on
+  every main screen.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-17 — Requester profile header fix (no backend changes)
+
+- Changed (`(requester)/profile.tsx` header only): removed the
+  redundant "requester" role pill — role is permanent and everyone
+  here is a requester, so it carried zero information. Header is now
+  Avatar 72 + name + email, matching the Helper Portal profile
+  header exactly. Native header (centered "Profile" + settings
+  gear), menu rows, Helper entry, dev switcher, and sign-out
+  untouched; no migration.
+- Reason: no badges/pills on identity headers, per the workspace
+  language (§22); the two profile headers now agree.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-17 — Request Detail rearranged per workspace language (no backend changes)
+
+- Changed (`orders/[id].tsx` only): vendor name is the Title with
+  `#id · placed · helper` as its caption (was: bare `#id` title +
+  status badge); status badge removed — the tone-tinted status
+  title + description block below carries it (tinted `Card`
+  replaced, same copy); Order Summary / Drop-off / Confirm /
+  Cancel / terminal record sections unwrapped from `Card`s into
+  flat headed sections with hairline separation for the destructive
+  zone; payment status badges → plain words; duplicate "Report an
+  issue" overflow item removed (inline toggle owns it). Progress,
+  breakdown, payment card, rating, timeline, settlement, dispute
+  flows, realtime, and guards untouched; no migration.
+- Reason: one title, one status voice, sections in reading order —
+  no badges, pills, or cards of its own (verified by grep).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: `RequesterPaymentCard` internals untouched
+  (separate component, own task); on-device check pending.
+
+## 2026-09-17 — Docs: workspace design language codified (`design.md` §22)
+
+- Changed: new `docs/design.md` §22 captures the task-first workspace
+  language established across the Helper delivery screens (single
+  task → subject → money → action → exceptions; hairlines not cards;
+  slider-first confirmations; subordinate destructive paths; quiet
+  active-flow chrome; emblem result pattern). No app, schema, or
+  backend code touched.
+- Reason: reusable spec for restyling other screens consistently.
+- Validation: `tsc --noEmit` clean (docs-only change).
+
+## 2026-09-17 — Helper Portal job screens minimalism pass (no backend changes)
+
+- Changed (portal Jobs queue `helper-portal/index.tsx`): 22pt
+  section titles → quiet muted eyebrow headers (`ACTIVE JOBS ·
+  n/3`, `AVAILABLE JOBS`); rows contiguous with hairline dividers
+  (no divider under last), roomier 12pt vertical rhythm; location
+  line de-iconed to plain secondary type; status stays a plain
+  caption word. Toggle, skeletons, empty/error/offline states,
+  navigation, realtime, and capacity logic untouched.
+- Changed (Job Detail decision in `jobs/[id].tsx`): items reuse
+  the shared workspace block (heading + 44pt thumbs, initials
+  marks gone here); pickup/deliver blocks de-iconed with caption
+  labels; fee row flattened to the plain money row (icon gone);
+  tinted capacity card flattened to a hairlined caption line.
+  Accept slider, Maps handoff, guards, and workspace stages
+  untouched.
+- Reason: type hierarchy + whitespace carry the layout; no badges,
+  pills, or cards anywhere on either screen (verified by grep).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: 56pt vendor marks stay as row identity (not a
+  badge); on-device check pending.
+
+## 2026-09-17 — Replace flows: remove previous file before saving the new one
+
+- Audited: backend needs no fix — owner-scoped DELETE/INSERT/
+  SELECT/UPDATE policies verified live for the `qr`, `avatar`,
+  and `evidence` prefixes; `send2u_submit_payment` requires the new
+  receipt to exist before it runs. Found the ordering fault client-
+  side: QR/avatar saved the new file before removing the old one
+  (silent best-effort, so failures orphaned files), avatar had no
+  orphan cleanup at all, and receipt resubmits never removed the
+  previous evidence.
+- Changed (`helper-portal/payment-qr.tsx`, `edit-profile.tsx`,
+  `hooks/usePaymentFlow.ts`): replace is now remove-first — delete
+  the previous object, then upload + repoint. A failed removal
+  aborts with nothing changed; a failure after removal reports
+  exactly that ("old removed, please upload again") and QR/avatar
+  best-effort clear the profile pointer so the UI shows the empty
+  state instead of a broken image. New-upload orphans are still
+  removed when the pointer/submit step fails.
+- Reason: a change must never leave two live files behind, and a
+  half-finished change must never show a dangling image.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; live orphan scan clean
+  (1 QR + 4 evidence referenced, zero unreferenced, zero avatars).
+- Limits/decisions: no migration; live replace tap-through pending
+  on-device check.
+
+## 2026-09-17 — Helper Payment QR redesign + square crop (no backend changes)
+
+- Changed (`services/storage.ts` `pickPaymentImage`, QR-only):
+  native square-crop editor enabled (`allowsEditing`, 1:1 — same
+  precedent as avatar picks); QR codes scan best cropped tightly to
+  the code. No new deps; ignored on web (photo taken as-is).
+- Changed (`helper-portal/payment-qr.tsx`): centered hero (QR or
+  empty emblem + status + one-line purpose); primary "Upload QR"
+  only when no QR is set; Change/Remove demoted to a quiet centered
+  "Change | Remove" row below a hairline (no full-width buttons when
+  a QR is set); Remove now asks first (honest consequence + Keep
+  QR); staged confirm-first review kept with a crop tip; download,
+  busy/error, and orphan-cleanup behavior unchanged.
+- Reason: Change/Remove are rare — the set QR is the content, not a
+  row of competing buttons; cropping at pick time beats re-uploads.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: native crop UI needs a device build to see;
+  on-device pick→crop→confirm tap-through pending.
+
+## 2026-09-17 — Helper delivery-completed result redesign (no backend changes)
+
+- Changed (`CompletionResult` in `helper-portal/jobs/[id].tsx`
+  only): success check now sits in a 76pt `successSoft` emblem
+  instead of a bare icon; centered hierarchy — emblem →
+  "Delivery completed" → item count · drop-off → green price-size
+  "+RM delivery fee" (label carries meaning, not color alone) →
+  muted "Returning to your deliveries…" hint. Dropped the vendor
+  initials mark + fee row for restraint; wider rhythm
+  (`gap md`, `paddingVertical xxxl`).
+- Reason: the old result gave no hint that the screen auto-returns
+  to Deliveries after 3.5s (existing timer, unchanged) — the helper
+  now sees it coming; fee matches the workspace price treatment.
+- Details: done-stage routing/timer, RPCs, realtime, and all other
+  stages untouched; no migration; no new deps.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-17 — Helper confirm stage redesign to match collect/deliver (no backend changes)
+
+- Changed (workspace `helper-portal/jobs/[id].tsx` confirm branch
+  only): same hierarchy — dots marker (fourth dot active) →
+  "Confirm delivery" + one-line copy → shared "Deliver to" block
+  (Navigate chip kept) → shared "Order items" block → hairline
+  money block with "Your delivery fee" (+RM green) → bottom-fixed
+  footer holding ONLY the soft-tone "Slide to confirm delivery"
+  slider (`mark_delivered`, same RPC). Removed "Requester isn't
+  available" + its confirm branch and the `noShow` state (backend
+  `report_failed` untouched). Header for confirm drops the back
+  chevron and bell; OS-back hold now covers go/collect/deliver/
+  confirm.
+- Refactored: deliver/confirm drop-off rows extracted to shared
+  `WorkspaceDeliverTo` (no visual change on deliver). Go/decision/
+  done stages, RPCs, realtime, guards, capacity untouched; no
+  migration; no new deps.
+- Reason: final active step reads as the same workspace; single
+  forward action, no competing exception, no backward navigation.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; self-audit (slider-only
+  footer, fee labeled not color-only, Maps intact) pass.
+- Limits/decisions: helper-side no-show exit is gone here — the
+  dispute path from `delivered` is now requester-driven (delivered
+  report form → `open_dispute`); live slider + handoff tap-through
+  pending on-device check.
+
+## 2026-09-17 — Helper deliver stage redesign to match collect (no backend changes)
+
+- Changed (workspace `helper-portal/jobs/[id].tsx` deliver branch
+  only): same hierarchy as collect — dots marker (third dot active)
+  → "Deliver to requester" + one-line copy → "Deliver to" block
+  (name + description + compact Navigate chip; Maps handoff kept, no
+  section icons) → shared "Order items" block (44pt thumbs) →
+  hairline money block with "Your delivery fee" (+RM green) →
+  bottom-fixed soft-tone "Slide to start delivery" (`start_delivery`,
+  same RPC). Removed "Can't complete this delivery" from this
+  screen (backend `abandon` untouched; still reachable post-purchase
+  on collect). Header for deliver drops the back chevron and bell,
+  and the OS-back hold now covers go/collect/deliver.
+- Refactored: `CollectProgress` generalized to `StageDots(step,
+  label)`; collect/deliver item rows extracted to shared
+  `WorkspaceOrderItems` (no visual change on collect). Go/confirm/
+  decision/done stages, RPCs, realtime, guards, capacity untouched;
+  no migration; no new deps.
+- Reason: deliver reads as the same workspace as collect; no
+  backward navigation and no competing exception action mid-run.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; self-audit (single primary
+  action, fee labeled not color-only, 320pt-safe rows) pass.
+- Limits/decisions: with abandon UI gone, a stuck deliver-stage job
+  advances via the slider (confirm-stage no-show path remains the
+  dispute exit); live slider + Maps tap-through pending on-device
+  check.
+
+## 2026-09-17 — Helper collect stage redesign (no backend changes)
+
+- Changed (workspace `helper-portal/jobs/[id].tsx` collect branch
+  only): dots-only 5-stage marker (second dot active, no step-count
+  text) → "Collect the food" + one-line task copy → "Order items"
+  rows with 44pt `PlaceholderImage` thumbs (no food/vendor hero, no
+  section icons) → hairline-grouped "Food cost (you pay)" (dark) /
+  "Your delivery fee" (+RM green) + one-line pay explainer →
+  bottom-fixed soft-tone "Slide to confirm food collected" →
+  separated quiet "Food not available?" link below the footer.
+  Deleted `StageMoneyPanel`/`StagePayNow` (tinted cards) and the
+  Release Job button + `canRelease` (backend `release` untouched).
+  Unavailable confirm is honest per live RPC def (row deleted
+  pre-purchase, nothing paid): danger "Cancel this delivery" +
+  "Keep this job", success lands on Deliveries. Abandon kept only
+  post-purchase (`food_purchased`, money spent → dispute path).
+  Header stays backless/bell-less with the OS-back hold; no
+  technical statuses, no Next/Continue anywhere on this screen.
+- Fixed (service `advanceFulfilment`): now returns
+  `{ deleted: true }` for the delete path instead of throwing
+  "unexpected shape" (the old unavailable confirm could never
+  succeed); both call sites handle it, chain defensively reloads.
+  Fixes one self-made lint error by rewording (no apostrophes).
+- Reason: one obvious task per screen; helper money (pay vs fee)
+  unmistakable; exception paths subordinate and deliberate.
+- Details: go/deliver/confirm/decision/done stages, RPCs, realtime,
+  guards, and capacity logic untouched; no migration; no new deps.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; RPC defs read live to verify
+  copy (delete vs queue vs dispute); 20-point self-audit pass.
+- Limits/decisions: header is "Delivery" with NO order number — the
+  spec asked for `Order #NNNN` but order numbers were reverted by
+  explicit direction (`revert_order_number` applied, column gone), so
+  no number is shown rather than a hardcoded/fake one; thumbnails use
+  the standard placeholder (no food imagery exists in product);
+  live accept→collect→confirm + unavailable tap-through pending
+  on-device check.
+
+## 2026-09-17 — Revert: order numbers removed (backend + client)
+
+- Changed (backend, migration `revert_order_number`): dropped
+  `send2u_orders.order_number` and sequence
+  `send2u_order_number_seq` (reverts `add_order_number`); verified
+  zero RPC references before dropping.
+- Changed (app): removed `orderNumber` from `Order`
+  (`types/domain.ts`) and `ORDER_SELECT`/row mapping
+  (`services/orders.ts`); removed `Order #NNNN` from the helper-portal
+  job decision header, the workspace `GlassHeader` subtitle, and the
+  delivery-completion line (now item count + location);
+  `GlassHeader` subtitle prop removed and single-line title layout
+  restored.
+- Reason: direction to revert order numbers; display returns to no
+  order-number UI.
+- Details: unrelated working-tree changes kept intact (workspace
+  stages, `location.description` join, slider tones, decision layout).
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; live SQL confirms 0
+  `order_number` columns/sequences and orders selectable; security
+  advisors show only pre-existing classes.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-16 — Collect/go workspace per reference + backend order numbers
+
+- Changed (backend, migration `add_order_number`): sequential
+  `order_number` on orders (sequence from 1024, chronological
+  backfill, unique, default-applied so `place_orders` unchanged);
+  client `ORDER_SELECT`/types carry it; headers/decision/completion
+  show `Order #NNNN`.
+- Changed (workspace `jobs/[id].tsx`): product steps remapped to go
+  1, collect 2, deliver 3, confirm 4 of 5; go/collect headers drop
+  back chevron and bell and hold OS-back via `beforeRemove`; collect
+  screen matches reference (pink pay-now box, soft-tone slider,
+  bottom-stuck action); Release button removed from go screen
+  (backend path untouched, still reachable pre-purchase in collect).
+  `GlassHeader` gains an optional centered subtitle;
+  `SlideToConfirm` gains a `soft` tone.
+- Reason: approved reference layout adapted to real states; order
+  numbers were display-only via UUID slices.
+- Details: no RPC/state-machine/realtime changes; no other screens
+  touched.
+- Validation: `tsc`, `lint`, `expo export` — pass; live numbering
+  (#1042 on a new order, client-visible) + accept flow + cleanup
+  verified; `expo-doctor` 19/21 (2 pre-existing environmental).
+- Limits/decisions: drag feel, 320pt rendering, and Maps-app open
+  pending on-device check.
+
+## 2026-09-16 — Workspace Go stage follows approved reference treatment
+
+- Changed (`helper-portal/jobs/[id].tsx` only): workspace header is
+  now "Delivery" across active stages; each active stage opens with a
+  "Step N of 5" segmented indicator mapped to the product workflow
+  (go 2, collect 3, deliver 4, confirm 5); location blocks use a
+  compact Navigate chip instead of full-width Maps buttons; order
+  preview uses per-item 48pt visuals with a plain "Order items"
+  heading and "Your delivery fee" row. Bottom-fixed single-primary
+  footer and all RPC/realtime/guard behavior unchanged.
+- Reason: approved reference composition adapted to real backend
+  states (no invented steps, dates, or estimates).
+- Details: no backend, navigation, or other-screen changes.
+- Validation: `tsc`, `lint`, `expo export` — pass; live place →
+  detail-readable → accept → vendor-advance → cleanup verified.
+- Limits/decisions: drag feel, 320pt rendering, and Maps-app open
+  pending on-device check.
+
+## 2026-09-16 — Job Detail decision view follows approved reference layout
+
+- Changed (decision branch of `helper-portal/jobs/[id].tsx` only):
+  vendor-name title + order number, per-item rows with small visuals
+  and line totals, icon-led Pick up from / Deliver to blocks (whole
+  row still opens external Maps, arrows omitted per reference),
+  "Your delivery fee" row, capacity info box, and the filled accept
+  slider stuck in a bottom footer; header is back + "Job Details"
+  with no bell on this screen. Removed now-unused hero/group
+  styles. Workspace stages, RPCs, realtime, and guards untouched.
+- Reason: approved reference hierarchy (visual → text → supporting
+  detail → decision) with one bottom-anchored commitment.
+- Details: no amounts invented (fee/counts/totals from backend
+  snapshots); Maps handoff + fallback preserved.
+- Validation: `tsc`, `lint` (one self-made unused-var warning fixed),
+  `expo export` — pass; live place → detail-visible → accept →
+  cleanup verified.
+- Limits/decisions: drag feel, 320pt rendering, and Maps-app open
+  pending on-device check.
+
+## 2026-09-16 — Helper Delivery Workspace 5-stage redesign (no backend changes)
+
+- Changed (workspace `helper-portal/jobs/[id].tsx` only): backend
+  states mapped to five Helper stages (accept → go → collect →
+  deliver → confirm → done-result) with no per-state technical UI.
+  Bottom-fixed single-primary footer + independently scrolling
+  content; collect stage runs one "confirm food collected" slider
+  through an idempotent status-driven chain
+  (availability→purchase→pickup) preserving the fronted-cost
+  boundary; exception paths (release/unavailable/abandon/no-show)
+  moved to subordinate tertiary links with inline danger confirms
+  stating consequences; completion is a buttonless result with timed
+  return to Deliveries; Helper payment card removed from the
+  workspace (deleted `components/HelperPaymentCard.tsx`, sole
+  importer) so delivered/confirmed show no payment workflow.
+- Reason: Helper answers one real-world question per screen; money
+  sequence stays deliberative, journey markers stay quiet.
+- Details: same RPCs/hooks/realtime/guards/capacity logic; no
+  migration; no other screens touched.
+- Validation: `tsc`, `lint`, `expo export`, `expo-doctor` 19/21 (2
+  pre-existing env) — pass; live chain from every entry state,
+  handoff, helper-confirm rejection, and solo requester completion
+  verified with cleanup.
+- Limits/decisions: drag feel, 320pt rendering, and Maps-app open
+  pending on-device check; requester/vendor UI untouched.
+
+## 2026-09-16 — Backend: post-delivery responsibility audit + dead notify branch
+
+- Audited the full pending→completed chain against live RPC defs:
+  `confirmed` is a genuine requester/payment gate (receipt attestation
+  unlocking payment), not a Helper waiting state — the Helper has zero
+  post-`delivered` RPCs, so the responsibility split already holds and
+  no state is removed. Only change (migrations `drop_dead_notify_status`
+  + `restore_notify_copy`): removed the unfireable
+  `awaiting_requester_payment` branch from `send2u_notify_order_event`;
+  the second migration solely restores two notification bodies
+  mistranscribed in the first (verified byte-identical otherwise).
+- Validation: live matrix — 25/25 lifecycle, 13/13 exceptions,
+  boundary cap race (single winner), 11/12 notify+realtime (one
+  expectation corrected: actor-skip means no self-notify on own
+  payment), unavailable-item rejection, realtime INSERT/UPDATE
+  delivery+payment completion, full cleanup (19 orders / 12 profiles /
+  4 objects, zero orphans). No app code changed (`tsc`/`lint`
+  unaffected).
+- Limits/decisions: `cancelled` stays in CHECK though currently
+  unwritable (client history logic); legacy display strings stay in
+  client as defensive compat; ghost-requester/confirmed-unpaid sit by
+  design (no timeouts exist); vendor sign-in untested (passwords
+  unknown, vendor paths untouched).
+
+## 2026-09-16 — Audit: post-cleanup lifecycle contract (no changes made)
+
+- Audited: all 13 live states against current RPC defs, 24 functions,
+  5 triggers, 18+12 policies, 6 realtime tables, client usage, and
+  storage orphans (zero). Verified live: same-helper simultaneous
+  accepts at the 3-cap boundary → exactly one winner (advisory lock
+  holds); sole assignment path is `send2u_accept_order` (orders
+  SELECT-only); narrowed CHECKs reject `role='helper'` and
+  `status='delivering'` with data untouched; realtime INSERT/UPDATE
+  coverage sufficient for queue/assign/release/complete without
+  refresh. No backend defects found — no migrations, no UI changes.
+- Limits/decisions: no timeouts anywhere (idle/ghost orders sit by
+  design); `cancelled` is stored-unreachable but kept in CHECK for
+  client history logic; legacy display strings in client are
+  defensive-only; UX contract for the Delivery Workspace recorded in
+  the task report (not in code).
+
+## 2026-09-16 — Backend audit + offer-subsystem retirement and CHECK narrowing
+
+- Changed (backend, migration `retire_offer_subsystem_narrow_checks`;
+  full audit first, no app/UI code touched): retired the sequential
+  offer subsystem — dropped `send2u_job_offers` (1 expired dead row),
+  its 5 indexes, RLS policy, realtime membership, both notify triggers
+  (`trg_send2u_offer_notify`), and functions `notify_offer_event`,
+  `respond_to_offer`, `expire_pending_offers`, `expire_stale_offer`,
+  `has_pending_offer`. Rewrote `accept_order` (direct atomic claim
+  only; lock + 3-cap + guarded UPDATE kept), `dispatch_next`
+  (availability count + notice only), `set_helper_availability`
+  (profile flip + broadcast re-check only), and the release trigger
+  (renamed to `send2u_after_order_release_redispatch` /
+  `trg_send2u_order_release_redispatch`, redispatch only). Narrowed
+  `profiles.role` CHECK to requester/vendor/admin and order `status`
+  CHECK to the 13 live states (verified zero rows and zero writers for
+  removed members). Deleted 3 orphan storage objects owned by deleted
+  users (direct SQL blocked by design — used the Storage API).
+- Reason: broadcast dispatch never creates offer rows and no client
+  references them; the audit found this the only genuinely dead
+  subsystem. Kept deliberately: all columns (incl. write-only audit
+  fields and reserved `pickup_code`/image paths), payments CHECK,
+  notify/push fan-out (`pg_net`/`dblink` load-bearing), dev-switch
+  edge function, dispute/admin paths, every RLS/storage policy.
+- Details: client needs zero changes (no references existed).
+- Validation: `tsc`, `lint`, `expo export`, `expo-doctor` 19/21 (2
+  pre-existing env) — pass; live regression 7/7 (rewritten accept,
+  release-redispatch, re-accept, full chain to completed, toggle
+  round-trip, orphan removal, cleanup); baseline restored (19 orders,
+  12 profiles, 4 objects, zero orphans).
+- Limits/decisions: legacy status strings stay in client display
+  vocabulary for robustness; dispute settlement stays manual/admin.
+
+## 2026-09-16 — Helper Job Detail decision view from approved reference
+
+- Changed (presentation + one small read-only query extension):
+  pending-job view rebuilt as hero (72pt `VendorMark`, name, stall
+  context) → "Pick up from" → "Deliver to" (whole-row Maps handoff
+  with plain-arrow affordance, real `location.description` now
+  selected via the existing location join) → "Order (N items)" full
+  lines → factual fee row → filled red-track "Slide to accept".
+  Claimed-job workspace untouched; bell added to all detail headers;
+  decision title is "Job Detail". No badges, cards, estimates, ETAs,
+  collapse toggles, or second back control in decision mode.
+- Reason: approved mockup hierarchy (visual → route → order → fee →
+  commitment) with action-oriented wording; payment card and
+  breakdown collapse stay in the post-claim workspace only.
+- Details: `SlideToConfirm` gains a `filled` tone; no RPC/state/
+  realtime changes; `docs/design.md` §19 records the decision layout.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; live decision-query shape
+  (description, hint, items) + accept + first advance verified with
+  cleanup; `expo-doctor` 19/21 (2 pre-existing environmental).
+- Limits/decisions: multi-line location data limited to what exists
+  (name + hint/description — nothing invented); drag feel and 320pt
+  rendering pending on-device check.
+
 ## 2026-09-16 — Helper Portal Jobs tab from approved reference (portal bottom nav + slider accept)
 
 - Changed (backend, migration `limit_helper_active_jobs`):

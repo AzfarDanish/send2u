@@ -137,14 +137,29 @@ export function usePaymentFlow(orderId: string, refreshToken = 0): UsePaymentFlo
     }
   }, [user, busy]);
 
+  // Previously submitted receipt, if any (a rejected payment can be
+  // resubmitted): removed before the new file is saved so a resubmit never
+  // leaves two live evidence files behind.
+  const previousEvidence = context?.payment?.evidencePath ?? null;
+
   const confirm = useCallback(async (): Promise<boolean> => {
     if (!user || busy || !staged) return false;
     setBusy(true);
-    setBusyMessage('Uploading receipt…');
     setSubmitError(null);
+    let removedPrevious = false;
     let uploadedPath: string | null = null;
     try {
+      if (previousEvidence) {
+        setBusyMessage('Removing old receipt…');
+        try {
+          await removeObject(previousEvidence);
+        } catch {
+          throw new Error('Could not remove the old receipt. Nothing was changed. Try again.');
+        }
+        removedPrevious = true;
+      }
       const path = evidencePathFor(user.id, orderId, staged.extension, staged.fileName);
+      setBusyMessage('Uploading receipt…');
       await uploadObject(path, staged);
       uploadedPath = path;
       setBusyMessage('Submitting…');
@@ -163,13 +178,19 @@ export function usePaymentFlow(orderId: string, refreshToken = 0): UsePaymentFlo
           // Orphaned upload is harmless; the payment row was never created.
         }
       }
-      setSubmitError(err instanceof Error ? err.message : 'Could not submit payment evidence.');
+      if (removedPrevious) {
+        setSubmitError(
+          'The old receipt was removed but the new one could not be submitted. Please choose the receipt again.',
+        );
+      } else {
+        setSubmitError(err instanceof Error ? err.message : 'Could not submit payment evidence.');
+      }
       return false;
     } finally {
       setBusy(false);
       setBusyMessage(null);
     }
-  }, [user, busy, staged, orderId, load]);
+  }, [user, busy, staged, orderId, load, previousEvidence]);
 
   const cancelStaged = useCallback(() => {
     setStaged(null);

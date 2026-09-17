@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { BlurView } from 'expo-blur';
@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuItemRow } from '@/components/MenuItemRow';
 import { CartFab } from '@/components/CartFab';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { SearchBar, matchesSearch } from '@/components/SearchBar';
 import { GlassHeader, GLASS_HEADER_ROW } from '@/components/GlassHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -50,10 +51,13 @@ export default function VendorPageScreen() {
   const { sections, status, error, retry } = useMenu();
   const [seenId, setSeenId] = useState(id);
   const [category, setCategory] = useState('All');
+  const [menuQuery, setMenuQuery] = useState('');
   if (seenId !== id) {
     setSeenId(id);
     setCategory('All');
+    setMenuQuery('');
   }
+  const deferredMenuQuery = useDeferredValue(menuQuery);
 
   const openItem = useCallback((item: MenuItemWithVendor) => {
     router.push({ pathname: '/(requester)/menu/[id]', params: { id: item.id } });
@@ -88,8 +92,12 @@ export default function VendorPageScreen() {
   const showBar = buckets.length > 1;
   const visibleItems = useMemo(() => {
     const list = section?.items ?? [];
-    return category === 'All' ? list : list.filter((item) => menuCategory(item) === category);
-  }, [section, category]);
+    return list.filter(
+      (item) =>
+        (category === 'All' || menuCategory(item) === category) &&
+        matchesSearch(deferredMenuQuery, item.name, item.description),
+    );
+  }, [section, category, deferredMenuQuery]);
 
   // Docked filter bar: the in-flow chips scroll away, so once the hero
   // collapses a translucent copy docks under the glass header (a sticky
@@ -237,6 +245,13 @@ export default function VendorPageScreen() {
           </View>
         </View>
 
+        <SearchBar
+          value={menuQuery}
+          onChangeText={setMenuQuery}
+          placeholder={`Search ${vendor.name} menu`}
+          accessibilityLabel={`Search ${vendor.name} menu`}
+        />
+
         {showBar ? <View style={styles.stickyBar}>{filterChips}</View> : null}
 
         <SectionHeader
@@ -248,6 +263,12 @@ export default function VendorPageScreen() {
             icon="restaurant-menu"
             title="No items yet"
             message="This stall hasn't listed any food. Check back later."
+          />
+        ) : visibleItems.length === 0 ? (
+          <EmptyState
+            icon="search"
+            title="No matches"
+            message="Try a different dish name."
           />
         ) : (
           <View style={styles.list}>

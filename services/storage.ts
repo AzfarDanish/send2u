@@ -88,8 +88,11 @@ function receiptExtensionFor(mimeType: string, fileName: string): string {
 }
 
 /**
- * Opens the system image library for a single photo. Returns null when the
- * user cancels. Throws a friendly error on denial/failure.
+ * Opens the system image library for a single payment QR photo, with the
+ * native square-crop editor (QR codes scan best cropped tightly to the
+ * code). Returns null when the user cancels. Throws a friendly error on
+ * denial/failure. The crop editor is a native affordance: it applies on
+ * device builds and is ignored on web, where the photo is taken as-is.
  */
 export async function pickPaymentImage(): Promise<PickedImage | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -98,7 +101,8 @@ export async function pickPaymentImage(): Promise<PickedImage | null> {
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    allowsEditing: false,
+    allowsEditing: true,
+    aspect: [1, 1],
     quality: 0.8,
   });
   if (result.canceled) return null;

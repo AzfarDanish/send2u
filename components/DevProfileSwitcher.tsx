@@ -2,9 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -22,12 +20,14 @@ let sessionProfileCache: DevProfile[] | null = null;
 /**
  * Development-only test-account switcher, rendered inside the Profile page.
  *
- * The whole section carries a red visual identity (red border + tinted red
- * surface + error badge) so it can never be mistaken for a production
- * setting. The list is sourced from the database on every load — never
- * hard-coded — so any number of seeded test accounts renders. Switching
- * assumes an existing account's session; it creates nothing and mutates
- * nothing (no new users, no profile writes, no role changes).
+ * The section keeps one restrained dev marker (red eyebrow) so it can
+ * never be mistaken for a production setting — everything else follows
+ * the workspace language: flat rows, hairline dividers, underline tabs,
+ * no cards, no badges. The list is sourced from the database on every
+ * load — never hard-coded — so any number of seeded test accounts
+ * renders. Switching assumes an existing account's session; it creates
+ * nothing and mutates nothing (no new users, no profile writes, no role
+ * changes).
  */
 export function DevProfileSwitcher() {
   const { user, profile, devAuthEnabled } = useAuth();
@@ -134,25 +134,18 @@ export function DevProfileSwitcher() {
     role === 'requester' ? 'Requester' : role === 'helper' ? 'Helper' : role === 'vendor' ? 'Vendor' : role;
 
   return (
-    <Card style={styles.devCard}>
-      <View style={styles.devHeader}>
-        <Badge label="Development" tone="error" />
-        {profiles.length > 0 && !loading && (
-          <Text variant="caption" color="error">
-            {profiles.length} test account{profiles.length === 1 ? '' : 's'}
-          </Text>
-        )}
-      </View>
-      <Text variant="subtitle" color="error">
-        Switch test account
+    <View style={styles.section}>
+      <Text variant="eyebrow" color="error">
+        {`Development${profiles.length > 0 && !loading ? ` · ${profiles.length} test account${profiles.length === 1 ? '' : 's'}` : ''}`.toUpperCase()}
       </Text>
-      <Text variant="caption" color="error">
+      <Text variant="subtitle">Switch test account</Text>
+      <Text variant="caption" color="secondary">
         Dev-only test accounts.
       </Text>
 
       {loading ? (
         <View style={styles.centerRow}>
-          <ActivityIndicator color={colors.error} />
+          <ActivityIndicator color={colors.primary} />
           <Text color="secondary">Loading test accounts…</Text>
         </View>
       ) : loadError ? (
@@ -200,7 +193,7 @@ export function DevProfileSwitcher() {
               No {activeTab} test accounts.
             </Text>
           ) : null}
-          {visible.map((item) => {
+          {visible.map((item, index) => {
             const isCurrent = item.id === user?.id;
             const isSwitching = switchingId === item.id;
             const disabled = switchingId !== null;
@@ -214,10 +207,10 @@ export function DevProfileSwitcher() {
                 onPress={() => void handleSwitch(item)}
                 style={({ pressed }) => [
                   styles.row,
-                  isCurrent && styles.rowCurrent,
+                  index < visible.length - 1 && styles.rowDivider,
                   pressed && !disabled && !isCurrent && styles.rowPressed,
                 ]}>
-                <View style={[styles.iconWrap, isCurrent && styles.iconWrapCurrent]}>
+                <View style={styles.iconWrap}>
                     <MaterialIcons
                       name={
                         item.role === 'helper'
@@ -227,7 +220,7 @@ export function DevProfileSwitcher() {
                             : 'shopping-bag'
                       }
                       size={22}
-                      color={isCurrent ? colors.onPrimary : colors.error}
+                      color={colors.secondary}
                     />
                 </View>
                 <View style={styles.rowText}>
@@ -240,19 +233,13 @@ export function DevProfileSwitcher() {
                   </Text>
                 </View>
                 {isSwitching ? (
-                  <ActivityIndicator color={colors.error} />
+                  <ActivityIndicator color={colors.primary} />
+                ) : isCurrent ? (
+                  <Text variant="caption" color="secondary">
+                    Current
+                  </Text>
                 ) : (
-                  <View style={styles.badges}>
-                    <Badge
-                      label={roleLabel(item.role)}
-                      tone={item.role === 'helper' ? 'success' : item.role === 'vendor' ? 'warning' : 'primary'}
-                    />
-                    {isCurrent ? (
-                      <Badge label="Current" tone="error" />
-                    ) : (
-                      <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
-                    )}
-                  </View>
+                  <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
                 )}
               </Pressable>
             );
@@ -265,57 +252,56 @@ export function DevProfileSwitcher() {
           />
         </View>
       )}
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  devCard: {
-    borderColor: colors.error,
-    borderWidth: 2,
-    backgroundColor: colors.errorSoft,
+  section: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
-  devHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   centerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   emptyBlock: { gap: spacing.sm },
   list: { gap: spacing.sm },
-  tabs: { flexDirection: 'row', gap: spacing.sm },
+  tabs: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.error,
-    backgroundColor: colors.surface,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  tabSelected: { backgroundColor: colors.error },
-  tabLabel: { fontWeight: '600', color: colors.error },
-  tabLabelSelected: { color: colors.onPrimary },
+  tabSelected: { borderBottomColor: colors.primary },
+  tabLabel: { fontWeight: '600', color: colors.secondary },
+  tabLabelSelected: { color: colors.primary },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.error,
-    padding: spacing.md,
+    paddingVertical: spacing.sm,
     minHeight: 64,
   },
-  rowCurrent: { backgroundColor: colors.surface, borderWidth: 2.5 },
+  rowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.divider,
+  },
   rowPressed: { opacity: 0.7 },
   iconWrap: {
     width: 44,
     height: 44,
     borderRadius: radii.md,
-    backgroundColor: colors.errorSoft,
+    backgroundColor: colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconWrapCurrent: { backgroundColor: colors.error },
-  rowText: { flex: 1, gap: spacing.xs },
+  rowText: { flex: 1, gap: 2 },
   rowTitle: { fontWeight: '600', color: colors.text },
-  badges: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });

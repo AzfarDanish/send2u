@@ -622,7 +622,6 @@ project_target/
 .cache/
 .cache_maven/
 .stamp
-lib/
 lib_managed/
 src_managed/
 

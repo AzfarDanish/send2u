@@ -2674,3 +2674,36 @@ only. No secrets are ever recorded here.
   `requireCommit: true` would switch EAS to the git upload client, which does
   not apply `.gitignore` rules to tracked files, fixing this whole class at
   once — at the cost of requiring a clean, committed tree for every build.
+
+## 2026-09-17 — config/eas: provision EXPO_PUBLIC_* build-time env on EAS
+
+- Change: pushed `EXPO_PUBLIC_SUPABASE_URL` and
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY` to the EAS `preview` environment
+  (`eas env:push preview`). The server-only `SUPABASE_SERVICE_ROLE_KEY` was
+  deliberately NOT pushed.
+- Reason: the first green build (`d2a8f0de`) produced an installable APK whose
+  JS bundle contained neither value, so `config/env.ts` resolved both to `''`,
+  `isSupabaseConfigured()` was false, and every service threw "Supabase is not
+  configured". The builder env dump had no `EXPO_PUBLIC_*` at all: `.env` is
+  gitignored (`.gitignore:.ENV`) and therefore never uploads, so local dev works
+  while EAS builds silently ship an unconfigured app. A successful build is not
+  a working app.
+- Details: `eas.json`'s `preview` profile declares no explicit `environment`, so
+  EAS uses the profile name (`preview`) as the environment — the same scope the
+  vars were pushed to. The app reads exactly three `EXPO_PUBLIC_*` vars
+  (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SEND2U_DEV_AUTH`); `USE_RN_FETCH` is
+  unset by default and was left alone.
+- Validation: build `e8c9ee55` FINISHED (843 s). Downloaded the artifact
+  (103.4 MB, ABIs arm64-v8a/armeabi-v7a/x86/x86_64, classes1-4.dex, v2/v3 APK
+  Signing Block present, package `com.anonymous.send2u`) and confirmed
+  `https://<ref>.supabase.co` and an `eyJ…` JWT now appear literally inside
+  `assets/index.android.bundle`. The previous build `d2a8f0de` (1092 s) had
+  neither. Build `5a891df2` (original failure) died at 45 s in `RUN_GRADLEW`.
+- Known limitation: `EXPO_PUBLIC_SEND2U_DEV_AUTH` (anonymous dev entry,
+  `config/dev.ts`) is not set on EAS, so the preview APK requires a real
+  sign-in. Enable deliberately with
+  `eas env:set --name EXPO_PUBLIC_SEND2U_DEV_AUTH --value 1 --environment preview --visibility plaintext`.
+- Known limitation: the `production` environment has no `EXPO_PUBLIC_*` vars, so
+  a production build would reproduce the unconfigured-app failure. Do not assume
+  production shares preview's values (it may point at a different Supabase
+  project).

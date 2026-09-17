@@ -7,13 +7,13 @@ import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { openMapsLocation } from '@/lib/maps';
 import { formatMYR } from '@/lib/money';
-import { formatOrderDate, paymentStatusLabel, paymentStatusTone } from '@/lib/orders';
+import { formatOrderDate, paymentStatusLabel } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
 /**
@@ -47,10 +47,9 @@ export function HelperHistoryDetail({
 
   return (
     <View style={styles.container}>
-      <View>
+      <Card style={styles.card}>
         {job.status === 'completed' ? (
           <>
-            <Badge label="Completed" tone="success" />
             {job.resolvedAt ? (
               <Text variant="title">Settled after dispute</Text>
             ) : (
@@ -66,7 +65,6 @@ export function HelperHistoryDetail({
           </>
         ) : job.status === 'cancelled' ? (
           <>
-            <Badge label="Cancelled" tone="error" />
             <Text variant="title">This job was cancelled</Text>
             <Text color="secondary">
               {job.cancelReason === 'food_unavailable'
@@ -78,10 +76,6 @@ export function HelperHistoryDetail({
           </>
         ) : (
           <>
-            <Badge
-              label={job.resolvedAt ? `Settled · ${job.resolution ?? 'resolved'}` : 'Disputed'}
-              tone="error"
-            />
             <Text variant="title">This delivery needs settlement</Text>
             <Text color="secondary">
               {job.disputeReason === 'helper_unable'
@@ -114,13 +108,13 @@ export function HelperHistoryDetail({
             ) : null}
           </>
         )}
-      </View>
+      </Card>
 
       {job.status === 'completed' ? (
-        <OrderRatingSection order={job} refreshToken={refreshToken} />
+        <OrderRatingSection order={job} refreshToken={refreshToken} cardStyle={styles.card} />
       ) : null}
 
-      <View style={styles.group}>
+      <Card style={styles.card}>
         <Text variant="subtitle">{job.vendor.name}</Text>
         <Text variant="caption" color="secondary">
           Requested {formatOrderDate(job.createdAt)}
@@ -162,9 +156,9 @@ export function HelperHistoryDetail({
         <Text variant="caption" color="muted">
           Requester {job.requesterId.slice(0, 8)}…
         </Text>
-      </View>
+      </Card>
 
-      <View style={styles.group}>
+      <Card style={styles.card}>
         <OrderBreakdown
           items={job.items}
           subtotalCents={job.subtotalCents}
@@ -174,22 +168,18 @@ export function HelperHistoryDetail({
         <Text variant="caption" color="muted">
           Only the delivery fee counts as your payout.
         </Text>
-      </View>
+      </Card>
 
-      <View style={styles.group}>
+      <Card style={styles.card}>
         <Text variant="subtitle">What happened</Text>
         <OrderTimeline order={job} />
-      </View>
+      </Card>
 
-      <View style={styles.group}>
-        <View style={styles.moneyRow}>
-          <Text variant="subtitle">Payment record</Text>
-          {job.payment ? (
-            <Badge label={paymentStatusLabel(job.payment.status)} tone={paymentStatusTone(job.payment.status)} />
-          ) : (
-            <Badge label="No payment" tone="neutral" />
-          )}
-        </View>
+      <Card style={styles.card}>
+        <Text variant="subtitle">Payment record</Text>
+        <Text variant="caption" color="secondary">
+          {job.payment ? paymentStatusLabel(job.payment.status) : 'No payment'}
+        </Text>
         {job.payment ? (
           <>
             <Text color="secondary">
@@ -209,18 +199,20 @@ export function HelperHistoryDetail({
               : 'No receipt was submitted for this delivery.'}
           </Text>
         )}
-      </View>
+      </Card>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { gap: spacing.lg },
-  group: {
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  // Bordered, explicitly shadow-free card surface.
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: radii.md,
+    padding: spacing.lg,
   },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, gap: spacing.xs },

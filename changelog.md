@@ -10,6 +10,113 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-17 — DB: drop 4 dev users, realistic personas, schema audit (no schema changes)
+
+- Audited: all 10 tables live (offer subsystem already retired;
+  order_number already reverted). Every suspicious column is
+  referenced by a live RPC or read path (`resolved_by` →
+  `send2u_resolve_dispute`; `pickup_code` → place/context/advance;
+  `image_url` → menu/vendor reads + upsert; `availability_updated_at`
+  → availability RPC + client) — no table or column was safe to
+  drop, so none was. Prior keep-decisions stand.
+- Deleted (data only, one transaction, email-keyed):
+  `dev.requester2/3`, `dev.helper2/3` from `auth.users` — profiles,
+  notifications, and push tokens cascaded; they held zero orders,
+  ratings, or files. Helper 3's live `out_for_delivery` order
+  (requester 1's) was reassigned to Helper 1 first, keeping Helper
+  1 at exactly the 3-active cap.
+- Personas (fictional): requester 1 → Ahmad Faizal, helper 1 → Siti
+  Aminah (display + full name, phone, student ID); 6 vendors keep
+  stall display names with operator names + phones (no student ID
+  — not students). All `@send2u.test` logins unchanged.
+- Validation: post-state verified live — 8 profiles (exact keeper
+  set), order intact under helper 1, zero dangling user references
+  across orders/notifications/tokens/ratings/profiles, zero orphan
+  storage objects. No code touched (`tsc`/`lint` unaffected).
+- Limits/decisions: dev-switch roster now shows 2 requesters +
+  6 vendors; display names changed (dev UI only).
+
+## 2026-09-17 — Portal back scoped to exit; rating matches record cards
+
+- Fixed: `forceFallback` removed from Delivery record, Job
+  Details, workspace, loading, and Payment QR headers — those
+  backs follow route history again (fallback only when
+  history-less). Only the portal Jobs root keeps the forced exit
+  to requester Home.
+- Changed (`OrderRatingSection`): new optional `cardStyle` prop —
+  the shared `Card` is gap-only, so helper record and request
+  detail pass their bordered card surface and the rating block
+  matches sibling sections. No shadow/elevation; logic untouched.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-17 — Portal record/detail cards, forced portal exit, dev on portal profile
+
+- Changed (`HelperHistoryDetail`): outcome, route, breakdown,
+  timeline, and payment groups wrapped in shared `Card` with the
+  same bordered shadow-free surface as Request Detail; outcome and
+  payment `Badge`s replaced with plain status words. Maps,
+  settlement, rating, receipt, and timeline behavior untouched.
+- Changed (`helper-portal/jobs/[id].tsx`): decision items/pickup/
+  deliver/fee-capacity blocks and all workspace content blocks
+  (way, order preview, deliver-to, items, money, completion) in
+  the same shadow-free cards; sliders, footers, guards, and
+  OS-back holds untouched; dead `wayWrap`/`itemsBlock`/
+  `moneyBlock`/`doneWrap`/`capLine` styles removed.
+- Fixed (portal leave): `HeaderBack`/`GlassHeader` gain
+  `forceFallback` — plain back pops in-portal history (which is
+  why the button never left), so Jobs tab, Payment QR, and every
+  Job Detail header now always replace to requester Home. Active
+  stages keep their backless held workflow. Vendor profile already
+  had the dev section; none needed there.
+- Changed (portal `profile.tsx`): `DevProfileSwitcher` added, so
+  all three profiles (requester, portal, vendor) carry it —
+  still renders only with dev auth enabled.
+- Reason: one card language on both record screens; exits that
+  actually exit; dev tools reachable everywhere in dev.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; grep confirms no badges
+  and no shadow/elevation in touched screens.
+- Limits/decisions: on-device check pending.
+
+## 2026-09-17 — Request Detail sections in shadow-free cards (no backend changes)
+
+- Changed (`orders/[id].tsx`, `RequesterPaymentCard`): detail
+  sections (summary, drop-off, confirm, cancel, terminal record)
+  and payment states wrapped in the shared `Card` with a local
+  bordered surface (white, hairline border, no shadow or elevation
+  anywhere — verified by grep). All decluttering kept: vendor
+  title, collapsible cancel, single help path, no badges, same
+  flows and copy.
+- Reason: try grouped card surfaces while staying shadow-free.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass.
+- Limits/decisions: shared `Card` itself untouched (still
+  gap-only); on-device check pending.
+
+## 2026-09-17 — Request Detail decluttered + payment card flattened (no backend changes)
+
+- Changed (`orders/[id].tsx`): title is now `Request from
+  {vendor}` with `#id · placed · helper` caption (accepted
+  timestamp dropped); cancel collapses behind a quiet toggle
+  instead of an always-open form; duplicate bottom "Need help?"
+  removed (overflow menu owns it); major groups get whitespace
+  breathing room instead of separators; dropped the redundant
+  "Did you receive your items?" line. All dispute/withdraw/
+  confirm/realtime logic untouched.
+- Changed (`RequesterPaymentCard`): all `Card` wrappers and status
+  `Badge`s removed — quiet text states ("Payment opens once a
+  helper accepts", "Payment opens after delivery"), plain
+  Recorded/Unpaid words, untinted numbered pay steps. Upload zone,
+  staged review, QR, amounts, and submit flow untouched.
+- Reason: one title, one status voice, one primary action per
+  state; spacing carries grouping, no cards/badges/separators.
+- Validation: `tsc --noEmit` clean, `npm run lint` exit 0,
+  `expo export -p web --clear` — pass; grep confirms no cards or
+  badges of its own on either file.
+- Limits/decisions: on-device check pending.
+
 ## 2026-09-17 — Dev section UI flattened (no backend changes)
 
 - Changed (`DevProfileSwitcher` only): red-bordered tinted card →

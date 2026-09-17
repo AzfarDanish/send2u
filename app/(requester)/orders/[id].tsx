@@ -13,6 +13,7 @@ import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { SettlementRecord } from '@/components/SettlementRecord';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -236,6 +237,7 @@ export default function OrderDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
@@ -288,6 +290,7 @@ export default function OrderDetailScreen() {
     setCancelError(null);
     setCancelled(false);
     setReason('');
+    setCancelOpen(false);
     setPaymentTick(0);
     setReportOpen(false);
     setReportCategory(null);
@@ -507,13 +510,11 @@ export default function OrderDetailScreen() {
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text variant="title" numberOfLines={2}>
-              {order.vendor.name}
+              Request from {order.vendor.name}
             </Text>
             <Text variant="caption" color="secondary">
               #{order.id.slice(0, 8)} · Placed {formatOrderDate(order.createdAt)}
-              {order.helperId
-                ? ` · ${helperLabel(helperIdentity, order.helperId)}${order.acceptedAt ? ` accepted ${formatOrderDate(order.acceptedAt)}` : ''}`
-                : ''}
+              {order.helperId ? ` · ${helperLabel(helperIdentity, order.helperId)}` : ''}
             </Text>
           </View>
           <Pressable
@@ -535,7 +536,7 @@ export default function OrderDetailScreen() {
           <Text color="secondary">{card.description}</Text>
         </View>
 
-        <View style={styles.section}>
+        <Card style={styles.card}>
           <Text variant="subtitle">Order Summary</Text>
           {order.vendor.locationHint ? (
             <Text variant="caption" color="secondary" numberOfLines={2}>
@@ -550,19 +551,18 @@ export default function OrderDetailScreen() {
           <Text variant="caption" color="muted">
             Pay only after the food is in your hands.
           </Text>
-        </View>
+        </Card>
 
-        <View style={styles.section}>
+        <Card style={styles.card}>
           <Text variant="subtitle">Drop-off Location</Text>
           <Text variant="secondary" numberOfLines={2}>
             {order.location.name}
           </Text>
-        </View>
+        </Card>
 
         {isDelivered ? (
-          <View style={styles.section}>
+          <Card style={styles.card}>
             <Text variant="subtitle">Confirm receipt</Text>
-            <Text color="secondary">Did you receive your items?</Text>
             <Button
               title="Review & confirm"
               onPress={() =>
@@ -623,7 +623,7 @@ export default function OrderDetailScreen() {
                 </Text>
               </View>
             ) : null}
-          </View>
+          </Card>
         ) : null}
 
         {!terminal ? <RequesterPaymentCard orderId={order.id} refreshToken={paymentTick} /> : null}
@@ -641,37 +641,45 @@ export default function OrderDetailScreen() {
         ) : null}
 
         {showCancel ? (
-          <View style={styles.dangerSection}>
-            <Text variant="subtitle">Cancel this request</Text>
-            {lateCancellable ? (
-              <Text color="secondary">
-                The helper already paid for your food. Cancelling now may make
-                you responsible for the food cost — settle it with them directly.
-              </Text>
-            ) : (
-              <Text color="secondary">Free of charge before the food is purchased.</Text>
-            )}
-            {cancelError ? (
-              <ErrorState title="Could not cancel" message={cancelError} retryTitle="Dismiss" onRetry={() => setCancelError(null)} />
-            ) : null}
-            <TextInput
-              value={reason}
-              onChangeText={setReason}
-              placeholder="Reason for cancelling"
-              placeholderTextColor={colors.muted}
-              maxLength={500}
-              editable={!cancelling}
-              style={styles.reasonInput}
-              accessibilityLabel="Cancellation reason"
-            />
+          <Card style={styles.card}>
             <Button
-              title={cancelling ? 'Cancelling…' : 'Cancel request'}
-              variant="danger"
-              onPress={() => void handleCancel()}
-              disabled={cancelling || reason.trim().length === 0}
-              loading={cancelling}
+              title={cancelOpen ? 'Hide cancellation' : 'Cancel this request'}
+              variant="tertiary"
+              onPress={() => setCancelOpen((open) => !open)}
             />
-          </View>
+            {cancelOpen ? (
+              <>
+                {lateCancellable ? (
+                  <Text color="secondary">
+                    The helper already paid for your food. Cancelling now may make
+                    you responsible for the food cost — settle it with them directly.
+                  </Text>
+                ) : (
+                  <Text color="secondary">Free of charge before the food is purchased.</Text>
+                )}
+                {cancelError ? (
+                  <ErrorState title="Could not cancel" message={cancelError} retryTitle="Dismiss" onRetry={() => setCancelError(null)} />
+                ) : null}
+                <TextInput
+                  value={reason}
+                  onChangeText={setReason}
+                  placeholder="Reason for cancelling"
+                  placeholderTextColor={colors.muted}
+                  maxLength={500}
+                  editable={!cancelling}
+                  style={styles.reasonInput}
+                  accessibilityLabel="Cancellation reason"
+                />
+                <Button
+                  title={cancelling ? 'Cancelling…' : 'Cancel request'}
+                  variant="danger"
+                  onPress={() => void handleCancel()}
+                  disabled={cancelling || reason.trim().length === 0}
+                  loading={cancelling}
+                />
+              </>
+            ) : null}
+          </Card>
         ) : null}
 
         {terminal ? (
@@ -680,16 +688,16 @@ export default function OrderDetailScreen() {
               <SettlementRecord order={order} />
             ) : null}
             {order.status === 'completed' ? (
-              <OrderRatingSection order={order} refreshToken={paymentTick} />
+              <OrderRatingSection order={order} refreshToken={paymentTick} cardStyle={styles.card} />
             ) : null}
             {order.status === 'cancelled' || order.status === 'disputed' ? (
-              <View style={styles.section}>
+              <Card style={styles.card}>
                 <Text variant="subtitle">What happened</Text>
                 <OrderTimeline order={order} />
-              </View>
+              </Card>
             ) : null}
             {order.disputeDetails ? (
-              <View style={styles.section}>
+              <Card style={styles.card}>
                 <Text variant="subtitle">Your report</Text>
                 <Text color="secondary">{order.disputeDetails}</Text>
                 {order.disputeNote ? (
@@ -697,10 +705,10 @@ export default function OrderDetailScreen() {
                     Resolution note: {order.disputeNote}
                   </Text>
                 ) : null}
-              </View>
+              </Card>
             ) : null}
             {canWithdraw ? (
-              <View style={styles.section}>
+              <Card style={styles.card}>
                 {withdrawError ? (
                   <ErrorState title="Could not withdraw" message={withdrawError} retryTitle="Dismiss" onRetry={() => setWithdrawError(null)} />
                 ) : null}
@@ -711,9 +719,9 @@ export default function OrderDetailScreen() {
                   disabled={withdrawing}
                   loading={withdrawing}
                 />
-              </View>
+              </Card>
             ) : null}
-            <View style={styles.section}>
+            <Card style={styles.card}>
               <Text variant="subtitle">Payment record</Text>
               {order.payment ? (
                 <>
@@ -746,7 +754,7 @@ export default function OrderDetailScreen() {
                   No payment was due.
                 </Text>
               ) : null}
-            </View>
+            </Card>
             <View style={styles.actionRow}>
               <View style={styles.actionFill}>
                 <Button title="Browse menu" onPress={() => router.push('/(requester)')} />
@@ -756,9 +764,7 @@ export default function OrderDetailScreen() {
               </View>
             </View>
           </>
-        ) : (
-          <Button title="Need help?" variant="secondary" onPress={() => router.push('/(requester)/help')} />
-        )}
+        ) : null}
       </Screen>
 
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
@@ -786,12 +792,13 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   headerText: { flex: 1, gap: spacing.xs },
   statusBlock: { gap: spacing.xs },
-  section: { gap: spacing.sm },
-  dangerSection: {
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+  // Bordered, explicitly shadow-free card surface for detail sections.
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: radii.md,
+    padding: spacing.lg,
   },
   menuButton: {
     width: 44,

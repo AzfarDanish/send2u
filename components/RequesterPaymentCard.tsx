@@ -5,7 +5,6 @@ import { PrivateImage } from '@/components/PrivateImage';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { StagedFileCard } from '@/components/StagedFileCard';
-import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -47,22 +46,16 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
   const handleConfirm = () => void confirm();
 
   if (status === 'loading') {
-    return (
-      <Card style={styles.stateCard}>
-        <LoadingState message="Loading payment…" />
-      </Card>
-    );
+    return <LoadingState message="Loading payment…" />;
   }
   if (status === 'error' || !context) {
     return (
-      <Card style={styles.stateCard}>
-        <ErrorState
-          title="Couldn't load payment"
-          message={error ?? 'Check your connection and try again.'}
-          retryTitle="Try again"
-          onRetry={retry}
-        />
-      </Card>
+      <ErrorState
+        title="Couldn't load payment"
+        message={error ?? 'Check your connection and try again.'}
+        retryTitle="Try again"
+        onRetry={retry}
+      />
     );
   }
 
@@ -72,17 +65,16 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
 
   if (!context.helperId || context.orderStatus === 'pending') {
     return (
-      <Card>
-        <Badge label="No payment yet" tone="neutral" />
+      <Card style={styles.card}>
         <Text variant="subtitle">Waiting for a helper</Text>
+        <Text color="secondary">Payment opens once a helper accepts.</Text>
       </Card>
     );
   }
 
   if (context.orderStatus === 'delivered') {
     return (
-      <Card>
-        <Badge label="Confirm delivery first" tone="success" />
+      <Card style={styles.card}>
         <Text variant="subtitle">No payment yet</Text>
         <Text color="secondary">
           Confirm delivery above to open payment.
@@ -102,9 +94,8 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
     context.orderStatus === 'delivering'
   ) {
     return (
-      <Card>
-        <Badge label="Pay after delivery" tone="info" />
-        <Text variant="subtitle">No payment yet</Text>
+      <Card style={styles.card}>
+        <Text color="secondary">Payment opens after delivery.</Text>
       </Card>
     );
   }
@@ -112,21 +103,19 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
   const payment = context.payment;
 
   return (
-    <Card>
-      <View style={styles.header}>
-        <Text variant="subtitle">{payment ? 'Payment' : 'Payment required'}</Text>
-        {reloading ? (
-          <ActivityIndicator
-            size="small"
-            color={colors.primary}
-            accessibilityLabel="Updating payment…"
-          />
-        ) : payment ? (
-          <Badge label="Recorded" tone="success" />
-        ) : (
-          <Badge label="Unpaid" tone="warning" />
-        )}
-      </View>
+    <Card style={styles.card}>
+      <Text variant="subtitle">{payment ? 'Payment' : 'Payment required'}</Text>
+      {reloading ? (
+        <ActivityIndicator
+          size="small"
+          color={colors.primary}
+          accessibilityLabel="Updating payment…"
+        />
+      ) : (
+        <Text variant="caption" color="secondary">
+          {payment ? 'Recorded' : 'Unpaid'}
+        </Text>
+      )}
       <OrderBreakdown
         subtotalCents={context.subtotalCents}
         deliveryFeeCents={context.deliveryFeeCents}
@@ -150,7 +139,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
               Helper {context.helperId.slice(0, 8)}… will receive this payment directly.
             </Text>
           ) : null}
-          <View style={styles.stepsCard}>
+          <View style={styles.steps}>
             <Text variant="subtitle">Pay outside the app</Text>
             <Text color="secondary">1. Open your banking app.</Text>
             <Text color="secondary">2. Scan the provided QR code.</Text>
@@ -232,14 +221,15 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
 }
 
 const styles = StyleSheet.create({
-  stateCard: { minHeight: 160, justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  stepsCard: {
-    gap: spacing.xs,
-    backgroundColor: colors.warningSoft,
-    borderRadius: radii.lg,
+  // Bordered, explicitly shadow-free card surface.
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: radii.md,
     padding: spacing.lg,
   },
+  steps: { gap: spacing.xs },
   uploadArea: {
     alignItems: 'center',
     justifyContent: 'center',

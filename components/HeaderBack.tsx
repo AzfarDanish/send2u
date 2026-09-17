@@ -14,11 +14,19 @@ export function HeaderBack({
   fallbackHref,
   color = colors.text,
   accessibilityLabel = 'Go back',
+  forceFallback = false,
 }: {
   fallbackHref: string;
   /** Chevron color — defaults to body text; pass white over imagery. */
   color?: string;
   accessibilityLabel?: string;
+  /**
+   * Skip history and always replace with the fallback. Used for exits
+   * (e.g. leaving the Helper Portal): inside nested tab navigators
+   * `canGoBack()` is almost always true, so plain back would pop to
+   * another in-portal route instead of leaving.
+   */
+  forceFallback?: boolean;
 }) {
   return (
     <Pressable
@@ -28,7 +36,7 @@ export function HeaderBack({
         // Back restores the true origin (backBehavior="history"); a
         // history-less entry (deep link) falls back to the role root
         // instead of a dead button.
-        if (router.canGoBack()) router.back();
+        if (!forceFallback && router.canGoBack()) router.back();
         else router.replace(fallbackHref as Href);
       }}
       style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}

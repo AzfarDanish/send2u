@@ -133,6 +133,7 @@ export default function HelperJobsScreen() {
       <GlassHeader
         title="Jobs"
         fallbackHref="/(requester)"
+        forceFallback
         right={<HeaderBell />}
       />
       <Screen

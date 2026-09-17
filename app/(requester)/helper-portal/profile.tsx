@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
+import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { GlassHeader } from '@/components/GlassHeader';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { Card } from '@/components/ui/Card';
@@ -50,6 +51,8 @@ export default function HelperPortalProfileScreen() {
           Delivering as a verified Send2U helper. Your requester orders,
           settings, and sign-out stay on your main profile.
         </Text>
+
+        <DevProfileSwitcher />
       </Screen>
     </HelperPortalGuard>
   );

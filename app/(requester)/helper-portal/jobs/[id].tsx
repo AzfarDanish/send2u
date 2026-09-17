@@ -10,12 +10,13 @@ import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { VendorMark } from '@/components/VendorMark';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { SlideToConfirm } from '@/components/ui/SlideToConfirm';
 import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { useMyDeliveries } from '@/hooks/useMyDeliveries';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { openMapsLocation } from '@/lib/maps';
@@ -107,7 +108,7 @@ function StageWayBlock({
   mapsDisabled: boolean;
 }) {
   return (
-    <View style={styles.wayWrap}>
+    <Card style={styles.card}>
       <View style={styles.sectionHead}>
         <MaterialIcons name={icon} size={20} color={colors.primary} />
         <Text variant="subtitle">{heading}</Text>
@@ -135,14 +136,14 @@ function StageWayBlock({
           </Text>
         </Pressable>
       </View>
-    </View>
+    </Card>
   );
 }
 
 /** Compact order preview: small visuals, item lines, optional fee line. */
 function StageOrderPreview({ job, showFee }: { job: OrderWithDetails; showFee?: boolean }) {
   return (
-    <View>
+    <Card style={styles.card}>
       <View style={styles.sectionHead}>
         <MaterialIcons name="receipt-long" size={20} color={colors.primary} />
         <Text variant="subtitle">Order items</Text>
@@ -171,7 +172,7 @@ function StageOrderPreview({ job, showFee }: { job: OrderWithDetails; showFee?: 
           </Text>
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
@@ -206,7 +207,7 @@ function WorkspaceDeliverTo({
   mapsDisabled: boolean;
 }) {
   return (
-    <View style={styles.itemsBlock}>
+    <Card style={styles.card}>
       <Text variant="subtitle">Deliver to</Text>
       <View style={styles.feeRow}>
         <View style={styles.itemText}>
@@ -231,14 +232,14 @@ function WorkspaceDeliverTo({
           </Text>
         </Pressable>
       </View>
-    </View>
+    </Card>
   );
 }
 
 /** Shared order-items block for the collect/deliver stages: 44pt thumbs, no heroes, no icons. */
 function WorkspaceOrderItems({ job }: { job: OrderWithDetails }) {
   return (
-    <View style={styles.itemsBlock}>
+    <Card style={styles.card}>
       <Text variant="subtitle">Order items</Text>
       {job.items.map((item) => (
         <View key={item.id} style={styles.itemRow}>
@@ -256,7 +257,7 @@ function WorkspaceOrderItems({ job }: { job: OrderWithDetails }) {
           </Text>
         </View>
       ))}
-    </View>
+    </Card>
   );
 }
 
@@ -295,7 +296,7 @@ function ExceptionConfirm({
 function CompletionResult({ job }: { job: OrderWithDetails }) {
   const itemCount = job.items.reduce((sum, item) => sum + item.quantity, 0);
   return (
-    <View style={styles.doneWrap}>
+    <Card style={[styles.card, styles.doneCard]}>
       <View accessibilityRole="image" accessibilityLabel="Delivery completed" style={styles.doneEmblem}>
         <MaterialIcons name="check" size={36} color={colors.success} />
       </View>
@@ -311,7 +312,7 @@ function CompletionResult({ job }: { job: OrderWithDetails }) {
       <Text variant="caption" color="muted" style={styles.doneCenter}>
         Returning to your deliveries…
       </Text>
-    </View>
+    </Card>
   );
 }
 
@@ -585,59 +586,64 @@ export default function PortalJobDetailScreen() {
 
             <WorkspaceOrderItems job={job} />
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Open pickup location in Maps: ${pickupLabel}`}
-              onPress={() => void openMaps(pickupLabel)}
-              disabled={mapsBusy}
-              style={({ pressed }) => [styles.locBlock, pressed && styles.pressed]}>
-              <View style={styles.locText}>
-                <Text variant="caption" color="secondary">
-                  Pick up from
-                </Text>
-                <Text variant="secondary" style={styles.waypointTitle} numberOfLines={2}>
-                  {job.vendor.name}
-                </Text>
-                {job.vendor.locationHint ? (
-                  <Text color="secondary" numberOfLines={3}>
-                    {job.vendor.locationHint}
+            <Card style={styles.card}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open pickup location in Maps: ${pickupLabel}`}
+                onPress={() => void openMaps(pickupLabel)}
+                disabled={mapsBusy}
+                style={({ pressed }) => [styles.locBlock, pressed && styles.pressed]}>
+                <View style={styles.locText}>
+                  <Text variant="caption" color="secondary">
+                    Pick up from
                   </Text>
-                ) : null}
-              </View>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Open delivery location in Maps: ${dropoffLabel}`}
-              onPress={() => void openMaps(dropoffLabel)}
-              disabled={mapsBusy}
-              style={({ pressed }) => [styles.locBlock, pressed && styles.pressed]}>
-              <View style={styles.locText}>
-                <Text variant="caption" color="secondary">
-                  Deliver to
-                </Text>
-                <Text variant="secondary" style={styles.waypointTitle} numberOfLines={2}>
-                  {job.location.name}
-                </Text>
-                {job.location.description ? (
-                  <Text color="secondary" numberOfLines={3}>
-                    {job.location.description}
+                  <Text variant="secondary" style={styles.waypointTitle} numberOfLines={2}>
+                    {job.vendor.name}
                   </Text>
-                ) : null}
-              </View>
-            </Pressable>
+                  {job.vendor.locationHint ? (
+                    <Text color="secondary" numberOfLines={3}>
+                      {job.vendor.locationHint}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            </Card>
 
-            <View style={styles.moneyRow}>
-              <Text color="secondary">Your delivery fee</Text>
-              <Text variant="price" style={styles.feeEarn}>
-                +{formatMYR(job.deliveryFeeCents)}
+            <Card style={styles.card}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open delivery location in Maps: ${dropoffLabel}`}
+                onPress={() => void openMaps(dropoffLabel)}
+                disabled={mapsBusy}
+                style={({ pressed }) => [styles.locBlock, pressed && styles.pressed]}>
+                <View style={styles.locText}>
+                  <Text variant="caption" color="secondary">
+                    Deliver to
+                  </Text>
+                  <Text variant="secondary" style={styles.waypointTitle} numberOfLines={2}>
+                    {job.location.name}
+                  </Text>
+                  {job.location.description ? (
+                    <Text color="secondary" numberOfLines={3}>
+                      {job.location.description}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            </Card>
+
+            <Card style={styles.card}>
+              <View style={styles.moneyRow}>
+                <Text color="secondary">Your delivery fee</Text>
+                <Text variant="price" style={styles.feeEarn}>
+                  +{formatMYR(job.deliveryFeeCents)}
+                </Text>
+              </View>
+              <Text variant="caption" color="secondary">
+                {activeCount} of {MAX_ACTIVE_JOBS_PER_HELPER} active jobs ·{' '}
+                {atCapacity ? 'Finish one to take another.' : 'You can accept this job.'}
               </Text>
-            </View>
-
-            <Text variant="caption" color="secondary" style={styles.capLine}>
-              {activeCount} of {MAX_ACTIVE_JOBS_PER_HELPER} active jobs ·{' '}
-              {atCapacity ? 'Finish one to take another.' : 'You can accept this job.'}
-            </Text>
+            </Card>
           </ScrollView>
           <View style={styles.footer}>
             {acceptError ? (
@@ -761,7 +767,7 @@ export default function PortalJobDetailScreen() {
           </Text>
         </View>
         <WorkspaceOrderItems job={job} />
-        <View style={styles.moneyBlock}>
+        <Card style={styles.card}>
           <View style={styles.moneyRow}>
             <Text color="secondary">Food cost (you pay)</Text>
             <Text variant="price">{formatMYR(foodCents)}</Text>
@@ -776,7 +782,7 @@ export default function PortalJobDetailScreen() {
             You pay {formatMYR(foodCents)} now. This is the food price. You will receive{' '}
             {formatMYR(job.deliveryFeeCents)} as your delivery fee.
           </Text>
-        </View>
+        </Card>
       </>
     );
     foot = confirmKind ? (
@@ -816,14 +822,14 @@ export default function PortalJobDetailScreen() {
           mapsDisabled={mapsBusy}
         />
         <WorkspaceOrderItems job={job} />
-        <View style={styles.moneyBlock}>
+        <Card style={styles.card}>
           <View style={styles.moneyRow}>
             <Text color="secondary">Your delivery fee</Text>
             <Text variant="price" style={styles.feeEarn}>
               +{formatMYR(job.deliveryFeeCents)}
             </Text>
           </View>
-        </View>
+        </Card>
       </>
     );
     foot = (
@@ -853,14 +859,14 @@ export default function PortalJobDetailScreen() {
           mapsDisabled={mapsBusy}
         />
         <WorkspaceOrderItems job={job} />
-        <View style={styles.moneyBlock}>
+        <Card style={styles.card}>
           <View style={styles.moneyRow}>
             <Text color="secondary">Your delivery fee</Text>
             <Text variant="price" style={styles.feeEarn}>
               +{formatMYR(job.deliveryFeeCents)}
             </Text>
           </View>
-        </View>
+        </Card>
       </>
     );
     foot = (
@@ -920,6 +926,14 @@ export default function PortalJobDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Bordered, explicitly shadow-free card surface for detail/workspace blocks.
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+  },
   shell: { paddingBottom: spacing.md },
   scroll: { flex: 1 },
   scrollBody: { gap: spacing.lg, paddingBottom: spacing.md },
@@ -929,7 +943,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  wayWrap: { gap: spacing.sm },
   progressTrack: { flexDirection: 'row', gap: 4, marginTop: spacing.xs },
   progressSeg: { flex: 1, height: 4, borderRadius: 999 },
   progressSegFilled: { backgroundColor: colors.primary },
@@ -952,16 +965,7 @@ const styles = StyleSheet.create({
   dotActive: { width: 18 },
   dotTodo: { backgroundColor: colors.border },
   titleBlock: { gap: spacing.xs },
-  itemsBlock: { gap: spacing.md },
   thumb: { width: 44, height: 44, borderRadius: 8 },
-  moneyBlock: {
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
   moneyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   exceptionLink: {
     alignSelf: 'center',
@@ -970,7 +974,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   confirmPanel: { gap: spacing.sm },
-  doneWrap: { gap: spacing.md, alignItems: 'center', paddingVertical: spacing.xxxl },
+  doneCard: { alignItems: 'center' },
   doneEmblem: {
     width: 76,
     height: 76,
@@ -984,11 +988,6 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, gap: 2 },
   locBlock: { flexDirection: 'row', gap: spacing.md },
   locText: { flex: 1, gap: 2 },
-  capLine: {
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   waypoint: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingLeft: 28 },
   waypointText: { flex: 1, gap: 2 },

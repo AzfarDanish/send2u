@@ -13,6 +13,8 @@ interface GlassHeaderProps {
   title: string;
   /** Deep-link fallback when there is no history to pop. */
   fallbackHref?: string;
+  /** Always replace with the fallback (portal exits); see HeaderBack. */
+  forceFallback?: boolean;
   /** Right-side action (bell, mark-read, settings…). Bell is opt-in per screen. */
   right?: React.ReactNode;
   accessibilityLabel?: string;
@@ -37,6 +39,7 @@ interface GlassHeaderProps {
 export function GlassHeader({
   title,
   fallbackHref = '/(requester)',
+  forceFallback = false,
   right,
   accessibilityLabel,
   backLabel,
@@ -73,6 +76,7 @@ export function GlassHeader({
           {hideBack ? null : (
             <HeaderBack
               fallbackHref={fallbackHref}
+              forceFallback={forceFallback}
               color={dark ? colors.onPrimary : undefined}
               accessibilityLabel={backLabel}
             />

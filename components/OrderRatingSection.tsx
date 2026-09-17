@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { RatingInput, RatingStars } from '@/components/RatingStars';
@@ -19,6 +19,12 @@ interface OrderRatingSectionProps {
   /** Bump to refetch (e.g. realtime rating event from the other party). */
   refreshToken?: number;
   /**
+   * Optional surface for the wrapper Card. The shared Card is gap-only,
+   * so record screens pass their bordered card style to make the rating
+   * block match sibling sections (still no shadow/elevation).
+   */
+  cardStyle?: StyleProp<ViewStyle>;
+  /**
    * Requester form placement. `link` (default) renders a compact entry that
    * pushes the dedicated rate screen; `inline` renders the full stars +
    * comment form (used BY the rate screen). Helpers always get the inline
@@ -34,7 +40,7 @@ interface OrderRatingSectionProps {
  * rating-free by design. Shows both directions' states plus the viewer's
  * submit form; submitted ratings are immutable and render read-only.
  */
-export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'link' }: OrderRatingSectionProps) {
+export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'link', cardStyle }: OrderRatingSectionProps) {
   const { user } = useAuth();
   const viewerId = user?.id ?? null;
   const viewerRole =
@@ -109,7 +115,7 @@ export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'l
   const otherLabel = viewerRole === 'requester' ? 'Helper' : 'Requester';
 
   return (
-    <Card>
+    <Card style={cardStyle}>
       <View style={styles.identity}>
         <View style={styles.avatar}>
           <MaterialIcons name="person" size={24} color={colors.primary} />

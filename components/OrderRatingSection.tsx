@@ -7,6 +7,7 @@ import { RatingInput, RatingStars } from '@/components/RatingStars';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -56,7 +57,7 @@ export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'l
   const eligible =
     viewerRole !== null &&
     order.status === 'completed' &&
-    order.payment?.status === 'verified' &&
+    (order.paymentStatus === 'paid' || order.paymentStatus === 'collected') &&
     !order.resolvedAt &&
     !!order.helperId;
 
@@ -131,6 +132,9 @@ export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'l
       </View>
       {loadError ? (
         <ErrorState title="Couldn't load ratings" message={loadError} retryTitle="Try again" onRetry={() => void load()} />
+      ) : null}
+      {ratings === null && !loadError ? (
+        <LoadingState message="Loading ratings…" />
       ) : null}
       {mine ? (
         <View style={styles.block}>

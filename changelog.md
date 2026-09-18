@@ -10,6 +10,24 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-18 — Load states: ratings gate fix + coverage audit
+
+- Fixed (bug): `OrderRatingSection` and the rate screen gated on legacy
+  `payment.status === 'verified'`, so ratings never rendered for the new
+  paid/collected model. Both now gate on completed + paid/collected, and
+  the section shows a loading indicator while ratings fetch.
+- Added: "Updating…" caption under the helper availability toggle while
+  the availability write is in flight.
+- Audited: every data-loading screen/surface already shows a loader —
+  lists (skeletons/spinners), details, pay-online, vendor queue/detail,
+  portal workspace, confirmation, notifications, ratings submit, auth,
+  sign-out, avatar (initials fallback by design), HelperIdentity
+  (short-id fallback by design), header bell (shared count, no spinner
+  needed). Static screens (help/terms/privacy) need none.
+- Validation: `tsc` clean, `expo lint` clean, `expo export -p web` pass.
+- Limits/decisions: on-device tap-through pending.
+
+
 ## 2026-09-18 — Audit: post-migration transaction hardening + doc cleanup
 
 - Fixed (backend, migrations `vendor_payments_select_policy`,

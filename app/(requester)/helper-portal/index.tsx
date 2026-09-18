@@ -151,6 +151,10 @@ export default function HelperJobsScreen() {
               <Text variant="caption" color="secondary">
                 {availabilityError}
               </Text>
+            ) : updating ? (
+              <Text variant="caption" color="secondary">
+                Updating…
+              </Text>
             ) : null}
           </View>
           <Switch

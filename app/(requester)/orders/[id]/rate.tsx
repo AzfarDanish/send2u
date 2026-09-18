@@ -18,7 +18,7 @@ import type { OrderWithDetails } from '@/types/domain';
 /**
  * Rate Your Helper: real helper identity plus the shared rating section
  * (5-star input, optional 500-char comment, once-per-order immutable).
- * Gated to completed + verified-payment orders for the owning requester —
+ * Gated to completed + paid/collected orders for the owning requester —
  * the same eligibility the section itself enforces.
  */
 export default function OrderRateScreen() {
@@ -109,7 +109,7 @@ export default function OrderRateScreen() {
     order !== null &&
     user?.id === order.requesterId &&
     order.status === 'completed' &&
-    order.payment?.status === 'verified' &&
+    (order.paymentStatus === 'paid' || order.paymentStatus === 'collected') &&
     !order.resolvedAt &&
     !!order.helperId;
 

@@ -10,6 +10,34 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-18 — Fix sweep iteration 2: review findings closed
+
+Follow-up to the two entries below (independent manager review of commit
+`135d3aff`).
+
+- Fixed (docs): the two entries below were each recorded TWICE.
+  `CHANGELOG.md` and `changelog.md` are a single file on this
+  case-insensitive volume, so the "append to both" instruction wrote each
+  entry twice into one file. The duplicate sections are removed
+  (130 -> 128 sections, no other content touched) and both git paths point
+  at the same content.
+- Fixed (app, `app/(requester)/orders/[id].tsx`): the Order Summary payment
+  caption was state-aware for only four states and rendered outside the
+  terminal gate, so a cancelled unpaid order was prompted "Not paid yet —
+  pay in Send2U when your order is ready" alongside its own "Cancelled"
+  status, and a cancelled COD order was told cash was due. The caption is
+  now suppressed for terminal orders, and its rail-neutral fallback comes
+  from the tested `paymentStatusLabel`. A null `paymentMethod` (legacy rows)
+  no longer silently reads as online — it was treated as online here and as
+  COD in `RequesterPaymentCard`, 40 lines apart.
+- Reason: the manager review found a high-severity documentation defect and
+  a re-opened instance of the copy-defect class iteration 1 fixed.
+- Validation: `npx tsc --noEmit` clean; `npm test` 43/43 pass;
+  `npx expo lint` clean; `npx expo export -p web` pass; de-duplication
+  verified (128 unique sections, exactly 2 sweep headings).
+- Limits/decisions: the duplicate-case changelog paths remain — collapsing
+  them to a single path is a CEO decision, not taken here.
+
 ## 2026-09-18 — Fix sweep iteration 1: QA findings closed
 
 Follow-up to the entry below (adversarial QA pass over commits `282dae3b`
@@ -49,94 +77,6 @@ and `8cbd3d16`).
   verbatim (unreachable from the app's four call sites — unread counts are
   integers), and subscriber-notification is not observable from a server
   render, so it stays untested. On-device tap-through still pending.
-
-## 2026-09-18 — Fix sweep iteration 1: QA findings closed
-
-Follow-up to the entry below (adversarial QA pass over commits `282dae3b`
-and `8cbd3d16`).
-
-- Fixed (app, `app/(requester)/orders/[id].tsx`): the Order Summary caption
-  told every non-COD requester "Paid in Send2U (simulated for this demo)"
-  regardless of payment state, so an online order still `unpaid` claimed to
-  be paid while the status card, the payment card ("Payment due") and the
-  "Continue to Payment" button on the same screen said otherwise. The
-  caption now follows the real state — cash collected / cash due for COD,
-  and paid / refunded / "Not paid yet — pay in Send2U when your order is
-  ready" for online. Same defect class as the already-fixed
-  `paymentStatusLabel` case, found by QA 80 lines away.
-- Fixed (app, `lib/money.ts`): the new thousands-separator rule still
-  accepted a zero-led leading group, so "0,123", "00,123" and "0,001.5"
-  were read as RM 123.00 / RM 123.00 / RM 1.50. The leading group must now
-  be 1-3 non-zero-led digits; those inputs raise the validation error.
-- Fixed (tests, `lib/unread.test.ts`): the previous version asserted only
-  that calls did not throw — the whole file passed even with
-  `setUnreadCount` replaced by a total no-op. It now reads the store back
-  through the real public API (`useSharedUnreadCount`, via
-  `react-dom/server`'s `renderToString`) and asserts the rendered count,
-  clamping, persistence and replacement. Verified by mutation: the no-op
-  mutation now fails 5 tests instead of passing.
-- Changed (config): `@types/node` (^26.6.1) and `@types/react-dom`
-  (~19.2.0) are now declared devDependencies. The suite cannot type-check
-  without them, and `@types/node` was previously resolving only
-  transitively — a `TS2688` whole-project failure waiting to happen.
-- Reason: QA of the sweep found the same copy-defect class the sweep had
-  just fixed, a too-permissive price rule, and a test file that could not
-  fail.
-- Validation: `npx tsc --noEmit` clean; `npm test` 43/43 pass;
-  `npx expo lint` clean; `npx expo export -p web` pass. Mutation check on
-  `lib/unread.ts` (no-op writer) fails 5 tests, then reverted clean.
-- Limits/decisions: `setUnreadCount` still stores non-integer input
-  verbatim (unreachable from the app's four call sites — unread counts are
-  integers), and subscriber-notification is not observable from a server
-  render, so it stays untested. On-device tap-through still pending.
-
-## 2026-09-18 — Fix sweep: money/state defects + first test suite
-
-- Fixed (app, `lib/orders.ts`): `paymentStatusLabel` now takes an optional
-  `method` and disambiguates `unpaid` — COD reads "Cash due on delivery",
-  online reads "Payment due". Previously every unpaid order was labelled
-  "Cash due on delivery", including online orders awaiting in-app payment,
-  contradicting the same card's "Pay in Send2U now" copy; the vendor order
-  detail rendered "Online Payment · Cash due on delivery". All three call
-  sites (`RequesterPaymentCard`, `TransactionRecord`, vendor `orders/[id]`)
-  now pass the order's method. Method changes no other state's label.
-- Fixed (app, `lib/orders.ts`): `orderStatusLabel` title-cased every word
-  ("Ready For Pickup", "Out For Delivery") for each multi-word status it
-  falls back on. Now sentence case, matching the hand-written labels
-  elsewhere. Affected the helper-portal deliveries list (visible text and
-  its accessibility label).
-- Fixed (app, `lib/money.ts`): `parsePriceToCents` stripped commas
-  anywhere, so a comma-decimal typo ("6,50") was silently read as
-  RM 650.00 — a 100x misread on the vendor menu price field. Commas are now
-  accepted only as well-formed thousands separators ("1,234.56"); a
-  misplaced separator raises the existing validation error instead of
-  changing the amount. Client-side fast feedback only — the server still
-  re-validates every stored price.
-- Added (tests): the project's first test suite — 40 tests over the pure
-  money/state logic in `lib/` (`money`, `orders`, `orderEvents`, `dedupe`,
-  `unread`), run by Node's built-in test runner (`npm test`,
-  `npm run test:watch`). No new dependencies: Node 22 strips TypeScript
-  natively and the tested modules use only erased type-only imports, so no
-  bundler/Jest/RN transform was added.
-- Changed (config): `tsconfig.json` gains `"types": ["node", "react"]`
-  (TypeScript 6 no longer auto-includes `@types/node`, which the suite's
-  `node:test`/`node:assert` imports require) and
-  `"allowImportingTsExtensions": true` (Node ESM needs explicit `.ts`
-  extensions on the test files' relative imports).
-- Reason: the ratings-eligibility repair in the entry above is sound; this
-  sweep closes the remaining copy and price-parsing defects found in the
-  money/state path and locks the behaviour down with tests.
-- Validation: `npx tsc --noEmit` clean; `npm test` 40/40 pass;
-  `npx expo lint` clean; `npx expo export -p web` pass (all routes,
-  including pay-online and vendor orders).
-- Limits/decisions: no Supabase schema, RPC, policy, or migration change
-  (DB untouched); legacy write-dead columns (`pickup_code`,
-  `payment_qr_path`, `evidence_path`) retained. Unit scope is pure `lib/`
-  logic only — `useSharedUnreadCount` and all React/RN/Supabase modules
-  stay out (no RN test environment added). Node prints a harmless
-  `MODULE_TYPELESS_PACKAGE_JSON` warning because the app is not an ESM
-  package; adding `"type": "module"` would break the Expo build, so it is
-  left as-is. On-device tap-through still pending.
 
 ## 2026-09-18 — Fix sweep: money/state defects + first test suite
 

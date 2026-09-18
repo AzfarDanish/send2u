@@ -24,6 +24,7 @@ import { emitOrderChanged } from '@/lib/orderEvents';
 import {
   formatOrderDate,
   isTerminalOrderStatus,
+  paymentStatusLabel,
   requesterStatusMessage,
 } from '@/lib/orders';
 import { cancelOrder, getOrderDetail, openDispute, withdrawDispute } from '@/services/orders';
@@ -470,6 +471,24 @@ export default function OrderDetailScreen() {
   const terminal = isTerminalOrderStatus(order.status);
   const card = statusCardFor(order);
 
+  // One payment line for the Order Summary. Terminal orders are history —
+  // they report nothing here (the transaction record and status card already
+  // cover them, and a cancelled order must never be prompted to pay). Live
+  // orders get an action hint per rail; a null method (legacy rows) falls
+  // back to the rail-neutral label rather than being silently read as online.
+  const paymentCaption = (() => {
+    if (terminal) return null;
+    if (order.paymentStatus === 'paid') return 'Paid in Send2U (simulated for this demo).';
+    if (order.paymentStatus === 'collected') return 'Cash collected on delivery.';
+    if (order.paymentMethod === 'cod') {
+      return 'Cash due on delivery — pay your helper when the food arrives.';
+    }
+    if (order.paymentMethod === 'online') {
+      return 'Not paid yet — pay in Send2U when your order is ready.';
+    }
+    return paymentStatusLabel(order.paymentStatus, null);
+  })();
+
   // Cancellation is possible while the kitchen has not committed — that
   // includes the vendor prep states. Past the purchase step, cancelling moves
   // the order to dispute for review (no food-cost liability: the helper never
@@ -572,17 +591,11 @@ export default function OrderDetailScreen() {
             subtotalCents={order.subtotalCents}
             deliveryFeeCents={order.deliveryFeeCents}
           />
-          <Text variant="caption" color="muted">
-            {order.paymentMethod === 'cod'
-              ? order.paymentStatus === 'collected'
-                ? 'Cash collected on delivery.'
-                : 'Cash due on delivery — pay your helper when the food arrives.'
-              : order.paymentStatus === 'paid'
-                ? 'Paid in Send2U (simulated for this demo).'
-                : order.paymentStatus === 'refunded'
-                  ? 'Refunded by Send2U.'
-                  : 'Not paid yet — pay in Send2U when your order is ready.'}
-          </Text>
+          {paymentCaption ? (
+            <Text variant="caption" color="muted">
+              {paymentCaption}
+            </Text>
+          ) : null}
         </Card>
 
         <Card style={styles.card}>

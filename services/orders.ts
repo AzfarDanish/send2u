@@ -6,9 +6,12 @@ import type {
   OrderStatus,
   OrderWithDetails,
   Payment,
+  PaymentMethod,
   PaymentStatus,
   PlaceOrderLine,
   PlacedOrderSummary,
+  Settlement,
+  SettlementStatus,
 } from '@/types/domain';
 
 /**
@@ -46,10 +49,24 @@ interface OrderItemRow {
 interface PaymentRow {
   order_id: string;
   amount_cents: number;
-  evidence_path: string;
+  evidence_path: string | null;
   status: string;
+  method: string | null;
+  provider_ref: string | null;
+  attempt_count: number | null;
+  last_error: string | null;
   submitted_at: string;
+  paid_at: string | null;
   verified_at: string | null;
+}
+
+interface SettlementRow {
+  order_id: string;
+  vendor_amount_cents: number;
+  helper_amount_cents: number;
+  platform_amount_cents: number;
+  commission_bps: number;
+  status: string;
 }
 
 interface OrderRow {
@@ -61,6 +78,16 @@ interface OrderRow {
   subtotal_cents: number;
   delivery_fee_cents: number;
   pickup_code: string;
+  payment_method: string | null;
+  payment_status: string;
+  settlement_status: string;
+  paid_at: string | null;
+  cod_expected_cents: number | null;
+  cod_collected_cents: number | null;
+  cod_collected_at: string | null;
+  settled_at: string | null;
+  refunded_at: string | null;
+  refund_reason: string | null;
   helper_id: string | null;
   accepted_at: string | null;
   going_to_vendor_at: string | null;
@@ -96,10 +123,26 @@ function toPayment(orderId: string, row: PaymentRow): Payment {
     amountCents: row.amount_cents,
     evidencePath: row.evidence_path,
     status: row.status as PaymentStatus,
+    method: (row.method as PaymentMethod | null) ?? null,
+    providerRef: row.provider_ref,
+    attemptCount: row.attempt_count ?? 0,
+    lastError: row.last_error,
     submittedAt: row.submitted_at,
+    paidAt: row.paid_at,
     verifiedAt: row.verified_at,
     createdAt: row.submitted_at,
-    updatedAt: row.verified_at ?? row.submitted_at,
+    updatedAt: row.paid_at ?? row.verified_at ?? row.submitted_at,
+  };
+}
+
+export function toSettlement(orderId: string, row: SettlementRow): Settlement {
+  return {
+    orderId,
+    vendorAmountCents: row.vendor_amount_cents,
+    helperAmountCents: row.helper_amount_cents,
+    platformAmountCents: row.platform_amount_cents,
+    commissionBps: row.commission_bps,
+    status: row.status as SettlementStatus,
   };
 }
 
@@ -129,6 +172,16 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
     subtotalCents: row.subtotal_cents,
     deliveryFeeCents: row.delivery_fee_cents,
     pickupCode: row.pickup_code,
+    paymentMethod: (row.payment_method as PaymentMethod | null) ?? null,
+    paymentStatus: (row.payment_status as PaymentStatus) ?? 'unpaid',
+    settlementStatus: (row.settlement_status as SettlementStatus) ?? 'pending',
+    paidAt: row.paid_at,
+    codExpectedCents: row.cod_expected_cents,
+    codCollectedCents: row.cod_collected_cents,
+    codCollectedAt: row.cod_collected_at,
+    settledAt: row.settled_at,
+    refundedAt: row.refunded_at,
+    refundReason: row.refund_reason,
     helperId: row.helper_id,
     acceptedAt: row.accepted_at,
     goingToVendorAt: row.going_to_vendor_at,
@@ -173,7 +226,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toPlacedSummary(value: unknown): PlacedOrderSummary {
   if (!isRecord(value)) throw new Error('Order creation returned an unexpected result.');
-  const { order_id, vendor_id, vendor_name, subtotal_cents, delivery_fee_cents, item_count, status, created_at } = value;
+  const { order_id, vendor_id, vendor_name, subtotal_cents, delivery_fee_cents, item_count, status, payment_method, created_at } = value;
   if (
     typeof order_id !== 'string' ||
     typeof vendor_id !== 'string' ||
@@ -194,19 +247,21 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
     deliveryFeeCents: delivery_fee_cents,
     itemCount: item_count,
     status: status as OrderStatus,
+    paymentMethod: (payment_method as PaymentMethod | undefined) ?? null,
     createdAt: created_at,
   };
 }
 
 const ORDER_SELECT =
   'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
+  ' payment_method, payment_status, settlement_status, paid_at, cod_expected_cents, cod_collected_cents, cod_collected_at, settled_at, refunded_at, refund_reason,' +
   ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, picked_up_at, out_for_delivery_at, delivered_at, confirmed_at,' +
   ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, dispute_details, dispute_note, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint),' +
   ' delivery_location:send2u_delivery_locations!inner(id, name, description),' +
   ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at),' +
-  ' send2u_payments(order_id, amount_cents, evidence_path, status, submitted_at, verified_at)';
+  ' send2u_payments(order_id, amount_cents, evidence_path, status, method, provider_ref, attempt_count, last_error, submitted_at, paid_at, verified_at)';
 
 /** Current user id for owner-scoped reads. Throws when signed out. */
 async function requireUserId(): Promise<string> {
@@ -219,19 +274,26 @@ async function requireUserId(): Promise<string> {
 }
 
 /**
- * Places the cart: one order per vendor sharing the delivery location.
- * Prices and snapshots come from the database — the `lines` carry ids and
- * quantities only, so requester-supplied totals are never trusted.
+ * Places the cart: one order per vendor sharing the delivery location and
+ * payment method. Prices and snapshots come from the database — the `lines`
+ * carry ids and quantities only, so requester-supplied totals are never
+ * trusted. Send2U records the transaction from birth (online=pending,
+ * COD=unpaid); no helper financing is involved.
  */
 export async function placeOrders(
   deliveryLocationId: string,
   lines: PlaceOrderLine[],
+  paymentMethod: PaymentMethod,
 ): Promise<PlacedOrderSummary[]> {
   const supabase = requireClient();
   if (lines.length === 0) throw new Error('Your cart is empty.');
+  if (paymentMethod !== 'online' && paymentMethod !== 'cod') {
+    throw new Error('Choose how you want to pay.');
+  }
   const { data, error } = await supabase.rpc('send2u_place_orders', {
     p_delivery_location_id: deliveryLocationId,
     p_items: lines.map((line) => ({ menu_item_id: line.menuItemId, quantity: line.quantity })),
+    p_payment_method: paymentMethod,
   });
   if (error) throw new Error(friendlyOrderError(error.message));
   if (!Array.isArray(data) || data.length === 0) {
@@ -299,7 +361,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderWithDetails 
   });
 }
 
-/** Open job queue: pending unassigned orders, oldest first. RLS is authoritative. */
+/** Open job queue: pending/prepared unassigned orders, oldest first. RLS is authoritative. */
 export async function listAvailableJobs(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
   const userId = await requireUserId();
@@ -307,7 +369,7 @@ export async function listAvailableJobs(): Promise<OrderWithDetails[]> {
     const { data, error } = await supabase
       .from('send2u_orders')
       .select(ORDER_SELECT)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'preparing', 'ready_for_pickup'])
       .is('helper_id', null)
       .order('created_at', { ascending: true });
     if (error) throw new Error(`Could not load open jobs: ${error.message}`);
@@ -356,7 +418,7 @@ export async function listMyDeliveries(): Promise<OrderWithDetails[]> {
 /**
  * HISTORICAL deliveries assigned to the current helper
  * (completed/cancelled/disputed), newest accepted first. Read-only records.
- * Food cost stays a fronted expense here — only the delivery fee is earnings.
+ * Only the delivery fee counts as earnings; the food is covered by Send2U.
  */
 export async function listMyDeliveryHistory(): Promise<OrderWithDetails[]> {
   const supabase = requireClient();
@@ -440,9 +502,8 @@ export type FulfilmentAction =
   | 'release';
 
 /**
- * Result of a fulfilment advance. Pre-purchase `report_food_unavailable`
- * permanently deletes the order row (no money spent, nothing to settle),
- * so the RPC returns `{ deleted: true }` with no status — every other
+ * Result of a fulfilment advance. Transaction records are always preserved
+ * (cancelled/unavailable orders keep their row for payment history) — every
  * action returns the new status.
  */
 export type FulfilmentResult = { status: OrderStatus } | { deleted: true };
@@ -481,14 +542,19 @@ function friendlyFulfilmentError(message: string): string {
 
 export interface CancelResult {
   status: OrderStatus;
-  /** 'none' when cancelled cleanly, 'food_cost' when settlement may be owed. */
+  /** 'none' — the helper never finances food, so cancellation carries no liability. */
   liability: 'none' | 'food_cost';
   foodCostCents: number | null;
+  paymentStatus: PaymentStatus | null;
 }
 
 /**
- * Requester cancellation. Before purchase it is clean; after purchase the
- * order moves to dispute with the helper's fronted cost preserved.
+ * Requester cancellation. Records are always preserved for transaction
+ * history (cancelled, never deleted). An online payment made before
+ * completion is recorded as a simulated refund; otherwise payment ends
+ * as cancelled. Late cancellation after the kitchen committed moves to
+ * dispute for review — with no food-cost liability, since the helper
+ * never pays for food.
  */
 export async function cancelOrder(orderId: string, reason: string): Promise<CancelResult> {
   const supabase = requireClient();
@@ -505,6 +571,8 @@ export async function cancelOrder(orderId: string, reason: string): Promise<Canc
     liability: data.liability === 'food_cost' ? 'food_cost' : 'none',
     foodCostCents:
       typeof data.food_cost_cents === 'number' ? (data.food_cost_cents as number) : null,
+    paymentStatus:
+      typeof data.payment_status === 'string' ? (data.payment_status as PaymentStatus) : null,
   };
 }
 
@@ -522,7 +590,9 @@ function friendlyCancelError(message: string): string {
 /**
  * Requester confirms the food arrived. Only the owning requester, only from
  * `delivered` — a single atomic UPDATE, so duplicates and concurrent
- * confirms serialize to exactly one winner. Opens the payment flow.
+ * confirms serialize to exactly one winner. When payment is already resolved
+ * (online paid or COD collected), the order converges to completed with its
+ * settlement recorded in the same flow.
  */
 export async function confirmDelivery(orderId: string): Promise<{ status: OrderStatus }> {
   const supabase = requireClient();

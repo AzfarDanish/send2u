@@ -87,13 +87,17 @@ export function useAvailableJobs(): UseAvailableJobsResult {
 
   // A locally-accepted job vanishes from the queue the moment the claim
   // succeeds — no waiting for the focus refetch. Rows that are still open
-  // patch in place. New arrivals come through realtime, never the emitter.
+  // (pending or vendor-prepared, unassigned) patch in place. New arrivals
+  // come through realtime, never the emitter.
   useEffect(() => {
     return subscribeOrderChanges((order) => {
       const { next } = applyOrderChange(
         jobsRef.current,
         order,
-        order.status === 'pending' && !order.helperId,
+        (order.status === 'pending' ||
+          order.status === 'preparing' ||
+          order.status === 'ready_for_pickup') &&
+          !order.helperId,
       );
       setJobs(next);
     });

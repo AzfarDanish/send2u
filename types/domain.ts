@@ -18,7 +18,7 @@ export interface Profile {
   id: string;
   /** Permanent account role, set once at signup. Never mutated afterwards. */
   role: ProfileRole;
-  /** Storage path of the helper's payment QR (`qr/<uid>/…`), null when unset. */
+  /** Legacy helper-QR storage path (retired flow); always null for new code. */
   paymentQrPath: string | null;
   /** Helper availability — only meaningful when role is helper. */
   isAvailable: boolean;
@@ -138,16 +138,17 @@ export interface DeliveryLocation {
 }
 
 /**
- * Fulfilment lifecycle. Happy path: pending → assigned → going_to_vendor →
- * at_vendor → food_available → food_purchased → picked_up → out_for_delivery →
- * delivered → confirmed (requester confirms receipt) →
- * awaiting_requester_payment → completed.
- * Exception states: cancelled (clean) and disputed (needs settlement).
- * Legacy values stay reserved but unused by current flows.
+ * Fulfilment lifecycle. Happy path: pending → assigned → preparing →
+ * ready_for_pickup → going_to_vendor → at_vendor → food_available →
+ * food_purchased → picked_up → out_for_delivery → delivered → confirmed →
+ * completed. The cafeteria prepares platform-covered orders; the helper
+ * never finances food. Legacy values stay reserved but unused by current flows.
  */
 export type OrderStatus =
   | 'pending'
   | 'assigned'
+  | 'preparing'
+  | 'ready_for_pickup'
   | 'going_to_vendor'
   | 'at_vendor'
   | 'food_available'
@@ -161,14 +162,14 @@ export type OrderStatus =
   | 'cancelled'
   | 'disputed'
   | 'accepted'
-  | 'preparing'
-  | 'ready_for_pickup'
   | 'confirmed';
 
 /**
- * One vendor fulfilment. The helper fronts the food cost at the physical
- * stall; the requester later pays food + delivery fee externally.
- * No payment/helper fields yet beyond assignment. No money moves in-app.
+ * One vendor fulfilment managed by Send2U. The platform records the
+ * transaction; the cafeteria prepares the food and the helper delivers it.
+ * The helper never finances food — `foodCostCents` is Send2U's covered-cost
+ * record (food subtotal snapshot at collection), not a fronted expense.
+ * Order status, payment status, and settlement status evolve independently.
  */
 export interface Order {
   id: string;
@@ -180,6 +181,22 @@ export interface Order {
   subtotalCents: number;
   /** Prototype delivery fee in cents; the helper's earning when completed. */
   deliveryFeeCents: number;
+  /** How this order is paid: platform-simulated online or cash on delivery. */
+  paymentMethod: PaymentMethod | null;
+  /** Independent payment state (see PaymentStatus). */
+  paymentStatus: PaymentStatus;
+  /** Independent settlement state (see SettlementStatus). */
+  settlementStatus: SettlementStatus;
+  /** When an online payment succeeded; null otherwise. */
+  paidAt: string | null;
+  /** COD cash due from the customer (= subtotal + fee); null for online. */
+  codExpectedCents: number | null;
+  /** COD cash recorded as collected; null until collected. */
+  codCollectedCents: number | null;
+  codCollectedAt: string | null;
+  settledAt: string | null;
+  refundedAt: string | null;
+  refundReason: string | null;
   /** Vendor-handoff reference, verified by the helper at pickup. */
   pickupCode: string;
   /** Assigned helper once accepted; null while pending. */
@@ -190,7 +207,7 @@ export interface Order {
   arrivedAt: string | null;
   foodAvailableAt: string | null;
   purchasedAt: string | null;
-  /** Snapshot of the fronted food cost (= subtotal at purchase). */
+  /** Snapshot of the platform-covered food cost (= subtotal at collection). */
   foodCostCents: number | null;
   /** When pickup verification succeeded; null until verified. */
   pickedUpAt: string | null;
@@ -252,6 +269,7 @@ export interface PlacedOrderSummary {
   deliveryFeeCents: number;
   itemCount: number;
   status: OrderStatus;
+  paymentMethod: PaymentMethod | null;
   createdAt: string;
 }
 
@@ -268,22 +286,66 @@ export interface AcceptedOrderSummary {
 }
 
 /**
- * External-payment state. No row means not submitted. Amount is snapshotted
- * as food subtotal + delivery fee at submit time — never supplied by the
- * client. It is the full receipt amount, NOT the helper's earning (which
- * is the delivery fee alone).
+ * How the requester pays. Online is a simulated in-app platform payment
+ * (competition prototype — no real money moves); COD is cash handed to the
+ * helper on delivery and recorded by Send2U. Never helper QR transfers.
  */
-export type PaymentStatus = 'submitted' | 'verified' | 'rejected';
+export type PaymentMethod = 'online' | 'cod';
+
+/**
+ * Independent payment state, separate from order fulfilment status.
+ * Online: unpaid → pending → paid | failed (→ pending on retry) → refunded.
+ * COD: unpaid → collected (→ refunded where applicable).
+ * Cancelled orders end at cancelled (or refunded when money was recorded).
+ */
+export type PaymentStatus =
+  | 'submitted'
+  | 'verified'
+  | 'rejected'
+  | 'unpaid'
+  | 'pending'
+  | 'paid'
+  | 'failed'
+  | 'collected'
+  | 'not_collected'
+  | 'refunded'
+  | 'refund_pending'
+  | 'cancelled';
+
+/** Independent settlement state for the platform accounting record. */
+export type SettlementStatus = 'pending' | 'settled' | 'failed' | 'reversed';
 
 export interface Payment {
   orderId: string;
   amountCents: number;
-  evidencePath: string;
+  /** Legacy receipt path (old QR flow); null for platform transactions. */
+  evidencePath: string | null;
   status: PaymentStatus;
+  method: PaymentMethod | null;
+  /** Simulated provider reference (e.g. SIM-…); null for COD/unstarted. */
+  providerRef: string | null;
+  attemptCount: number;
+  lastError: string | null;
   submittedAt: string;
+  paidAt: string | null;
   verifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Simulated settlement split for one order (accounting only — no real
+ * money movement). Vendor gets the food subtotal minus platform commission,
+ * the helper earns the delivery fee, and the platform takes its configured
+ * share (RM0 in the competition prototype).
+ */
+export interface Settlement {
+  orderId: string;
+  vendorAmountCents: number;
+  helperAmountCents: number;
+  platformAmountCents: number;
+  commissionBps: number;
+  status: SettlementStatus;
 }
 
 /**
@@ -310,7 +372,8 @@ export interface Delivery {
  * Two-sided trust record for one completed order. At most one row per party
  * per order (requester→helper and helper→requester), written once through
  * `send2u_submit_rating` and never modified afterwards — ratings are history,
- * not live state. Only orders with a verified payment are rateable.
+ * not live state. Only completed orders with a recorded payment
+ * (paid/collected) are rateable.
  */
 export interface Rating {
   id: string;

@@ -46,6 +46,19 @@ export default function VendorLayout() {
         options={{ title: 'Stall', tabBarIcon: tabIcon('storefront') }}
       />
       <Tabs.Screen
+        name="orders"
+        options={{ title: 'Orders', tabBarIcon: tabIcon('receipt-long') }}
+      />
+      <Tabs.Screen
+        name="orders/[id]"
+        options={{
+          href: null,
+          title: 'Order',
+          tabBarStyle: { display: 'none' },
+          headerShown: true,
+        }}
+      />
+      <Tabs.Screen
         name="menu"
         options={{ title: 'Menu', tabBarIcon: tabIcon('restaurant-menu') }}
       />

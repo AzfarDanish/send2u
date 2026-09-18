@@ -17,15 +17,6 @@ export type PushRegistration =
   | { status: 'registered'; token: string }
   | { status: 'unsupported' | 'denied' | 'error' };
 
-export type PushPlatform = 'ios' | 'android' | 'web' | 'unknown';
-
-export function normalizePlatform(): PushPlatform {
-  if (Platform.OS === 'ios') return 'ios';
-  if (Platform.OS === 'android') return 'android';
-  if (Platform.OS === 'web') return 'web';
-  return 'unknown';
-}
-
 let foregroundPolicySet = false;
 
 /** Foreground pushes stay silent at OS level; the UI updates live instead. */

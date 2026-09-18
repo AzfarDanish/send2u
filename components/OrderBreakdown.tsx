@@ -11,18 +11,18 @@ interface OrderBreakdownProps {
   items?: OrderItem[];
   subtotalCents: number;
   deliveryFeeCents: number;
-  /** Helper-history snapshot of the fronted food cost; omit elsewhere. */
-  frontedCents?: number | null;
+  /** Helper-history snapshot of the Send2U-covered food cost; omit elsewhere. */
+  coveredCents?: number | null;
 }
 
 /**
- * The single order/receipt breakdown used on every surface: item lines
+ * The single order breakdown used on every surface: item lines
  * (name × quantity, unit price, line total), food subtotal, delivery fee,
  * and the payable total. Plain text rows and dividers — never pills. All
  * numbers are database snapshots; the total is `orderTotalCents`, the one
  * shared definition of food + fee.
  */
-export function OrderBreakdown({ items, subtotalCents, deliveryFeeCents, frontedCents }: OrderBreakdownProps) {
+export function OrderBreakdown({ items, subtotalCents, deliveryFeeCents, coveredCents }: OrderBreakdownProps) {
   return (
     <View style={styles.container}>
       {items && items.length > 0 ? (
@@ -50,10 +50,10 @@ export function OrderBreakdown({ items, subtotalCents, deliveryFeeCents, fronted
         <Text color="secondary">Food subtotal</Text>
         <Text variant="secondary">{formatMYR(subtotalCents)}</Text>
       </View>
-      {frontedCents !== undefined ? (
+      {coveredCents !== undefined ? (
         <View style={styles.row}>
-          <Text color="secondary">Food you fronted</Text>
-          <Text variant="secondary">{frontedCents !== null ? formatMYR(frontedCents) : '—'}</Text>
+          <Text color="secondary">Food (covered by Send2U)</Text>
+          <Text variant="secondary">{coveredCents !== null ? formatMYR(coveredCents) : '—'}</Text>
         </View>
       ) : null}
       <View style={styles.row}>

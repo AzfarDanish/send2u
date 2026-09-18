@@ -72,7 +72,7 @@ export default function RequesterProfileScreen() {
         <View style={styles.helperSection}>
           <Text variant="subtitle">Helper</Text>
           <Text variant="caption" color="secondary">
-            Your delivery capability — queue, active jobs, and payment QR.
+            Your delivery capability — queue, active jobs, and deliveries.
           </Text>
           <Card style={styles.section}>
             <ListRow

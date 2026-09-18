@@ -23,7 +23,7 @@ import type { UserRole } from '@/types/domain';
  * control here that changes an existing role.
  */
 export default function SelectRoleScreen() {
-  const { user, profile, role, isLoading, claimMissingProfile, refreshProfile, signOut } = useAuth();
+  const { user, profile, role, isLoading, authError, claimMissingProfile, refreshProfile, signOut } = useAuth();
   const [selected, setSelected] = useState<UserRole>('requester');
   const [busy, setBusy] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -49,6 +49,7 @@ export default function SelectRoleScreen() {
 
   const retry = async () => {
     setRefreshing(true);
+    setClaimError(null);
     try {
       await refreshProfile();
     } catch (error) {
@@ -70,6 +71,25 @@ export default function SelectRoleScreen() {
       setBusy(false);
     }
   };
+
+  if (authError && !profile) {
+    return (
+      <Screen>
+        <SectionHeader title="Could not load your account" />
+        <ErrorState
+          title="Check your connection"
+          message={claimError ?? authError}
+        />
+        <Button
+          title={refreshing ? 'Checking…' : 'Try again'}
+          onPress={() => void retry()}
+          disabled={refreshing}
+          loading={refreshing}
+        />
+        <Button title="Sign out" variant="tertiary" onPress={signOut} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

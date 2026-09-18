@@ -1,4 +1,4 @@
-import type { OrderStatus, PaymentStatus } from '@/types/domain';
+import type { OrderStatus, PaymentMethod, PaymentStatus, SettlementStatus } from '@/types/domain';
 
 /** Short honest timestamp for order lists, e.g. "10 Sep, 3:45 PM". */
 export function formatOrderDate(iso: string): string {
@@ -68,6 +68,10 @@ export function helperStatusLabel(status: OrderStatus): string {
   switch (status) {
     case 'assigned':
       return 'Assigned';
+    case 'preparing':
+      return 'Being prepared';
+    case 'ready_for_pickup':
+      return 'Ready for pickup';
     case 'going_to_vendor':
       return 'Going to vendor';
     case 'at_vendor':
@@ -96,6 +100,8 @@ export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warn
   switch (status) {
     case 'pending':
     case 'assigned':
+    case 'preparing':
+    case 'ready_for_pickup':
     case 'going_to_vendor':
     case 'at_vendor':
     case 'food_available':
@@ -147,14 +153,24 @@ export function orderTotalCents(subtotalCents: number, deliveryFeeCents: number)
   return subtotalCents + deliveryFeeCents;
 }
 
-/** Badge tone for the external-payment state (separate from order status). */
+/** Badge tone for the platform payment state (separate from order status). */
 export function paymentStatusTone(status: PaymentStatus): 'info' | 'success' | 'warning' | 'error' {
   switch (status) {
     case 'submitted':
+    case 'pending':
+    case 'refund_pending':
       return 'info';
     case 'verified':
+    case 'paid':
+    case 'collected':
       return 'success';
+    case 'unpaid':
+    case 'failed':
+    case 'not_collected':
+      return 'warning';
     case 'rejected':
+    case 'refunded':
+    case 'cancelled':
       return 'error';
   }
 }
@@ -168,23 +184,69 @@ export function paymentStatusLabel(status: PaymentStatus): string {
       return 'Payment verified';
     case 'rejected':
       return 'Payment rejected';
+    case 'unpaid':
+      return 'Cash due on delivery';
+    case 'pending':
+      return 'Payment processing';
+    case 'paid':
+      return 'Paid';
+    case 'failed':
+      return 'Payment failed';
+    case 'collected':
+      return 'Cash collected';
+    case 'not_collected':
+      return 'Cash not collected';
+    case 'refunded':
+      return 'Refunded';
+    case 'refund_pending':
+      return 'Refund pending';
+    case 'cancelled':
+      return 'Payment cancelled';
+  }
+}
+
+/** Human label for the payment method. */
+export function paymentMethodLabel(method: PaymentMethod | null): string {
+  switch (method) {
+    case 'online':
+      return 'Online Payment';
+    case 'cod':
+      return 'Cash on Delivery';
+    default:
+      return 'Payment';
+  }
+}
+
+/** Human label for the settlement state. */
+export function settlementStatusLabel(status: SettlementStatus): string {
+  switch (status) {
+    case 'pending':
+      return 'Settlement pending';
+    case 'settled':
+      return 'Settled';
+    case 'failed':
+      return 'Settlement failed';
+    case 'reversed':
+      return 'Settlement reversed';
   }
 }
 
 /**
  * Accurate user-facing status wording for requesters. Describes only the
- * actual backend state — never claims preparation, payment completion, or
- * arrival times. Legacy values map to their closest honest equivalent
- * (`preparing` is never surfaced as "Preparing").
+ * actual backend state — never claims arrival times. Legacy display values
+ * map to their closest honest equivalent.
  */
 export function requesterStatusMessage(status: OrderStatus): string {
   switch (status) {
     case 'pending':
-    case 'preparing':
       return 'Waiting for a helper';
     case 'assigned':
     case 'accepted':
       return 'Helper assigned';
+    case 'preparing':
+      return 'Vendor is preparing your food';
+    case 'ready_for_pickup':
+      return 'Food is ready for pickup';
     case 'going_to_vendor':
       return 'Helper is going to the vendor';
     case 'at_vendor':
@@ -192,9 +254,8 @@ export function requesterStatusMessage(status: OrderStatus): string {
     case 'food_available':
       return 'Food is available';
     case 'food_purchased':
-      return 'Food purchased';
+      return 'Food secured';
     case 'picked_up':
-    case 'ready_for_pickup':
       return 'Request picked up';
     case 'out_for_delivery':
     case 'delivering':
@@ -203,7 +264,7 @@ export function requesterStatusMessage(status: OrderStatus): string {
       return 'Delivered';
     case 'confirmed':
     case 'awaiting_requester_payment':
-      return 'Payment required';
+      return 'Confirmed — finishing up';
     case 'completed':
       return 'Completed';
     case 'cancelled':

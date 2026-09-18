@@ -5,15 +5,15 @@ import { StyleSheet, View } from 'react-native';
 import { OrderRatingSection } from '@/components/OrderRatingSection';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { OrderTimeline } from '@/components/OrderTimeline';
-import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { SettlementRecord } from '@/components/SettlementRecord';
+import { TransactionRecord } from '@/components/TransactionRecord';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { openMapsLocation } from '@/lib/maps';
 import { formatMYR } from '@/lib/money';
-import { formatOrderDate, paymentStatusLabel } from '@/lib/orders';
+import { formatOrderDate } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
 /**
@@ -67,31 +67,29 @@ export function HelperHistoryDetail({
           <>
             <Text variant="title">This job was cancelled</Text>
             <Text color="secondary">
-              {job.cancelReason === 'food_unavailable'
-                ? 'No food — no money changed hands.'
-                : `Cancelled${job.cancelReason ? `: ${job.cancelReason}` : ''}.`}
+              {job.cancelReason === 'Food not available'
+                ? 'The stall had no food, so this delivery was cancelled. You owe nothing.'
+                : `Cancelled${job.cancelReason ? `: ${job.cancelReason}` : ''}. You never pay for food.`}
               {job.cancelledAt ? ` (${formatOrderDate(job.cancelledAt)})` : ''}
             </Text>
             <SettlementRecord order={job} />
           </>
         ) : (
           <>
-            <Text variant="title">This delivery needs settlement</Text>
+            <Text variant="title">This delivery is under review</Text>
             <Text color="secondary">
               {job.disputeReason === 'helper_unable'
-                ? 'You stopped after paying. '
+                ? 'You could not continue this delivery. '
                 : job.disputeReason === 'late_cancellation'
-                  ? 'Cancelled after you paid. '
+                  ? 'Cancelled after the kitchen committed. '
                   : job.disputeReason === 'not_received' ||
                       job.disputeReason === 'incorrect' ||
                       job.disputeReason === 'damaged' ||
                       job.disputeReason === 'refused'
                     ? 'Requester reported a problem. '
                     : ''}
-              {job.foodCostCents
-                ? `Your fronted ${formatMYR(job.foodCostCents)} is recorded. `
-                : ''}
-              {job.disputedAt ? `(flagged ${formatOrderDate(job.disputedAt)})` : ''}
+              You never pay for food, so there is nothing to settle from your side.
+              {job.disputedAt ? ` (flagged ${formatOrderDate(job.disputedAt)})` : ''}
               {job.resolvedAt
                 ? ` Settled${job.resolution ? ` as ${job.resolution}` : ''} on ${formatOrderDate(job.resolvedAt)}.`
                 : ''}
@@ -163,7 +161,7 @@ export function HelperHistoryDetail({
           items={job.items}
           subtotalCents={job.subtotalCents}
           deliveryFeeCents={job.deliveryFeeCents}
-          frontedCents={job.foodCostCents}
+          coveredCents={job.foodCostCents}
         />
         <Text variant="caption" color="muted">
           Only the delivery fee counts as your payout.
@@ -175,31 +173,7 @@ export function HelperHistoryDetail({
         <OrderTimeline order={job} />
       </Card>
 
-      <Card style={styles.card}>
-        <Text variant="subtitle">Payment record</Text>
-        <Text variant="caption" color="secondary">
-          {job.payment ? paymentStatusLabel(job.payment.status) : 'No payment'}
-        </Text>
-        {job.payment ? (
-          <>
-            <Text color="secondary">
-              {formatMYR(job.payment.amountCents)} receipt · submitted{' '}
-              {formatOrderDate(job.payment.submittedAt)}
-              {job.payment.verifiedAt
-                ? ` · recorded ${formatOrderDate(job.payment.verifiedAt)}`
-                : ''}
-              .
-            </Text>
-            <ReceiptEvidenceView path={job.payment.evidencePath} />
-          </>
-        ) : (
-          <Text color="secondary">
-            {job.status === 'completed'
-              ? 'No payment record was stored for this delivery.'
-              : 'No receipt was submitted for this delivery.'}
-          </Text>
-        )}
-      </Card>
+      <TransactionRecord orderId={job.id} />
     </View>
   );
 }

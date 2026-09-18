@@ -20,6 +20,8 @@ import type { UserRole } from '@/types/domain';
 
 const KIND_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'order.assigned': 'person-add',
+  'order.preparing': 'restaurant',
+  'order.ready_for_pickup': 'shopping-bag',
   'order.picked_up': 'shopping-bag',
   'order.out_for_delivery': 'delivery-dining',
   'order.delivered': 'check-circle-outline',

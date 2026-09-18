@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 
 import { DEV_AUTH_ENABLED } from '@/config/dev';
@@ -24,7 +24,6 @@ interface AuthContextValue {
   role: UserRole | null;
   /** Verified Helper Portal capability (requester + flag). Independent of role. */
   isVerifiedHelper: boolean;
-  /** True until the initial session + profile restore completes. */
   isLoading: boolean;
   isSupabaseEnabled: boolean;
   /** Gates dev-only UI (the test-account switcher). Never a prod capability. */
@@ -74,105 +73,117 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const profileRequest = useRef(0);
+  const sessionUserId = useRef<string | null>(null);
 
-  // Initial restore: session first, then the profile row for auth.uid().
-  // Legacy anonymous sessions are signed out: the app only admits real
-  // accounts, and keeping a stale anon identity would strand the user on a
-  // role-less session with no upgrade path.
   useEffect(() => {
     let mounted = true;
     let unsubscribe: (() => void) | null = null;
-    const clearToSignedOut = () => {
-      setSession(null);
-      setAuthUser(null);
-      setProfile(null);
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const applySession = (nextSession: Session | null) => {
+      if (!mounted) return;
+      const request = ++profileRequest.current;
+      const nextUser = nextSession?.user ?? null;
+      const changedUser = sessionUserId.current !== nextUser?.id;
+      sessionUserId.current = nextUser?.id ?? null;
+      if (pending) clearTimeout(pending);
+      if (!nextUser || nextUser.is_anonymous) {
+        setSession(null);
+        setAuthUser(null);
+        setProfile(null);
+        setAuthError(null);
+        setIsLoading(false);
+        if (nextUser?.is_anonymous) {
+          pending = setTimeout(() => {
+            if (mounted && request === profileRequest.current) {
+              void signOutService().catch(() => {});
+            }
+          }, 0);
+        }
+        return;
+      }
+      if (changedUser) {
+        setIsLoading(true);
+        setProfile(null);
+        setAuthError(null);
+      }
+      setSession(nextSession);
+      setAuthUser(nextUser);
+      pending = setTimeout(() => {
+        if (!mounted || request !== profileRequest.current) return;
+        void (async () => {
+          try {
+            const nextProfile = await fetchProfile(nextUser.id);
+            if (mounted && request === profileRequest.current) {
+              setProfile(nextProfile);
+              setAuthError(null);
+            }
+          } catch (error) {
+            if (mounted && request === profileRequest.current) {
+              setAuthError(error instanceof Error ? error.message : 'Could not load profile.');
+            }
+          } finally {
+            if (mounted && request === profileRequest.current) setIsLoading(false);
+          }
+        })();
+      }, 0);
     };
-    (async () => {
+    void (async () => {
+      const restoreRequest = profileRequest.current;
       try {
         if (!getSupabaseClient()) {
           if (mounted) setIsLoading(false);
           return;
         }
+        unsubscribe = onAuthStateChange(applySession);
         const active = await getActiveSession();
-        if (!mounted) return;
-        if (active && active.user.is_anonymous) {
-          await signOutService().catch(() => {});
-          if (mounted) clearToSignedOut();
-        } else {
-          setSession(active?.session ?? null);
-          setAuthUser(active?.user ?? null);
-          if (active) {
-            const restored = await fetchProfile(active.user.id);
-            if (mounted) setProfile(restored);
-          }
+        if (mounted && restoreRequest === profileRequest.current) {
+          applySession(active?.session ?? null);
         }
-        unsubscribe = onAuthStateChange(async (nextSession) => {
-          if (!mounted) return;
-          if (nextSession && nextSession.user.is_anonymous) {
-            await signOutService().catch(() => {});
-            if (mounted) clearToSignedOut();
-            return;
-          }
-          setSession(nextSession);
-          setAuthUser(nextSession?.user ?? null);
-          if (!nextSession) {
-            setProfile(null);
-            return;
-          }
-          try {
-            const nextProfile = await fetchProfile(nextSession.user.id);
-            if (mounted) {
-              setProfile(nextProfile);
-              setAuthError(null);
-            }
-          } catch (error) {
-            if (mounted) {
-              setAuthError(error instanceof Error ? error.message : 'Could not load profile.');
-            }
-          }
-        });
-        if (mounted) setAuthError(null);
       } catch (error) {
-        if (mounted) {
+        if (mounted && restoreRequest === profileRequest.current) {
           setAuthError(error instanceof Error ? error.message : 'Could not restore session.');
+          setIsLoading(false);
         }
-      } finally {
-        if (mounted) setIsLoading(false);
       }
     })();
     return () => {
       mounted = false;
+      profileRequest.current += 1;
+      sessionUserId.current = null;
+      if (pending) clearTimeout(pending);
       unsubscribe?.();
     };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, role: UserRole) => {
     const result = await signUpAccount(email, password, role);
-    if (result.status === 'active') {
-      setAuthUser(result.user);
-      setSession(result.session);
+    if (result.status === 'active' && sessionUserId.current === result.user.id) {
+      profileRequest.current += 1;
       setProfile(result.profile);
       setAuthError(null);
+      setIsLoading(false);
     }
-    // The session object also arrives via onAuthStateChange; setting it
-    // directly keeps state consistent even if the event races this update.
-    // Confirmation-required signups deliberately set nothing: there is no
-    // session yet, and inventing one would bypass email verification.
     return result;
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await signInWithPassword(email, password);
-    setAuthUser(result.user);
-    setSession(result.session);
-    setProfile(result.profile);
-    setAuthError(null);
+    if (sessionUserId.current === result.user.id) {
+      profileRequest.current += 1;
+      setProfile(result.profile);
+      setAuthError(null);
+      setIsLoading(false);
+    }
   }, []);
 
   const claimMissingProfile = useCallback(async (role: UserRole) => {
     const nextProfile = await claimMissingProfileService(role);
+    if (sessionUserId.current !== nextProfile.id) return;
+    profileRequest.current += 1;
     setProfile(nextProfile);
     setAuthError(null);
+    setIsLoading(false);
   }, []);
 
   const signOut = useCallback(async () => {
@@ -185,8 +196,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (!authUser) return;
-    const nextProfile = await fetchProfile(authUser.id);
-    setProfile(nextProfile);
+    const request = ++profileRequest.current;
+    try {
+      const nextProfile = await fetchProfile(authUser.id);
+      if (request !== profileRequest.current) return;
+      setProfile(nextProfile);
+      setAuthError(null);
+    } catch (error) {
+      if (request === profileRequest.current) {
+        setAuthError(error instanceof Error ? error.message : 'Could not load profile.');
+      }
+      throw error;
+    } finally {
+      if (request === profileRequest.current) setIsLoading(false);
+    }
   }, [authUser]);
 
   const updateProfile = useCallback((next: Profile) => {

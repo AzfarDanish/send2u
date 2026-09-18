@@ -7,8 +7,6 @@ import { getSupabaseClient } from '@/lib/supabase';
  * user's token to any client.
  */
 
-export type PushPlatform = 'ios' | 'android' | 'web' | 'unknown';
-
 function requireClient() {
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -29,11 +27,11 @@ async function requireUserId(): Promise<string> {
 }
 
 /** Inserts or refreshes this device's token for the signed-in user. */
-export async function registerPushToken(token: string, platform: PushPlatform): Promise<void> {
+export async function registerPushToken(token: string): Promise<void> {
   const supabase = requireClient();
   const userId = await requireUserId();
   const { error } = await supabase.from('send2u_push_tokens').upsert(
-    { user_id: userId, token, platform, updated_at: new Date().toISOString() },
+    { user_id: userId, token, updated_at: new Date().toISOString() },
     { onConflict: 'user_id,token' },
   );
   if (error) throw new Error(`Could not register this device: ${error.message}`);

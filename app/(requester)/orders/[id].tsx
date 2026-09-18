@@ -6,11 +6,10 @@ import { Modal, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'r
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { OrderRatingSection } from '@/components/OrderRatingSection';
 import { OrderTimeline } from '@/components/OrderTimeline';
-import { ReceiptEvidenceView } from '@/components/ReceiptEvidenceView';
 import { RequestProgress } from '@/components/RequestProgress';
 import type { StatusCardTone } from '@/components/RequestStatusCard';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
-import { SettlementRecord } from '@/components/SettlementRecord';
+import { TransactionRecord } from '@/components/TransactionRecord';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -21,12 +20,10 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
-import { formatMYR } from '@/lib/money';
 import { emitOrderChanged } from '@/lib/orderEvents';
 import {
   formatOrderDate,
   isTerminalOrderStatus,
-  orderTotalCents,
   requesterStatusMessage,
 } from '@/lib/orders';
 import { cancelOrder, getOrderDetail, openDispute, withdrawDispute } from '@/services/orders';
@@ -59,23 +56,30 @@ interface StatusCardContent {
 
 /**
  * Contextual status copy per real backend state. Describes only what the
- * backend tracks — a helper collecting and delivering food the requester
- * chose, paid externally after handover. Never claims restaurant prep,
- * drivers, arrival times, or in-app payment.
+ * backend tracks — a cafeteria preparing Send2U-covered food and a helper
+ * collecting and delivering it. Never claims arrival times, and never asks
+ * the requester to pay anyone outside Send2U.
  */
 function statusCardFor(order: OrderWithDetails): StatusCardContent {
   const vendor = order.vendor.name;
   const location = order.location.name;
-  const total = formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents));
   switch (order.status) {
     case 'pending':
-    case 'preparing':
       return {
         tone: 'info',
         icon: 'receipt-long',
         title: 'Request submitted',
         description:
-          'Your request has been sent to nearby helpers. We\u2019ll notify you when a helper accepts it.',
+          order.paymentMethod === 'online' && order.paymentStatus !== 'paid'
+            ? 'Complete your online payment to fire the kitchen. Helpers can already see your request.'
+            : 'Your request has been sent to nearby helpers. We\u2019ll notify you when a helper accepts it.',
+      };
+    case 'preparing':
+      return {
+        tone: 'info',
+        icon: 'storefront',
+        title: `${vendor} is preparing your food`,
+        description: 'The cafeteria confirmed your order and is getting it ready.',
       };
     case 'assigned':
     case 'accepted':
@@ -105,22 +109,28 @@ function statusCardFor(order: OrderWithDetails): StatusCardContent {
         icon: 'storefront',
         title: 'Your items are available',
         description:
-          'The stall confirmed your items are available. Your helper will pay for and collect them.',
+          'The stall confirmed your items are available. Your helper will collect them — everything is covered by Send2U.',
       };
     case 'food_purchased':
       return {
         tone: 'info',
         icon: 'storefront',
-        title: 'Food purchased',
-        description: `Your helper paid for your items at ${vendor} and is getting them ready for pickup.`,
+        title: 'Food collected from the stall',
+        description: `Your items at ${vendor} are secured and being readied for pickup. Your helper never pays for your food.`,
       };
     case 'picked_up':
-    case 'ready_for_pickup':
       return {
         tone: 'info',
         icon: 'check-circle',
         title: 'Items collected',
         description: `Your helper has your items and is starting the trip to ${location}.`,
+      };
+    case 'ready_for_pickup':
+      return {
+        tone: 'info',
+        icon: 'check-circle',
+        title: 'Food is ready for pickup',
+        description: `The cafeteria finished preparing your food. Your helper will collect it shortly.`,
       };
     case 'out_for_delivery':
     case 'delivering':
@@ -144,21 +154,26 @@ function statusCardFor(order: OrderWithDetails): StatusCardContent {
         tone: 'success',
         icon: 'check-circle',
         title: 'Receipt confirmed',
-        description: 'Thanks for confirming. Complete the payment step below to finish the request.',
+        description:
+          order.paymentStatus === 'paid' || order.paymentStatus === 'collected'
+            ? 'Thanks for confirming. Your transaction is settling.'
+            : order.paymentMethod === 'cod'
+              ? 'Thanks for confirming. Your cash payment will be recorded by your helper.'
+              : 'Thanks for confirming. Finish your online payment to complete the request.',
       };
     case 'awaiting_requester_payment':
       return {
         tone: 'warning',
         icon: 'account-balance-wallet',
-        title: 'Payment pending',
-        description: `Send ${total} to your helper externally, then submit the receipt below to complete the request.`,
+        title: 'Finishing up',
+        description: 'Your transaction is being settled.',
       };
     case 'completed':
       return {
         tone: 'success',
         icon: 'verified',
         title: 'Request completed',
-        description: 'This request was delivered and settled. Thanks for using Send2U.',
+        description: 'Delivered and recorded by Send2U. Thanks for using Send2U.',
       };
     case 'cancelled':
       return {
@@ -196,11 +211,11 @@ function disputeDescription(order: OrderWithDetails): string {
     : '';
   switch (order.disputeReason) {
     case 'late_cancellation':
-      return `You cancelled after the helper paid ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle with your helper directly.${settled}`;
+      return `You cancelled after the kitchen committed to your order. It is under review — you carry no food-cost debt since helpers never pay for food.${settled}`;
     case 'delivery_failed':
-      return `The delivery could not be completed. Settle any food cost directly.${flagged}${settled}`;
+      return `The delivery could not be completed and is under review.${flagged}${settled}`;
     case 'helper_unable':
-      return `Your helper could not continue after paying ${order.foodCostCents ? formatMYR(order.foodCostCents) : 'for the food'}. Settle with them directly.${flagged}${settled}`;
+      return `Your helper could not continue the delivery. Your order is under review.${flagged}${settled}`;
     case 'not_received':
       return `You reported the food as not received.${flagged}${settled}`;
     case 'incorrect':
@@ -263,12 +278,15 @@ export default function OrderDetailScreen() {
     }
   }, [id]);
 
-  // Live updates (helper advances, reviews payment, rates…). RLS-scoped to
-  // this order; failures fall back to the focus/manual paths.
+  // Live updates (helper advances, vendor prep, payment, settlement,
+  // ratings…). RLS-scoped to this order; failures fall back to the
+  // focus/manual paths.
   useRealtimeReload(
     typeof id === 'string'
       ? [
           { table: 'send2u_orders', filter: `id=eq.${id}` },
+          { table: 'send2u_payments', filter: `order_id=eq.${id}` },
+          { table: 'send2u_settlements', filter: `order_id=eq.${id}` },
           { table: 'send2u_ratings', filter: `order_id=eq.${id}` },
         ]
       : [],
@@ -350,7 +368,11 @@ export default function OrderDetailScreen() {
     setCancelError(null);
     try {
       const result = await cancelOrder(order.id, reason);
-      const patched = { ...previous, status: result.status };
+      const patched = {
+        ...previous,
+        status: result.status,
+        paymentStatus: result.paymentStatus ?? previous.paymentStatus,
+      };
       setOrder(patched);
       emitOrderChanged(patched);
       setCancelled(true);
@@ -448,14 +470,16 @@ export default function OrderDetailScreen() {
   const terminal = isTerminalOrderStatus(order.status);
   const card = statusCardFor(order);
 
-  // Clean cancellation is possible while no food has been purchased — that
-  // includes `food_available` (the purchase step itself leaves that status,
-  // so no money can have been spent there). Past purchase, cancelling moves
-  // the order to dispute with the helper's fronted cost preserved.
+  // Cancellation is possible while the kitchen has not committed — that
+  // includes the vendor prep states. Past the purchase step, cancelling moves
+  // the order to dispute for review (no food-cost liability: the helper never
+  // pays for food). Records are always preserved, never deleted.
   const cancellable =
     !cancelled &&
     (order.status === 'pending' ||
       order.status === 'assigned' ||
+      order.status === 'preparing' ||
+      order.status === 'ready_for_pickup' ||
       order.status === 'going_to_vendor' ||
       order.status === 'at_vendor' ||
       order.status === 'food_available');
@@ -549,7 +573,9 @@ export default function OrderDetailScreen() {
             deliveryFeeCents={order.deliveryFeeCents}
           />
           <Text variant="caption" color="muted">
-            Pay only after the food is in your hands.
+            {order.paymentMethod === 'cod'
+              ? 'Cash due on delivery — pay your helper when the food arrives.'
+              : 'Paid in Send2U (simulated for this demo).'}
           </Text>
         </Card>
 
@@ -619,7 +645,8 @@ export default function OrderDetailScreen() {
                   loading={reporting}
                 />
                 <Text variant="caption" color="muted">
-                  Reporting moves the order to dispute — no automatic refund.
+                  Reporting moves the order to dispute for review. Paid online orders are
+                  recorded as refunded when cancelled before completion (simulated).
                 </Text>
               </View>
             ) : null}
@@ -629,13 +656,15 @@ export default function OrderDetailScreen() {
         {!terminal ? <RequesterPaymentCard orderId={order.id} refreshToken={paymentTick} /> : null}
 
         {!terminal &&
-        (order.status === 'confirmed' || order.status === 'awaiting_requester_payment') &&
-        !order.payment ? (
+        order.paymentMethod === 'online' &&
+        (order.paymentStatus === 'pending' ||
+          order.paymentStatus === 'failed' ||
+          order.paymentStatus === 'unpaid') ? (
           <Button
             title="Continue to Payment"
             variant="secondary"
             onPress={() =>
-              router.push({ pathname: '/(requester)/orders/[id]/payment', params: { id: order.id } })
+              router.push({ pathname: '/(requester)/orders/[id]/pay-online', params: { id: order.id } })
             }
           />
         ) : null}
@@ -651,11 +680,14 @@ export default function OrderDetailScreen() {
               <>
                 {lateCancellable ? (
                   <Text color="secondary">
-                    The helper already paid for your food. Cancelling now may make
-                    you responsible for the food cost — settle it with them directly.
+                    The kitchen may already be working on your food. Cancelling now sends
+                    the order for review — you carry no food-cost debt.
                   </Text>
                 ) : (
-                  <Text color="secondary">Free of charge before the food is purchased.</Text>
+                  <Text color="secondary">
+                    Free cancellation while the kitchen has not committed. A completed
+                    online payment is recorded as refunded (simulated).
+                  </Text>
                 )}
                 {cancelError ? (
                   <ErrorState title="Could not cancel" message={cancelError} retryTitle="Dismiss" onRetry={() => setCancelError(null)} />
@@ -684,9 +716,7 @@ export default function OrderDetailScreen() {
 
         {terminal ? (
           <>
-            {order.status === 'completed' || order.status === 'cancelled' ? (
-              <SettlementRecord order={order} />
-            ) : null}
+            <TransactionRecord orderId={order.id} />
             {order.status === 'completed' ? (
               <OrderRatingSection order={order} refreshToken={paymentTick} cardStyle={styles.card} />
             ) : null}
@@ -721,40 +751,6 @@ export default function OrderDetailScreen() {
                 />
               </Card>
             ) : null}
-            <Card style={styles.card}>
-              <Text variant="subtitle">Payment record</Text>
-              {order.payment ? (
-                <>
-                  <Text variant="caption" color="secondary">
-                    {order.payment.status === 'verified'
-                      ? 'Verified'
-                      : order.payment.status === 'rejected'
-                        ? 'Needs a new receipt'
-                        : 'Submitted'}
-                  </Text>
-                  <Text color="secondary">
-                    {formatMYR(order.payment.amountCents)} · submitted{' '}
-                    {formatOrderDate(order.payment.submittedAt)}
-                    {order.payment.verifiedAt
-                      ? ` · reviewed ${formatOrderDate(order.payment.verifiedAt)}`
-                      : ''}
-                    .
-                  </Text>
-                  <ReceiptEvidenceView path={order.payment.evidencePath} />
-                </>
-              ) : (
-                <Text color="secondary">
-                  {order.status === 'completed'
-                    ? 'No payment record was stored for this order.'
-                    : 'No payment was submitted for this order.'}
-                </Text>
-              )}
-              {order.status === 'cancelled' && order.cancelReason === 'food_unavailable' ? (
-                <Text variant="caption" color="muted">
-                  No payment was due.
-                </Text>
-              ) : null}
-            </Card>
             <View style={styles.actionRow}>
               <View style={styles.actionFill}>
                 <Button title="Browse menu" onPress={() => router.push('/(requester)')} />

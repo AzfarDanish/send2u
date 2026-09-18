@@ -16,13 +16,19 @@ import type { OrderWithDetails } from '@/types/domain';
  * Nudge shown only for statuses where the detail page offers the requester
  * a real action. Every other status surfaces through the badge alone.
  */
-function actionHint(status: OrderWithDetails['status']): string | null {
-  switch (status) {
+function actionHint(order: OrderWithDetails): string | null {
+  switch (order.status) {
     case 'delivered':
       return 'Tap to confirm receipt';
     case 'confirmed':
+      return order.paymentMethod === 'online' &&
+        (order.paymentStatus === 'pending' ||
+          order.paymentStatus === 'failed' ||
+          order.paymentStatus === 'unpaid')
+        ? 'Tap to complete payment'
+        : null;
     case 'awaiting_requester_payment':
-      return 'Tap to complete payment';
+      return 'Tap to finish up';
     default:
       return null;
   }
@@ -46,7 +52,7 @@ export function RequestCard({
   onPress: (order: OrderWithDetails) => void;
 }) {
   const statusMessage = requesterStatusMessage(order.status);
-  const hint = actionHint(order.status);
+  const hint = actionHint(order);
   const age = formatRelativeTime(order.createdAt);
   return (
     <Pressable

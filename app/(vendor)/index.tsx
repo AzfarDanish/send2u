@@ -16,7 +16,7 @@ import type { Vendor } from '@/types/domain';
 
 /**
  * Vendor Stall tab: own stall information and the day-to-day open switch.
- * Vendors never see orders here — this screen manages the stall only.
+ * Orders live on the Orders tab — this screen manages the stall only.
  * `is_active` is admin-controlled (hidden stall notice); vendors own
  * `is_open` (day-to-day) and the editable details.
  */

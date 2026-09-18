@@ -35,7 +35,7 @@ interface OrderRatingSectionProps {
 
 /**
  * Two-sided ratings for a completed, paid order. Renders nothing unless the
- * order is genuinely rateable (completed + verified payment, no admin
+ * order is genuinely rateable (completed + recorded payment, no admin
  * settlement, helper assigned) — settled-as-completed records stay
  * rating-free by design. Shows both directions' states plus the viewer's
  * submit form; submitted ratings are immutable and render read-only.

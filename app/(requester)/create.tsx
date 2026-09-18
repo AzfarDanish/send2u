@@ -19,7 +19,7 @@ import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
 import { formatMYR } from '@/lib/money';
 import { ESTIMATED_DELIVERY_FEE_CENTS, orderTotalCents } from '@/lib/orders';
 import { placeOrders } from '@/services/orders';
-import type { CartLine } from '@/types/domain';
+import type { CartLine, PaymentMethod } from '@/types/domain';
 
 interface VendorGroup {
   vendorId: string;
@@ -30,10 +30,12 @@ interface VendorGroup {
 }
 
 /**
- * Review Request — cart review, delivery-location selection, and Submit
- * Request. Orders are created server-side via `send2u_place_orders`
- * (one order per vendor); the cart clears only after confirmed success.
- * Payment happens later through the external QR receipt flow, never here.
+ * Review Request — cart review, delivery-location selection, payment-method
+ * selection, and Submit Request. Orders are created server-side via
+ * `send2u_place_orders` (one order per vendor); the cart clears only after
+ * confirmed success. Send2U records the transaction from birth: online
+ * payments are simulated in-app, COD is cash on delivery — the helper never
+ * finances food and there are no helper QR transfers.
  *
  * Notes are intentionally absent: the backend accepts item ids +
  * quantities only, so a notes field would mislead (nothing carries it
@@ -45,6 +47,7 @@ export default function CreateRequestScreen() {
   const locations = useDeliveryLocations();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
 
   const groups = useMemo<VendorGroup[]>(() => {
     const byVendor = new Map<string, VendorGroup>();
@@ -84,17 +87,26 @@ export default function CreateRequestScreen() {
       const summaries = await placeOrders(
         selectedLocation.id,
         lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
+        paymentMethod,
       );
       clear();
       // Terminal transition: the emptied cart must leave history, so step
-      // back to the menu first, then open the confirmation on top — back
-      // from confirmation returns to the menu, never to a cleared Review
-      // Request that invites resubmit. (`router.replace` cannot do this:
+      // back to the menu first, then open the next screen on top — back
+      // from there returns to the menu, never to a cleared Review Request
+      // that invites resubmit. (`router.replace` cannot do this:
       // expo-router downgrades every action to JUMP_TO on tab navigators,
       // so a replace would append and strand the empty cart underneath.)
-      // The confirmation screen fetches the real just-created orders by ID;
-      // "View Request" then pushes the full detail for the chosen request.
+      // Online orders go straight to the simulated payment; COD and
+      // multi-vendor orders land on the confirmation screen, which fetches
+      // the real just-created orders by ID.
       if (router.canGoBack()) router.back();
+      if (summaries.length === 1 && paymentMethod === 'online') {
+        router.push({
+          pathname: '/(requester)/orders/[id]/pay-online',
+          params: { id: summaries[0].orderId },
+        });
+        return;
+      }
       router.push({
         pathname: '/(requester)/orders/confirmation',
         params: { orderIds: summaries.map((s) => s.orderId).join(',') },
@@ -243,15 +255,42 @@ export default function CreateRequestScreen() {
                 </Text>
               </View>
               <Text variant="caption" color="muted">
-                Fee confirmed at submit. Nothing is charged in the app.
+                Fee confirmed at submit.{' '}
+                {paymentMethod === 'online'
+                  ? 'You pay in Send2U right after (simulated for this demo).'
+                  : 'You pay cash to the helper on delivery.'}
               </Text>
+            </View>
+
+            <Text variant="subtitle" style={styles.sectionLabel}>
+              Payment Method
+            </Text>
+            <View style={styles.methodGroup}>
+              <PaymentMethodOption
+                selected={paymentMethod === 'online'}
+                title="Online Payment"
+                description="Pay in Send2U now (simulated for this demo). No cash needed on delivery."
+                onSelect={() => setPaymentMethod('online')}
+              />
+              <PaymentMethodOption
+                selected={paymentMethod === 'cod'}
+                title="Cash on Delivery"
+                description={`Pay ${formatMYR(totalEstimateCents)} in cash to the helper when your food arrives.`}
+                onSelect={() => setPaymentMethod('cod')}
+              />
             </View>
 
             {submitError ? (
               <ErrorState title="Request failed" message={submitError} retryTitle="Try again" onRetry={() => void handlePlaceRequest()} />
             ) : null}
             <Button
-              title={submitting ? 'Submitting…' : 'Submit Request'}
+              title={
+                submitting
+                  ? 'Placing…'
+                  : paymentMethod === 'online'
+                    ? 'Continue to Payment'
+                    : 'Place COD Order'
+              }
               onPress={() => void handlePlaceRequest()}
               disabled={!canSubmit}
               loading={submitting}
@@ -269,6 +308,43 @@ export default function CreateRequestScreen() {
         )}
       </Screen>
     </>
+  );
+}
+
+function PaymentMethodOption({
+  selected,
+  title,
+  description,
+  onSelect,
+}: {
+  selected: boolean;
+  title: string;
+  description: string;
+  onSelect: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={title}
+      onPress={onSelect}
+      style={({ pressed }) => [
+        styles.methodOption,
+        selected && styles.methodOptionSelected,
+        pressed && styles.pressed,
+      ]}>
+      <View style={[styles.radio, selected && styles.radioSelected]}>
+        {selected ? <View style={styles.radioDot} /> : null}
+      </View>
+      <View style={styles.itemText}>
+        <Text variant="secondary" style={styles.itemName}>
+          {title}
+        </Text>
+        <Text variant="caption" color="secondary">
+          {description}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -300,4 +376,27 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   numeric: { fontVariant: ['tabular-nums'] as const },
   stateCard: { minHeight: 160, justifyContent: 'center' },
+  methodGroup: { gap: spacing.sm },
+  methodOption: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: spacing.md,
+  },
+  methodOptionSelected: { borderColor: colors.primary, borderWidth: 1.5 },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  radioSelected: { borderColor: colors.primary },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
 });

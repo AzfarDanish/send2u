@@ -21,15 +21,16 @@ import type { OrderWithDetails } from '@/types/domain';
 const CHECKLIST = [
   'You have received the correct items.',
   'The food is in acceptable condition.',
-  'Confirming opens payment — you pay the helper next.',
+  'Confirming finishes the handover — COD cash is due now if this is a cash order.',
   'This action cannot be undone.',
 ];
 
 /**
  * Confirm Delivery: the guided checklist behind the requester's receipt
  * confirmation. Only `delivered` orders qualify; success patches the order
- * from the RPC's authoritative status, broadcasts it, and continues to
- * payment. "Not yet" changes nothing.
+ * from the RPC's authoritative status and broadcasts it. When payment is
+ * already resolved, confirmation completes the transaction with its
+ * settlement. "Not yet" changes nothing.
  */
 export default function OrderConfirmScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -191,15 +192,28 @@ export default function OrderConfirmScreen() {
                 Delivery confirmed
               </Text>
               <Text color="secondary" style={styles.centered}>
-                Payment is now open — pay your helper to complete the request.
+                {order.paymentMethod === 'cod'
+                  ? order.paymentStatus === 'collected'
+                    ? 'Cash recorded by Send2U — your request is complete.'
+                    : 'Hand the cash to your helper — Send2U records the collection to finish the request.'
+                  : order.paymentStatus === 'paid'
+                    ? 'Payment already recorded — your request is complete.'
+                    : 'Finish your online payment to complete the request.'}
               </Text>
             </View>
-            <Button
-              title="Continue to Payment"
-              onPress={() =>
-                router.push({ pathname: '/(requester)/orders/[id]/payment', params: { id: orderId } })
-              }
-            />
+            {order.paymentMethod === 'online' &&
+            order.paymentStatus !== 'paid' &&
+            order.paymentStatus !== 'refunded' ? (
+              <Button
+                title="Continue to Payment"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(requester)/orders/[id]/pay-online',
+                    params: { id: orderId },
+                  })
+                }
+              />
+            ) : null}
             <Button title="Back to Request" variant="secondary" onPress={() => router.back()} />
           </>
         ) : order.status !== 'delivered' ? (

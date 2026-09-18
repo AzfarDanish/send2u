@@ -66,14 +66,6 @@ export default function HelperPortalLayout() {
             tabBarStyle: { display: 'none' },
           }}
         />
-        <Tabs.Screen
-          name="payment-qr"
-          options={{
-            href: null,
-            title: 'Payment QR',
-          tabBarStyle: { display: 'none' },
-        }}
-      />
     </Tabs>
   );
 }

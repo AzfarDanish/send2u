@@ -136,6 +136,16 @@ export default function RequesterLayout() {
         }}
       />
       <Tabs.Screen
+        name="orders/[id]/pay-online"
+        options={{
+          href: null,
+          title: 'Online Payment',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+          headerTitleAlign: 'center',
+        }}
+      />
+      <Tabs.Screen
         name="orders/[id]/payment"
         options={{
           href: null,
@@ -149,7 +159,7 @@ export default function RequesterLayout() {
         name="orders/[id]/receipt"
         options={{
           href: null,
-          title: 'Upload Payment Receipt',
+          title: 'Request details',
           tabBarStyle: { display: 'none' },
           headerShown: false,
           headerTitleAlign: 'center',

@@ -284,7 +284,7 @@ Prescribed language for consequential actions (irreversible
 confirmation, destructive advances, payment submission):
 
 - "Slide to accept" — claiming work or starting an irreversible step.
-- "Slide to confirm" — attesting receipt, submitting evidence.
+- "Slide to confirm" — confirming handover, recording cash collection.
 - "Slide again to cancel" — safe reversal where the backend permits one.
 
 Implemented for job acceptance (`SlideToConfirm` on Job Detail: drag
@@ -307,16 +307,17 @@ authoritative). Tones: pre-dispatch fulfilment is deep-red `info`;
 fixed: "Waiting for a helper", "Helper assigned", "Helper is going to
 the vendor", "Helper is at the vendor", "Food is available", "Food
 purchased", "Request picked up", "On the way", "Delivered", "Payment
-required", "Completed", "Cancelled", "Under review". Payment states:
-"Verification pending" (`submitted`), "Payment verified" (`verified`),
-"Payment rejected" (`rejected`) — `verified` here means the requester's
-submitted receipt closed the order (self-attestation), never an
-approval. The payable total is always food subtotal + the fixed RM2.00
-delivery fee, computed server-side.
+required", "Completed", "Cancelled", "Under review". Payment method is
+Online Payment or Cash on Delivery. Payment states: "Paid" (`paid`),
+"Cash collected" (`collected`), "Cash due on delivery" (`unpaid`),
+"Payment processing" (`pending`), "Payment failed" (`failed`),
+"Refunded" (`refunded`, simulated). Settlement states: "Settlement
+pending", "Settled", "Settlement reversed". The payable total is always
+food subtotal + the fixed RM2.00 delivery fee, computed server-side;
+settlement splits it into cafeteria / helper-earning / Send2U amounts.
 
 **Rule.** Never surface raw status keys, and never invent friendlier
-states that imply tracking, ETAs, preparation, or refunds the backend
-does not have.
+states that imply tracking, ETAs, or preparation the backend does not have.
 
 ---
 
@@ -370,14 +371,16 @@ sheets; honest, state-accurate wording with no backend jargon.
 ## 17. Copy and wording
 
 Short, direct, human, action-led, contextual. Name real states
-("Waiting for a helper", "Food purchased with my money"); state
+("Waiting for a helper", "Food is covered by Send2U"); state
 consequences plainly ("Stopping here moves the order to dispute",
-"This action cannot be undone", "No QR set yet. Requesters cannot pay
-you without one."); remind of external payment exactly where money
-moves ("Pay only after the food is in your hands"). No paragraphs that
-restate the obvious, no instructions for self-evident controls, no
-filler sentences. Button labels are verbs ("Accept", "Confirm pickup",
-"Mark delivered", "Submit Receipt", "Save Changes").
+"This action cannot be undone", "Collect RM10.00 in cash on delivery —
+the cash belongs to Send2U."); remind of cash duty exactly where money
+moves ("Pay RM10.00 in cash to your helper when your food arrives"). No
+paragraphs that restate the obvious, no instructions for self-evident
+controls, no filler sentences. Button labels are verbs ("Accept",
+"Confirm pickup", "Mark delivered", "Confirm Cash Collected",
+"Save Changes"). Never ask helpers to pay, never mention QR codes or
+receipt uploads — those flows are retired.
 
 ---
 
@@ -400,8 +403,8 @@ header language, list rows, buttons, state components, copy voice,
 white surfaces, red discipline. Role-specific is only content and
 entry: vendors see stall operations; verified helpers additionally see
 the Helper entry on their normal Profile. The portal reuses portal-wide
-components (`OrderBreakdown`, `OrderTimeline`, evidence views, payment
-cards) with helper-appropriate copy — same shapes, task-led ordering.
+components (`OrderBreakdown`, `OrderTimeline`, transaction records) with
+helper-appropriate copy — same shapes, task-led ordering.
 
 **Prescribed Helper Portal shape (future mockups/redesigns).**
 Exactly three bottom-navigation destinations — **Jobs, Deliveries,
@@ -415,7 +418,7 @@ expired, or otherwise unavailable jobs leave the available list
 three active jobs**; the UI must make the active set continuable at a
 glance without becoming a dashboard. **No estimated revenue**: the fee
 is fixed at RM2 — show it as a plain fact (`+RM2.00 fee`), with richer
-money detail only inside receipt/payment context. Job rows stay lean
+money detail only inside the transaction record. Job rows stay lean
 (vendor, items summary, location, date, fee); full order information
 belongs on Job Detail. **Acceptance happens on the Job Detail page**
 via the §11 confirmation interaction, so the queue row itself is never
@@ -486,8 +489,9 @@ Helper delivery workspace, 2026-09-17; apply to new screens verbatim).
   the food*), one supporting sentence follows — no paragraphs, no
   lifecycle explainers, no technical states.
 - Reading order: task → subject → money → action → exceptions.
-  Money shows pay-dark first, fee-green second, plus a one-line
-  explainer; fee meaning is always labeled, never color-only (§8).
+  Money shows the Send2U-covered food total first, fee-green second,
+  plus a one-line explainer (COD cash duty vs earning distinction);
+  fee meaning is always labeled, never color-only (§8).
 - Exactly one bottom-fixed primary action: the §11 slider when the
   confirmation is consequential, a button when it is in-flow
   navigation. Rare/destructive paths sit below a hairline as quiet
@@ -503,6 +507,9 @@ Helper delivery workspace, 2026-09-17; apply to new screens verbatim).
 ---
 
 *Document status: rewritten 2026-09-16 from direct source inspection
-(`constants/theme.ts`, `components/ui/*`, all route groups, `lib/orders.ts`).
+(`constants/theme.ts`, `components/ui/*`, all route groups, `lib/orders.ts`);
+payment/transaction language refreshed 2026-09-18 for the platform-managed
+model (Online/COD, Send2U-covered food, settlement splits — QR/receipt
+flows retired).
 Supersedes the prior redesign-spec revision as the visual source of truth;
 behavioral contracts (roles, statuses, RPCs) remain with code and migrations.*

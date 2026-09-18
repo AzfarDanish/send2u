@@ -22,8 +22,9 @@ import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { openMapsLocation } from '@/lib/maps';
 import { formatMYR } from '@/lib/money';
 import { emitOrderChanged } from '@/lib/orderEvents';
-import { isTerminalOrderStatus, MAX_ACTIVE_JOBS_PER_HELPER } from '@/lib/orders';
+import { isTerminalOrderStatus, MAX_ACTIVE_JOBS_PER_HELPER, orderTotalCents } from '@/lib/orders';
 import { acceptOrder, advanceFulfilment, getJobDetail, type FulfilmentAction } from '@/services/orders';
+import { confirmCodCollection } from '@/services/payments';
 import type { OrderWithDetails } from '@/types/domain';
 
 /**
@@ -36,6 +37,8 @@ type WorkspaceStage = 'go' | 'collect' | 'deliver' | 'confirm' | 'done';
 function stageFor(status: string): WorkspaceStage | null {
   switch (status) {
     case 'assigned':
+    case 'preparing':
+    case 'ready_for_pickup':
     case 'going_to_vendor':
       return 'go';
     case 'at_vendor':
@@ -293,7 +296,7 @@ function ExceptionConfirm({
 }
 
 /** Terminal-for-helper result: what happened, what was earned, no actions. */
-function CompletionResult({ job }: { job: OrderWithDetails }) {
+function CompletionResult({ job, staysForCash }: { job: OrderWithDetails; staysForCash?: boolean }) {
   const itemCount = job.items.reduce((sum, item) => sum + item.quantity, 0);
   return (
     <Card style={[styles.card, styles.doneCard]}>
@@ -310,7 +313,7 @@ function CompletionResult({ job }: { job: OrderWithDetails }) {
         +{formatMYR(job.deliveryFeeCents)} delivery fee
       </Text>
       <Text variant="caption" color="muted" style={styles.doneCenter}>
-        Returning to your deliveries…
+        {staysForCash ? 'Confirm the cash collection below.' : 'Returning to your deliveries…'}
       </Text>
     </Card>
   );
@@ -336,6 +339,7 @@ export default function PortalJobDetailScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [mapsBusy, setMapsBusy] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const [cashingOut, setCashingOut] = useState(false);
   const [confirmKind, setConfirmKind] = useState<null | 'unavailable' | 'abandon'>(null);
   const mountedRef = useRef(true);
   // Active-delivery count gates acceptance at the 3-job capacity (the
@@ -366,6 +370,7 @@ export default function PortalJobDetailScreen() {
     setPaymentTick(0);
     setActionError(null);
     setCollecting(false);
+    setCashingOut(false);
     setConfirmKind(null);
   }
 
@@ -417,6 +422,8 @@ export default function PortalJobDetailScreen() {
     typeof id === 'string'
       ? [
           { table: 'send2u_orders', filter: `id=eq.${id}` },
+          { table: 'send2u_payments', filter: `order_id=eq.${id}` },
+          { table: 'send2u_settlements', filter: `order_id=eq.${id}` },
           { table: 'send2u_ratings', filter: `order_id=eq.${id}` },
         ]
       : [],
@@ -468,10 +475,16 @@ export default function PortalJobDetailScreen() {
         setPaymentTick((t) => t + 1);
         if (result.status === 'delivered') {
           // Handoff done: show the completion result, then return to the
-          // delivery list. Guarded so a manual exit wins over the timer.
-          setTimeout(() => {
-            if (mountedRef.current) router.replace('/(requester)/helper-portal/deliveries');
-          }, 3500);
+          // delivery list — unless COD cash is still unrecorded, in which
+          // case the helper stays to confirm the collection. Guarded so a
+          // manual exit wins over the timer.
+          const staysForCash =
+            previous.paymentMethod === 'cod' && previous.paymentStatus !== 'collected';
+          if (!staysForCash) {
+            setTimeout(() => {
+              if (mountedRef.current) router.replace('/(requester)/helper-portal/deliveries');
+            }, 3500);
+          }
         }
       } catch (err) {
         setJob(previous);
@@ -485,9 +498,10 @@ export default function PortalJobDetailScreen() {
 
   /**
    * One meaningful "collect food" confirmation. Runs the backend chain
-   * (availability → purchase → pickup) step by step from the live
-   * status, reloading at the end; any failure stops the chain with the
-   * backend error surfaced, and retrying resumes from actual state.
+   * (availability → platform-covered collection → pickup) step by step from
+   * the live status, reloading at the end; any failure stops the chain with
+   * the backend error surfaced, and retrying resumes from actual state.
+   * The helper never pays: the food is covered by Send2U.
    */
   const runCollectChain = useCallback(async () => {
     if (!job || collecting) return;
@@ -531,6 +545,35 @@ export default function PortalJobDetailScreen() {
     }
   }, [mapsBusy]);
 
+  /**
+   * COD cash collection: records the customer handover as a platform
+   * transaction event. Amount comes from the database — the helper only
+   * confirms. Idempotent: double taps return the same collected state.
+   */
+  const handleCollectCash = useCallback(async () => {
+    if (!job || cashingOut) return;
+    const previous = job;
+    setCashingOut(true);
+    setActionError(null);
+    try {
+      const result = await confirmCodCollection(job.id);
+      const patched: OrderWithDetails = {
+        ...previous,
+        paymentStatus: result.status,
+        codCollectedCents: result.amountCents,
+      };
+      setJob(patched);
+      emitOrderChanged(patched);
+      setPaymentTick((t) => t + 1);
+      await reload();
+    } catch (err) {
+      setJob(previous);
+      setActionError(err instanceof Error ? err.message : 'Could not record cash collection.');
+    } finally {
+      setCashingOut(false);
+    }
+  }, [job, cashingOut, reload]);
+
   if (status === 'loading' || !job) {
     return (
       <HelperPortalGuard title="Delivery">
@@ -566,10 +609,12 @@ export default function PortalJobDetailScreen() {
   const pickupLabel = job.vendor.locationHint ?? job.vendor.name;
   const dropoffLabel = job.location.name;
 
-  // Decision mode: an open job under review. Visual → route → order →
+  // Decision mode: an open job under review (pending, or already prepared
+  // by the cafeteria awaiting a collector). Visual → route → order →
   // fee → commitment, with everything on screen and nothing hidden.
   // Once claimed, the same screen becomes the task-first workspace below.
-  if (job.status === 'pending' && !accepted) {
+  if (!accepted && !job.helperId &&
+    (job.status === 'pending' || job.status === 'preparing' || job.status === 'ready_for_pickup')) {
     return (
       <HelperPortalGuard title="Job Details">
         <GlassHeader title="Job Details" fallbackHref="/(requester)" />
@@ -643,6 +688,11 @@ export default function PortalJobDetailScreen() {
                 {activeCount} of {MAX_ACTIVE_JOBS_PER_HELPER} active jobs ·{' '}
                 {atCapacity ? 'Finish one to take another.' : 'You can accept this job.'}
               </Text>
+              <Text variant="caption" color="secondary">
+                {job.paymentMethod === 'cod'
+                  ? `Cash on delivery — collect ${formatMYR(orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} from the customer.`
+                  : 'Online payment — the food is covered by Send2U. Just collect and deliver.'}
+              </Text>
             </Card>
           </ScrollView>
           <View style={styles.footer}>
@@ -683,7 +733,7 @@ export default function PortalJobDetailScreen() {
   const confirmPanel =
     confirmKind === 'unavailable' ? (
       <ExceptionConfirm
-        message="The vendor doesn't have this food. This delivery will be cancelled and removed. You haven't paid anything, so there's nothing to settle."
+        message="The vendor doesn't have this food. This delivery will be cancelled and kept for the record. You haven't paid anything, so there's nothing to settle."
         confirmTitle="Cancel this delivery"
         confirming={acting === 'report_food_unavailable'}
         disabled={busy}
@@ -692,7 +742,7 @@ export default function PortalJobDetailScreen() {
       />
     ) : confirmKind === 'abandon' ? (
       <ExceptionConfirm
-        message={`Stopping now moves the order to a dispute. Your fronted ${formatMYR(foodCents)} is recorded for settlement.`}
+        message="Stopping now moves the order to a dispute for review. The food stays covered by Send2U — you never pay for it."
         confirmTitle="Stop delivery"
         confirming={acting === 'abandon'}
         disabled={busy}
@@ -723,15 +773,18 @@ export default function PortalJobDetailScreen() {
   let foot: ReactNode = null;
 
   if (stage === 'go') {
-    const justClaimed = job.status === 'assigned';
+    const needsDepart =
+      job.status === 'assigned' || job.status === 'preparing' || job.status === 'ready_for_pickup';
     body = (
       <>
         <StageProgress step={STAGE_STEP.go} />
         <Text variant="title">Go to vendor</Text>
         <Text color="secondary">
-          {justClaimed
+          {job.status === 'assigned'
             ? 'Head to the vendor to collect this order.'
-            : `You are on your way to ${job.vendor.name}. Confirm when you arrive.`}
+            : job.status === 'going_to_vendor'
+              ? `You are on your way to ${job.vendor.name}. Confirm when you arrive.`
+              : `The cafeteria is preparing your order. Head to ${job.vendor.name} and confirm when you arrive.`}
         </Text>
         <StageWayBlock
           icon="storefront"
@@ -749,27 +802,36 @@ export default function PortalJobDetailScreen() {
       <>
         {actionFailed}
         <Button
-          title={acting === 'go_to_vendor' || acting === 'arrive' ? 'Working…' : justClaimed ? "I'm on my way" : "I've arrived"}
-          onPress={() => void handleAdvance(justClaimed ? 'go_to_vendor' : 'arrive')}
+          title={
+            acting === 'go_to_vendor' || acting === 'arrive'
+              ? 'Working…'
+              : needsDepart
+                ? "I'm on my way"
+                : "I've arrived"
+          }
+          onPress={() => void handleAdvance(needsDepart ? 'go_to_vendor' : 'arrive')}
           disabled={busy}
           loading={acting === 'go_to_vendor' || acting === 'arrive'}
         />
       </>
     );
   } else if (stage === 'collect') {
+    const isCod = job.paymentMethod === 'cod';
+    const customerTotal = orderTotalCents(job.subtotalCents, job.deliveryFeeCents);
     body = (
       <>
         <StageDots step={STAGE_STEP.collect} label="Delivery stage 2 of 5: collect the food" />
         <View style={styles.titleBlock}>
           <Text variant="title">Collect the food</Text>
           <Text color="secondary">
-            Check that your order is available, then pay with your own money and collect it.
+            Check that the order is ready, then collect it. The food is covered by Send2U —
+            never pay with your own money.
           </Text>
         </View>
         <WorkspaceOrderItems job={job} />
         <Card style={styles.card}>
           <View style={styles.moneyRow}>
-            <Text color="secondary">Food cost (you pay)</Text>
+            <Text color="secondary">Food total (covered by Send2U)</Text>
             <Text variant="price">{formatMYR(foodCents)}</Text>
           </View>
           <View style={styles.moneyRow}>
@@ -778,10 +840,17 @@ export default function PortalJobDetailScreen() {
               +{formatMYR(job.deliveryFeeCents)}
             </Text>
           </View>
-          <Text color="secondary">
-            You pay {formatMYR(foodCents)} now. This is the food price. You will receive{' '}
-            {formatMYR(job.deliveryFeeCents)} as your delivery fee.
-          </Text>
+          {isCod ? (
+            <Text color="secondary">
+              The customer pays {formatMYR(customerTotal)} in cash on delivery. That cash
+              belongs to Send2U — your earning is the delivery fee above.
+            </Text>
+          ) : (
+            <Text color="secondary">
+              This order is already paid in Send2U{job.paymentStatus === 'paid' ? '' : ' (payment pending)'}. Just
+              collect and deliver — your earning is the delivery fee above.
+            </Text>
+          )}
         </Card>
       </>
     );
@@ -829,6 +898,12 @@ export default function PortalJobDetailScreen() {
               +{formatMYR(job.deliveryFeeCents)}
             </Text>
           </View>
+          {job.paymentMethod === 'cod' ? (
+            <Text color="secondary">
+              Collect {formatMYR(orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} in
+              cash from the customer on handover.
+            </Text>
+          ) : null}
         </Card>
       </>
     );
@@ -866,6 +941,12 @@ export default function PortalJobDetailScreen() {
               +{formatMYR(job.deliveryFeeCents)}
             </Text>
           </View>
+          {job.paymentMethod === 'cod' ? (
+            <Text color="secondary">
+              Collect {formatMYR(orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} in
+              cash from the customer, then confirm the collection.
+            </Text>
+          ) : null}
         </Card>
       </>
     );
@@ -882,7 +963,48 @@ export default function PortalJobDetailScreen() {
       </>
     );
   } else if (stage === 'done') {
-    body = <CompletionResult job={job} />;
+    const codDue =
+      job.paymentMethod === 'cod' &&
+      job.paymentStatus !== 'collected' &&
+      job.paymentStatus !== 'refunded';
+    const codDone = job.paymentMethod === 'cod' && job.paymentStatus === 'collected';
+    body = (
+      <>
+        <CompletionResult job={job} staysForCash={codDue} />
+        {codDue ? (
+          <Card style={styles.card}>
+            <Text variant="subtitle">
+              Cash due: {formatMYR(job.codExpectedCents ?? orderTotalCents(job.subtotalCents, job.deliveryFeeCents))}
+            </Text>
+            <Text color="secondary">
+              Collect the cash from the customer, then confirm below. Your earning stays
+              the delivery fee — the cash belongs to Send2U.
+            </Text>
+            {actionError ? (
+              <ErrorState
+                title="Could not record collection"
+                message={actionError}
+                retryTitle="Dismiss"
+                onRetry={() => setActionError(null)}
+              />
+            ) : null}
+            <Button
+              title={cashingOut ? 'Recording…' : 'Confirm Cash Collected'}
+              onPress={() => void handleCollectCash()}
+              disabled={cashingOut}
+              loading={cashingOut}
+            />
+          </Card>
+        ) : codDone ? (
+          <Card style={styles.card}>
+            <Text color="secondary">
+              Cash of {formatMYR(job.codCollectedCents ?? orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} collected
+              and recorded.
+            </Text>
+          </Card>
+        ) : null}
+      </>
+    );
     foot = null;
   } else {
     body = (

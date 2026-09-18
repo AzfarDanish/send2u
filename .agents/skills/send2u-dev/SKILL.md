@@ -96,3 +96,33 @@ Distinguish environmental failures from implementation errors and document them 
 ## Continuity
 
 Use `changelog.md` to understand what exists, past decisions, known limitations, recent fixes, Supabase changes, and current direction. But it is not the sole source of truth: source code, schema, migrations, config, tests, and actual project state are authoritative. If the changelog conflicts with reality, inspect the implementation and correct the changelog.
+
+## Local Android build (`npx expo run:android`)
+
+Non-EAS native builds on this machine. Preconditions, in order:
+
+1. **Free space first.** The native link/package stage needs several GB. Check
+   `df -h /System/Volumes/Data` before starting; below ~5 GB free the build can
+   die and the terminal will not say why (see below).
+2. **Export the toolchain.** `android/local.properties` does not exist, so the
+   SDK path comes only from the environment — in a non-interactive shell set
+   `ANDROID_HOME="$HOME/Library/Android/sdk"`, `ANDROID_SDK_ROOT="$ANDROID_HOME"`
+   and `JAVA_HOME=/opt/homebrew/opt/openjdk@17`, then prepend
+   `$JAVA_HOME/bin:$ANDROID_HOME/platform-tools` to `PATH`.
+3. **Do not pass `--device <serial>`.** It fails with
+   `CommandError: Could not find device with name: <serial>`; with exactly one
+   device attached (`adb devices`), plain `npx expo run:android` targets it.
+   The device currently used for on-device verification is model `ELP_NX9`.
+
+When a build fails, read the Gradle daemon log at
+`~/.gradle/daemon/<gradle-version>/daemon-<pid>.out.log` — it holds the full
+output including the real cause the terminal truncated. An `ENOSPC` abort
+surfaces as one task failure (`...: No space left on device`, typically
+`copyDebugJniLibsProjectOnly` copying a `lib*.so`) plus `Build cancelled`
+cascades on other CMake tasks. Fix the disk, rerun; Gradle resumes
+incrementally off the aborted state.
+
+A failing build is an environmental failure, not an implementation error —
+document it in `changelog.md` instead of chasing it (see the validation loop above).
+`[CXX5304] This version only understands SDK XML versions up to 3 ...` is a
+benign cmake-version warning, not a failure.

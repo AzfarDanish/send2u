@@ -220,25 +220,6 @@ export async function claimMissingProfile(role: UserRole): Promise<Profile> {
   return toProfile(data as any);
 }
 
-/**
- * Points the signed-in user's profile at their payment QR object
- * (or clears it with null). Own row only — enforced by RLS. Role and
- * dev-flag columns are untouched (and trigger-guarded regardless).
- */
-export async function setPaymentQrPath(path: string | null): Promise<Profile> {
-  const supabase = requireClient();
-  const active = await getActiveSession();
-  if (!active) throw new Error('No active session. Sign in first.');
-  const { data, error } = await supabase
-    .from('send2u_profiles')
-    .update({ payment_qr_path: path, updated_at: new Date().toISOString() })
-    .eq('id', active.user.id)
-    .select(PROFILE_SELECT)
-    .single();
-  if (error) throw error;
-  return toProfile(data as any);
-}
-
 export async function signOut(): Promise<void> {
   const supabase = requireClient();
   const { error } = await supabase.auth.signOut();

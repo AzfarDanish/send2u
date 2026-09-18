@@ -6,7 +6,6 @@ import {
   addPushResponseListener,
   addPushTokenRefreshListener,
   initForegroundPolicy,
-  normalizePlatform,
   registerForPushToken,
 } from '@/lib/push';
 import { registerPushToken, removePushToken } from '@/services/pushTokens';
@@ -91,7 +90,7 @@ export function usePushNotifications(): void {
       if (cancelled || registration.status !== 'registered') return;
       currentToken.current = registration.token;
       try {
-        await registerPushToken(registration.token, normalizePlatform());
+        await registerPushToken(registration.token);
       } catch {
         // Registration failed (offline?). Realtime + center still work;
         // next mount retries. Never block the session on push.
@@ -99,7 +98,7 @@ export function usePushNotifications(): void {
     })();
     const refresh = addPushTokenRefreshListener((token) => {
       currentToken.current = token;
-      void registerPushToken(token, normalizePlatform()).catch(() => {});
+      void registerPushToken(token).catch(() => {});
     });
     return () => {
       cancelled = true;

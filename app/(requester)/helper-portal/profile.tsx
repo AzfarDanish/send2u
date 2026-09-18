@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
@@ -6,7 +5,6 @@ import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { GlassHeader } from '@/components/GlassHeader';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { Card } from '@/components/ui/Card';
-import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { spacing } from '@/constants/theme';
@@ -15,7 +13,8 @@ import { useAuth } from '@/hooks/useAuth';
 /**
  * Helper Portal profile: the helper's working identity. It is not an
  * account screen — sign-out and account settings live on the main
- * Profile. Payment QR management lives on its own screen.
+ * Profile. Earnings are the delivery fee per settled order; COD cash
+ * collected on delivery belongs to Send2U.
  */
 export default function HelperPortalProfileScreen() {
   const { user, profile } = useAuth();
@@ -39,12 +38,12 @@ export default function HelperPortalProfileScreen() {
         </View>
 
         <Card style={styles.section}>
-          <ListRow
-            icon="qr-code"
-            title="Payment QR"
-            subtitle="Requesters repay you through this code"
-            onPress={() => router.push('/(requester)/helper-portal/payment-qr')}
-          />
+          <Text variant="secondary">How you earn</Text>
+          <Text color="secondary">
+            You earn the delivery fee on every settled order. The food is covered by
+            Send2U — never pay with your own money. Cash you collect on COD orders
+            belongs to Send2U; confirm the collection in the delivery.
+          </Text>
         </Card>
 
         <Text variant="caption" color="muted" style={styles.note}>

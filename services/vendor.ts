@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '@/lib/supabase';
-import type { MenuItem, Vendor } from '@/types/domain';
+import type { MenuItem, OrderStatus, OrderWithDetails, Vendor } from '@/types/domain';
 
 /**
  * Vendor self-management service layer (Option A: stall + menu only).
@@ -200,4 +200,146 @@ export async function deleteMenuItem(itemId: string): Promise<void> {
   const supabase = requireClient();
   const { error } = await supabase.rpc('send2u_delete_menu_item', { p_item_id: itemId });
   if (error) throw new Error(error.message ? `Could not delete the item: ${error.message}` : 'Could not delete the item.');
+}
+
+export type VendorPrepAction = 'start_preparing' | 'mark_ready';
+
+/**
+ * Orders for the signed-in vendor's own stall, newest first — the prep
+ * queue. Paid online orders and COD orders appear here; the helper only
+ * collects food, never pays for it. RLS scopes visibility to the own stall.
+ */
+export async function listVendorOrders(): Promise<OrderWithDetails[]> {
+  const supabase = requireClient();
+  const vendorId = await requireLinkedVendorId();
+  const { data, error } = await supabase
+    .from('send2u_orders')
+    .select(VENDOR_ORDER_SELECT)
+    .eq('vendor_id', vendorId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Could not load stall orders: ${error.message}`);
+  return ((data ?? []) as unknown as VendorOrderRow[]).map(toVendorOrderWithDetails);
+}
+
+interface VendorOrderItemRow {
+  id: string;
+  order_id: string;
+  menu_item_id: string | null;
+  item_name: string;
+  unit_price_cents: number;
+  quantity: number;
+  line_total_cents: number;
+  created_at: string;
+}
+
+interface VendorOrderRow {
+  id: string;
+  requester_id: string;
+  vendor_id: string;
+  delivery_location_id: string;
+  status: string;
+  subtotal_cents: number;
+  delivery_fee_cents: number;
+  payment_method: string | null;
+  payment_status: string;
+  settlement_status: string;
+  helper_id: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  delivery_location: { id: string; name: string; description: string | null } | null;
+  send2u_order_items: VendorOrderItemRow[] | null;
+}
+
+const VENDOR_ORDER_SELECT =
+  'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents,' +
+  ' payment_method, payment_status, settlement_status, helper_id, accepted_at, created_at, updated_at,' +
+  ' delivery_location:send2u_delivery_locations!inner(id, name, description),' +
+  ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at)';
+
+function toVendorOrderWithDetails(row: VendorOrderRow): OrderWithDetails {
+  if (!row.delivery_location) throw new Error('Order references data that is no longer visible.');
+  return {
+    id: row.id,
+    requesterId: row.requester_id,
+    vendorId: row.vendor_id,
+    deliveryLocationId: row.delivery_location_id,
+    status: row.status as OrderWithDetails['status'],
+    subtotalCents: row.subtotal_cents,
+    deliveryFeeCents: row.delivery_fee_cents,
+    pickupCode: '',
+    paymentMethod: (row.payment_method as OrderWithDetails['paymentMethod']) ?? null,
+    paymentStatus: row.payment_status as OrderWithDetails['paymentStatus'],
+    settlementStatus: row.settlement_status as OrderWithDetails['settlementStatus'],
+    paidAt: null,
+    codExpectedCents: null,
+    codCollectedCents: null,
+    codCollectedAt: null,
+    settledAt: null,
+    refundedAt: null,
+    refundReason: null,
+    helperId: row.helper_id,
+    acceptedAt: row.accepted_at,
+    goingToVendorAt: null,
+    arrivedAt: null,
+    foodAvailableAt: null,
+    purchasedAt: null,
+    foodCostCents: null,
+    pickedUpAt: null,
+    outForDeliveryAt: null,
+    deliveredAt: null,
+    confirmedAt: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    cancelReason: null,
+    disputeReason: null,
+    disputeDetails: null,
+    disputeNote: null,
+    disputedAt: null,
+    resolvedAt: null,
+    resolution: null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    vendor: { id: row.vendor_id, name: '', locationHint: null },
+    location: {
+      id: row.delivery_location.id,
+      name: row.delivery_location.name,
+      description: row.delivery_location.description,
+    },
+    items: (row.send2u_order_items ?? []).map((item) => ({
+      id: item.id,
+      orderId: item.order_id,
+      menuItemId: item.menu_item_id,
+      itemName: item.item_name,
+      unitPriceCents: item.unit_price_cents,
+      quantity: item.quantity,
+      lineTotalCents: item.line_total_cents,
+      createdAt: item.created_at,
+    })),
+    payment: null,
+  };
+}
+
+/** Advances preparation for an own-stall order (pending/assigned → preparing → ready). */
+export async function advancePreparation(
+  orderId: string,
+  action: VendorPrepAction,
+): Promise<OrderStatus> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.rpc('send2u_vendor_advance', {
+    p_order_id: orderId,
+    p_action: action,
+  });
+  if (error) {
+    const message = error.message ?? '';
+    if (/only vendors/i.test(message)) throw new Error('Only vendors can update preparation.');
+    if (/invalid action/i.test(message))
+      throw new Error('That step is not available for this order right now. Refresh and try again.');
+    throw new Error(message ? `Could not update preparation: ${message}` : 'Could not update preparation.');
+  }
+  const row = data as { status?: unknown } | null;
+  if (!row || typeof row.status !== 'string') {
+    throw new Error('Preparation update came back in an unexpected shape.');
+  }
+  return row.status as OrderStatus;
 }

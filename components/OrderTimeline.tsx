@@ -29,11 +29,11 @@ function buildEvents(order: OrderWithDetails): TimelineEvent[] {
     { key: 'available', label: 'Food confirmed available', at: order.foodAvailableAt },
     {
       key: 'purchased',
-      label: 'Food purchased',
+      label: 'Food secured (covered by Send2U)',
       at: order.purchasedAt,
       detail:
         order.foodCostCents !== null
-          ? `${formatMYR(order.foodCostCents)} fronted by helper`
+          ? `${formatMYR(order.foodCostCents)} covered by Send2U`
           : undefined,
     },
     { key: 'picked_up', label: 'Food picked up', at: order.pickedUpAt },

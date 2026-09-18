@@ -31,8 +31,11 @@ export function progressPosition(order: OrderWithDetails): { reached: number; cu
     case 'food_available':
     case 'food_purchased':
       return { reached: 1, current: 2 };
-    case 'picked_up':
     case 'ready_for_pickup':
+      // Food is ready at the stall but not yet collected: pickup stage is
+      // current, nothing beyond it is claimed.
+      return { reached: 1, current: 2 };
+    case 'picked_up':
     case 'out_for_delivery':
     case 'delivering':
       return { reached: 2, current: 3 };

@@ -79,6 +79,14 @@ export default function PortalDeliveriesScreen() {
     await Promise.all([active.refresh(), history.refresh()]);
   }, [active, history]);
 
+  // Settled earnings: delivery fees on completed + settled orders only.
+  const settledEarnings =
+    history.status === 'ready'
+      ? history.deliveries
+          .filter((d) => d.status === 'completed' && d.settlementStatus === 'settled')
+          .reduce((sum, d) => sum + d.deliveryFeeCents, 0)
+      : 0;
+
   return (
     <HelperPortalGuard title="Deliveries">
       <GlassHeader title="Deliveries" hideBack />
@@ -115,7 +123,11 @@ export default function PortalDeliveriesScreen() {
                 <DeliveryRow
                   key={delivery.id}
                   delivery={delivery}
-                  detail={`${delivery.location.name} · ${formatMYR(orderTotalCents(delivery.subtotalCents, delivery.deliveryFeeCents))} total`}
+                  detail={
+                    delivery.paymentMethod === 'cod'
+                      ? `${delivery.location.name} · collect ${formatMYR(orderTotalCents(delivery.subtotalCents, delivery.deliveryFeeCents))} cash`
+                      : `${delivery.location.name} · ${delivery.paymentStatus === 'paid' ? 'paid via Send2U' : 'online payment pending'}`
+                  }
                   isLast={index === active.deliveries.length - 1}
                   onPress={openDelivery}
                 />
@@ -155,7 +167,9 @@ export default function PortalDeliveriesScreen() {
             : null}
           {history.status === 'ready' ? (
             <Text variant="caption" color="muted">
-              Payouts total your completed delivery fees; food costs you fronted are reimbursed separately by requesters.
+              Settled earnings so far: {formatMYR(settledEarnings)}. Only delivery fees
+              count as earnings — food is covered by Send2U, and COD cash you collect
+              belongs to Send2U.
             </Text>
           ) : null}
         </View>

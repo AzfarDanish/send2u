@@ -9,11 +9,13 @@
 Campus food delivery, fulfilled by fellow students — not restaurants.
 
 **Send2U** is a cross-platform mobile app (Android, iOS, web from one
-codebase) where **requesters** order food from campus stalls, **helpers**
-(a nearby student) accept the request, buy the food at the stall with
-their own money, and deliver it to a campus drop-off point. The requester
-then pays the helper **externally** (QR + receipt evidence) — no money
-ever moves inside the app.
+codebase) where **requesters** order food from campus stalls, choosing
+**Online Payment** (simulated in-app for this competition prototype) or
+**Cash on Delivery**. Send2U records and manages every transaction: the
+cafeteria prepares the food, a nearby student **helper** collects and
+delivers it, and COD cash is recorded on collection. Helpers never pay
+for food with their own money — no money ever moves outside the app's
+transaction record.
 
 ## How it works
 
@@ -21,26 +23,30 @@ ever moves inside the app.
 Requester                          Helper                         Vendor
 ─────────                          ──────                         ──────
 Browse stalls & menu
-Add to cart, pick drop-off   →     Sees open job in queue
-Submit request               →     Accepts (atomic first-claim)
-                                       ↓
-                                  Goes to stall → confirms
-                                  availability → pays for food
-                                  → picks up → delivers
-                                       ↓
+Add to cart, pick drop-off   →     Sees open job in queue               Sees paid/COD order
+Pick Online or COD                                                    (prep queue)
+Submit request               →     Accepts (atomic first-claim)    Prepares → marks ready
+  Online: simulated payment  →          ↓                               ↓
+  (persisted, idempotent)         Goes to stall → collects
+                                  Send2U-covered food → delivers
+                                        ↓
 Confirm receipt              ←     Marks delivered
-Pay helper externally   →→→→→→→→→→  Receives food + fee
-Submit receipt evidence  →     Review (verified → completed)
-Rate each other (after verified payment)
+  COD: hand cash to helper   →     Confirms cash collected (COD)
+Send2U records settlement (cafeteria / helper earning / Send2U split)
+Rate each other (after completed order)
 ```
 
 Order lifecycle (happy path):
 
-`pending` → `assigned` → `going_to_vendor` → `at_vendor` →
-`food_available` → `food_purchased` → `picked_up` → `out_for_delivery` →
-`delivered` → `confirmed` → `awaiting_requester_payment` → `completed`
+`pending` → `assigned` → `preparing` → `ready_for_pickup` →
+`going_to_vendor` → `at_vendor` → `food_available` → `food_purchased` →
+`picked_up` → `out_for_delivery` → `delivered` → `confirmed` →
+`completed`
 
-Exception states: `cancelled` (clean) and `disputed` (needs settlement,
+Order, payment (`unpaid`/`pending`/`paid`/`failed`/`collected`/
+`refunded`), and settlement (`pending`/`settled`/`reversed`) states are
+independent. Exception states: `cancelled` (history preserved; paid
+online orders reach a simulated refund) and `disputed` (needs review,
 retractable by the reporter). A fixed **RM 2.00** delivery fee is recorded
 server-side per order; food totals are database snapshots, never estimates.
 
@@ -48,24 +54,26 @@ server-side per order; food totals are database snapshots, never estimates.
 
 ### Requester
 - Vendor discovery, item detail, and in-memory cart with floating cart button
-- Review Request with predefined campus drop-off locations
+- Review Request with predefined campus drop-off locations + Online/COD method picker
+- Simulated online payment (persisted, idempotent, retry-safe) or cash-on-delivery state
 - Request Submitted confirmation with real order data, then full Request Detail
 - Active / Past request lists with live status badges and recorded totals
-- Six-stage progress tracker, contextual status cards, order timeline
-- Delivery confirmation, external-QR payment with receipt-evidence upload
+- Six-stage progress tracker, contextual status cards, order timeline, transaction record
+- Delivery confirmation, COD cash-due states, simulated-refund states on cancellation
 - Delivered-only issue reporting (with withdrawal) and two-sided ratings
 - In-app notification center + push notifications, Help Center, report flow
 
 ### Helper
 - Availability toggle gating a live open-job queue (atomic first-claim accept)
-- Guided fulfilment stepper: go to vendor → availability → purchase → pickup → deliver
-- Fee-only earnings screen, payment-QR management, read-only payment inspection
+- Guided fulfilment stepper: go to vendor → collect Send2U-covered food → deliver
+- COD cash-collection confirmation (exact server amount, double-tap safe)
+- Delivery-fee earnings (distinct from COD cash), settled-earnings total, delivery history
 - Deliveries history, ratings, notifications, profile
 
-### Vendor (stall operations only)
+### Vendor
+- Orders prep queue with payment method/state visibility + prepare/ready actions
 - Open/closed switch and stall-detail editing
 - Menu CRUD with availability toggles
-- Deliberately no orders, preparation, verification, notification, or payment UI
 
 ### Platform
 - Email/password auth with immutable role profiles; credential-free dev mode
@@ -87,11 +95,15 @@ server-side per order; food totals are database snapshots, never estimates.
 | Validation | `tsc --noEmit` · `expo lint` (eslint-config-expo) · `expo-doctor` · `expo export -p web` |
 
 Key backend contracts live in `types/domain.ts` (`OrderStatus`,
-`OrderWithDetails`, `Payment`, `Rating`, …). All fulfilment transitions
-run as Postgres RPCs (`send2u_place_orders`, `send2u_accept_order`,
-`send2u_helper_advance`, `send2u_cancel_order`, `send2u_confirm_delivery`,
-`send2u_open_dispute` / `send2u_withdraw_dispute`, `send2u_submit_payment`,
-`send2u_submit_rating`, …) so state changes stay atomic server-side.
+`PaymentStatus`, `SettlementStatus`, `OrderWithDetails`, `Payment`,
+`Settlement`, `Rating`, …). All fulfilment and transaction transitions
+run as Postgres RPCs (`send2u_place_orders`, `send2u_initiate_payment` /
+`send2u_complete_payment`, `send2u_vendor_advance`, `send2u_accept_order`,
+`send2u_helper_advance`, `send2u_confirm_cod_collection`,
+`send2u_settle_order`, `send2u_cancel_order`, `send2u_confirm_delivery`,
+`send2u_open_dispute` / `send2u_withdraw_dispute`, `send2u_submit_rating`,
+…) so amounts, splits, and states stay derived server-side and every
+money verb is idempotent.
 
 ## Project structure
 
@@ -102,8 +114,8 @@ app/                    # expo-router routes (auth gate + role groups)
                         #   orders/confirmation, orders (Active/Past), orders/[id],
                         #   location(s), notifications, help, report, profile,
                         #   helper-portal/ (verified helpers: queue, jobs/[id],
-                        #   deliveries, payment-qr)
-  (vendor)/             #   Stall, menu, profile
+                        #   deliveries, profile)
+  (vendor)/             #   Stall, orders (prep queue), menu, profile
 components/             # Domain components (RequestCard, OrderBreakdown,
                         # RequestProgress, NotificationCenter, …)
 components/ui/          # Design-system primitives (Button, Card, Screen, Text,
@@ -174,7 +186,7 @@ npm run ios             # local native build (macOS + Xcode only)
 ```bash
 npx tsc --noEmit              # typecheck (strict)
 npm run lint                  # expo lint
-npx expo-doctor                # 21/21 checks expected
+npx expo-doctor                # 19/21 (2 pre-existing environmental failures)
 npx expo export -p web --clear # production web bundle smoke test
 ```
 
@@ -195,16 +207,20 @@ project skill):
 - **Tables** (`send2u_*`): `profiles` (immutable role per `auth.uid()` +
   `is_verified_helper` capability flag for Helper Portal access, granted
   out-of-band and guarded server-side),
-  `vendors`, `menu_items`, `orders`, `order_items` (immutable purchase
+  `vendors`, `menu_items`, `orders` (independent order / payment /
+  settlement states), `order_items` (immutable purchase
   snapshots), `delivery_locations`, `notifications` (outbox + in-app
-  center), `push_tokens`, `payments` (external-receipt records),
+  center), `push_tokens`, `payments` (simulated-online + COD records),
+  `settlements` (vendor / helper / platform splits, one row per order),
+  `app_config` (commission + fee rules),
   `ratings` (one row per party per order, write-once).
 - **Realtime**: `useRealtimeReload` subscribes to `postgres_changes`
   (RLS-scoped); lists, detail screens, and the unread badge refresh live,
   with pull-to-refresh/retry as the offline fallback.
-- **Storage**: helpers' payment QR + requesters' payment receipts via
-  signed paths; photo permission copy explains exactly why access is needed.
-- **Security**: ownership-pinned RLS throughout; service-role key never
+- **Storage**: profile avatars via signed paths; photo permission copy explains exactly why access is needed.
+- **Security**: ownership-pinned RLS throughout (SELECT-only on
+  transaction tables; all money writes through `SECURITY DEFINER` RPCs
+  with anon EXECUTE revoked); service-role key never
   ships in the app; no secrets in code, chat, or `changelog.md`.
 
 ## Status & limitations
@@ -215,8 +231,9 @@ project skill):
 - No automated test suite yet — `tsc` + `lint` + `expo-doctor` + web-export
   is the current validation loop.
 - `admin` is a database-only role with no UI.
-- Food/vendor photography, maps/GPS, chat, and in-app payments are
-  intentionally out of scope.
+- Food/vendor photography, maps/GPS, chat, and real payment gateways are
+  intentionally out of scope (online payment is simulated for the
+  competition prototype; no real money moves).
 
 ## Resources
 

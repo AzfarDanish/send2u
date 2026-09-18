@@ -63,6 +63,7 @@ export default function OrderConfirmationScreen() {
   useRealtimeReload(
     ids.flatMap((id) => [
       { table: 'send2u_orders', filter: `id=eq.${id}` },
+      { table: 'send2u_payments', filter: `order_id=eq.${id}` },
       { table: 'send2u_ratings', filter: `order_id=eq.${id}` },
     ]),
     () => {
@@ -158,8 +159,11 @@ export default function OrderConfirmationScreen() {
             Request Submitted!
           </Text>
           <Text color="secondary" style={styles.heroSubtitle}>
-            Your request has been sent to available helpers. We&rsquo;ll notify you once a helper
-            accepts it.
+            {single && single.paymentMethod === 'cod'
+              ? `Pay ${formatMYR(orderTotalCents(single.subtotalCents, single.deliveryFeeCents))} in cash when your food arrives — Send2U records the collection.`
+              : single && single.paymentMethod === 'online' && single.paymentStatus !== 'paid'
+                ? 'Complete your online payment below to fire the kitchen.'
+                : 'Your request has been sent to available helpers. We\u2019ll notify you once a helper accepts it.'}
           </Text>
         </View>
 
@@ -287,8 +291,38 @@ export default function OrderConfirmationScreen() {
             }}
           />
         ) : (
-          <Button title="View Requests" onPress={() => router.push('/(requester)/orders')} />
+          <>
+            <Button title="View Requests" onPress={() => router.push('/(requester)/orders')} />
+            {orders.some(
+              (order) =>
+                order.paymentMethod === 'online' &&
+                (order.paymentStatus === 'pending' ||
+                  order.paymentStatus === 'failed' ||
+                  order.paymentStatus === 'unpaid'),
+            ) ? (
+              <Text variant="caption" color="secondary" style={styles.heroSubtitle}>
+                Open each request to complete its online payment — the kitchen fires per order.
+              </Text>
+            ) : null}
+          </>
         )}
+        {single &&
+        single.paymentMethod === 'online' &&
+        (single.paymentStatus === 'pending' ||
+          single.paymentStatus === 'failed' ||
+          single.paymentStatus === 'unpaid') ? (
+          <Button
+            title={`Pay ${formatMYR(orderTotalCents(single.subtotalCents, single.deliveryFeeCents))}`}
+            variant="secondary"
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              router.push({
+                pathname: '/(requester)/orders/[id]/pay-online',
+                params: { id: single.id },
+              });
+            }}
+          />
+        ) : null}
       </Screen>
     </>
   );

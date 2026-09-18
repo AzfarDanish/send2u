@@ -1,0 +1,61 @@
+{
+  "project": "send2u",
+  "slug": "send2u-fix-sweep",
+  "iteration": 2,
+  "status": "reviewing",
+  "current_agent": "MANAGER",
+  "classifications": [
+    "iteration 1: NEEDS_FIXES (manager) - 2 findings: each sweep changelog entry duplicated; payment caption re-opened its own defect class"
+  ],
+  "open_issues": [
+    "F6 (open): formatRelativeTime / formatOrderDate have no test coverage - manager pinned Date.now and verified the boundaries manually; a hermetic test needs an injected clock",
+    "F7 (latent): setUnreadCount stores non-integer input verbatim; unreachable from the app's 4 call sites",
+    "F8 (pre-existing): helper copy differs between Deliveries ('Delivering') and Jobs ('On the way')",
+    "manager: the plan's 'no duplicate emit' requirement for unread is still uncovered (a no-removed-guard mutant survived 6/6)",
+    "manager (unverifiable here): whether legacy payment_status='verified' rows were backfilled - if not, the new ratings gate silently makes those completed orders unrateable",
+    "CEO decision: CHANGELOG.md and changelog.md are one file on a case-insensitive FS but two git index entries - keep one path or both?",
+    "on-device tap-through still pending (no device run this sweep)",
+    "disk at 99% (2.2 GiB free) - next heavy native build may hit ENOSPC",
+    "MODULE_TYPELESS_PACKAGE_JSON warning from node --test is harmless; 'type':'module' would break Expo"
+  ],
+  "decisions": [
+    "2026-09-18 migration is correct and authoritative - do not re-audit",
+    "scope = code defects + commit pending fixes + test suite; no DB changes",
+    "DEVIATION (justified by manager): Node built-in test runner instead of Vitest - real disk constraint; still killed 13/16 mutations",
+    "DEVIATION (justified but costly, per manager): tsconfig types:[node,react] + allowImportingTsExtensions; directly caused the @types/node finding",
+    "DEVIATION (manager: explicit plan section-5 breach): added @types/node + @types/react-dom devDependencies - required for the suite to type-check",
+    "CHANGELOG.md and changelog.md are one inode: never write to both in a loop (caused duplicate entries in iteration 1)"
+  ],
+  "artifacts": {
+    "brief": "TEAM/brief.md",
+    "plan": "TEAM/plan.md",
+    "report": "TEAM/report.md",
+    "test_report": "TEAM/test-report.md",
+    "review": "TEAM/review.md"
+  },
+  "commits": {
+    "pending_fixes": "282dae3b",
+    "sweep_and_tests": "8cbd3d16",
+    "qa_fixes": "135d3aff",
+    "review_fixes": "a496ff07"
+  },
+  "defects_fixed": [
+    "D1 paymentStatusLabel('unpaid') said 'Cash due on delivery' for online orders",
+    "D2 orderStatusLabel produced title case ('Ready For Pickup')",
+    "D3 parsePriceToCents could misread a price 100x ('6,50' -> RM 650.00)",
+    "F1 (QA, HIGH) orders/[id] claimed 'Paid in Send2U' for online orders still unpaid",
+    "F2 (QA) lib/unread.test.ts was vacuous - passed with a no-op writer",
+    "F3 (QA) @types/node undeclared while tsconfig required it",
+    "F4 (QA) comma rule accepted zero-led groups ('0,123')",
+    "M1 (REVIEW, HIGH) each sweep changelog entry recorded twice (one inode, two filenames)",
+    "M2 (REVIEW) payment caption rendered on terminal orders and treated null method as online"
+  ],
+  "validation": {
+    "tsc": "pass",
+    "tests": "43/43 pass",
+    "lint": "pass",
+    "expo_export_web": "pass",
+    "mutation_check": "setUnreadCount -> no-op fails 5 tests, then reverted clean",
+    "changelog": "128 unique sections, exactly 3 sweep headings (one per entry)"
+  }
+}

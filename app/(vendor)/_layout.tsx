@@ -2,6 +2,8 @@ import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { ColorValue } from 'react-native';
 
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
+import { Screen } from '@/components/ui/Screen';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -15,9 +17,22 @@ function tabIcon(name: keyof typeof MaterialIcons.glyphMap) {
 export default function VendorLayout() {
   const { user, role, isLoading } = useAuth();
 
-  if (isLoading) return null;
+  // Identity is still resolving (session restore + the profile row). Render a
+  // designed placeholder rather than a blank frame.
+  if (isLoading) {
+    return (
+      <Screen>
+        <SkeletonList rows={3} lines={2} label="Loading your stall" />
+      </Screen>
+    );
+  }
   if (!user) return <Redirect href="/(auth)/sign-in" />;
-  if (role !== 'vendor') return <Redirect href="/" />;
+  // Send each account to the application that can actually serve it: a
+  // requester to the main app, a role-less account to account recovery. The
+  // root route is a content screen, not a bouncing gate.
+  if (role !== 'vendor') {
+    return <Redirect href={role ? '/(requester)' : '/select-role'} />;
+  }
 
   return (
     <Tabs

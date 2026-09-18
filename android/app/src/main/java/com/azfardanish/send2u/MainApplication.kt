@@ -1,4 +1,4 @@
-package com.anonymous.send2u
+package com.azfardanish.send2u
 
 import android.app.Application
 import android.content.res.Configuration

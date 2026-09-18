@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { ListRow } from '@/components/ui/ListRow';
-import { LoadingState } from '@/components/ui/LoadingState';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -110,9 +110,9 @@ export default function OrderConfirmationScreen() {
     return (
       <>
         <GlassHeader title="Request Submitted" />
-        <Screen>
+        <Screen beneathHeader>
           {status === 'loading' ? (
-            <LoadingState message="Confirming your request…" />
+            <SkeletonDetail label="Confirming your request" />
           ) : loadFailed ? (
             <ErrorState
               title="Couldn't load the confirmation"

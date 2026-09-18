@@ -9,6 +9,7 @@ import { MainHeader } from '@/components/MainHeader';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
+import { SkeletonProfile } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing, touchTargets, typography } from '@/constants/theme';
@@ -23,7 +24,7 @@ const MENU_ROWS = [
 ] as const;
 
 export default function RequesterProfileScreen() {
-  const { user, profile, isVerifiedHelper, signOut } = useAuth();
+  const { user, profile, isVerifiedHelper, signOut, isLoading } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
@@ -45,45 +46,53 @@ export default function RequesterProfileScreen() {
   return (
     <Screen underTabs>
       <MainHeader title="Profile" showSettings />
-      <View style={styles.header}>
-        <Avatar name={displayName} path={profile?.avatarPath} size={72} />
-        <Text variant="subtitle" style={styles.name} numberOfLines={2}>
-          {displayName}
-        </Text>
-        {user?.email ? (
-          <Text variant="caption" color="secondary" numberOfLines={1}>
-            {user.email}
-          </Text>
-        ) : null}
-      </View>
+      {isLoading ? (
+        // The avatar, name, and email all come from the session/profile rows:
+        // placeholder personal data here would be wrong twice over.
+        <SkeletonProfile rows={5} label="Loading your profile" />
+      ) : (
+        <>
+          <View style={styles.header}>
+            <Avatar name={displayName} path={profile?.avatarPath} size={72} />
+            <Text variant="subtitle" style={styles.name} numberOfLines={2}>
+              {displayName}
+            </Text>
+            {user?.email ? (
+              <Text variant="caption" color="secondary" numberOfLines={1}>
+                {user.email}
+              </Text>
+            ) : null}
+          </View>
 
-      <Card style={styles.section}>
-        {MENU_ROWS.map((row) => (
-          <ListRow
-            key={row.href}
-            icon={row.icon}
-            title={row.title}
-            onPress={() => router.push(row.href)}
-          />
-        ))}
-      </Card>
-
-      {isVerifiedHelper ? (
-        <View style={styles.helperSection}>
-          <Text variant="subtitle">Helper</Text>
-          <Text variant="caption" color="secondary">
-            Your delivery capability — queue, active jobs, and deliveries.
-          </Text>
           <Card style={styles.section}>
-            <ListRow
-              icon="delivery-dining"
-              title="Helper Portal"
-              subtitle="Available jobs and your deliveries"
-              onPress={() => router.push('/(requester)/helper-portal')}
-            />
+            {MENU_ROWS.map((row) => (
+              <ListRow
+                key={row.href}
+                icon={row.icon}
+                title={row.title}
+                onPress={() => router.push(row.href)}
+              />
+            ))}
           </Card>
-        </View>
-      ) : null}
+
+          {isVerifiedHelper ? (
+            <View style={styles.helperSection}>
+              <Text variant="subtitle">Helper</Text>
+              <Text variant="caption" color="secondary">
+                Your delivery capability — queue, active jobs, and deliveries.
+              </Text>
+              <Card style={styles.section}>
+                <ListRow
+                  icon="delivery-dining"
+                  title="Helper Portal"
+                  subtitle="Available jobs and your deliveries"
+                  onPress={() => router.push('/(requester)/helper-portal')}
+                />
+              </Card>
+            </View>
+          ) : null}
+        </>
+      )}
 
       <DevProfileSwitcher />
 

@@ -7,7 +7,7 @@ import { GlassHeader } from '@/components/GlassHeader';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
@@ -100,7 +100,9 @@ export default function PortalDeliveriesScreen() {
           <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
             ACTIVE DELIVERIES
           </Text>
-          {active.status === 'loading' ? <LoadingState message="Loading your deliveries…" /> : null}
+          {active.status === 'loading' ? (
+            <SkeletonList rows={3} lines={3} thumb={56} trailing label="Loading your deliveries" />
+          ) : null}
           {active.status === 'error' ? (
             <ErrorState
               title="Couldn't load deliveries"
@@ -138,7 +140,9 @@ export default function PortalDeliveriesScreen() {
           <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
             HISTORY
           </Text>
-          {history.status === 'loading' ? <LoadingState message="Loading your history…" /> : null}
+          {history.status === 'loading' ? (
+            <SkeletonList rows={3} lines={3} thumb={56} trailing label="Loading your history" />
+          ) : null}
           {history.status === 'error' ? (
             <ErrorState
               title="Couldn't load history"

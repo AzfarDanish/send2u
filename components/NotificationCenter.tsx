@@ -7,7 +7,7 @@ import { GlassHeader } from '@/components/GlassHeader';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl';
@@ -180,9 +180,7 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
         accessibilityLabel="Filter notifications"
       />
       {status === 'loading' ? (
-        <Card style={styles.stateCard}>
-          <LoadingState message="Loading notifications…" />
-        </Card>
+        <SkeletonList rows={3} lines={3} thumb={44} round label="Loading notifications" />
       ) : null}
       {status === 'error' ? (
         <Card style={styles.stateCard}>

@@ -5,6 +5,7 @@ import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { GlassHeader } from '@/components/GlassHeader';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { Card } from '@/components/ui/Card';
+import { SkeletonProfile } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { spacing } from '@/constants/theme';
@@ -17,9 +18,23 @@ import { useAuth } from '@/hooks/useAuth';
  * collected on delivery belongs to Send2U.
  */
 export default function HelperPortalProfileScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const displayName =
     profile?.fullName?.trim() || profile?.displayName?.trim() || user?.email?.split('@')[0] || 'Helper';
+
+  // While the profile row is still being fetched, the header name and email
+  // would be fallbacks (an email prefix) rather than this helper's real
+  // identity — hold the profile shape instead of printing a stand-in.
+  if (isLoading && !profile) {
+    return (
+      <HelperPortalGuard title="Profile">
+        <GlassHeader title="Profile" hideBack />
+        <Screen beneathHeader underTabs>
+          <SkeletonProfile rows={4} label="Loading your helper profile" />
+        </Screen>
+      </HelperPortalGuard>
+    );
+  }
 
   return (
     <HelperPortalGuard title="Profile">

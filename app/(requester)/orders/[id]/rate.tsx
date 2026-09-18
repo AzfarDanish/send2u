@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonForm, SkeletonList } from '@/components/ui/LoadingBlocks';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/hooks/useAuth';
@@ -119,7 +119,14 @@ export default function OrderRateScreen() {
       <Screen beneathHeader>
         {status === 'loading' || !order ? (
           status === 'loading' ? (
-            <LoadingState message="Loading request…" />
+            <>
+              {/* Helper identity card, then the rating form — the same shape
+                  the loaded screen renders. */}
+              <Card>
+                <SkeletonList rows={1} lines={2} thumb={52} round label="Loading request" />
+              </Card>
+              <SkeletonForm fields={2} label="Loading rating" />
+            </>
           ) : loadFailed ? (
             <ErrorState
               title="Couldn't load the request"
@@ -150,6 +157,7 @@ export default function OrderRateScreen() {
                 identity={identity}
                 helperId={order.helperId}
                 caption="Delivered your request — how was the experience?"
+                loading={identityStatus === 'loading'}
                 loadFailed={identityStatus === 'error'}
                 onRetry={retryIdentity}
               />

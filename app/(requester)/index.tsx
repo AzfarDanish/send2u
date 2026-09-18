@@ -11,9 +11,9 @@ import { VendorCard } from '@/components/VendorCard';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useMenu } from '@/hooks/useMenu';
@@ -93,19 +93,9 @@ export default function RequesterHomeScreen() {
         ) : null}
 
         <SectionHeader title="Available Vendors" />
+        {/* VendorCard geometry: 72px tile + name/open state/hours lines. */}
         {status === 'loading' ? (
-          <View accessibilityRole="progressbar" accessibilityLabel="Loading vendors">
-            {[0, 1, 2].map((row) => (
-              <Card key={row} style={styles.vendorSkeleton}>
-                <Skeleton width={64} height={64} radius={radii.md} />
-                <View style={styles.skeletonText}>
-                  <Skeleton width="60%" height={20} />
-                  <Skeleton width="80%" height={14} />
-                  <Skeleton width="30%" height={22} radius={radii.full} />
-                </View>
-              </Card>
-            ))}
-          </View>
+          <SkeletonList rows={3} lines={3} thumb={72} label="Loading vendors" />
         ) : null}
         {status === 'error' ? (
           <Card style={styles.stateCard}>
@@ -175,6 +165,4 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   bannerImage: { borderRadius: radii.lg },
-  vendorSkeleton: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  skeletonText: { flex: 1, gap: spacing.xs },
 });

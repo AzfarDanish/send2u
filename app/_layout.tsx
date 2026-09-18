@@ -57,6 +57,7 @@ function AuthedProviders() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="select-role" />
+        <Stack.Screen name="onboarding" />
         <Stack.Screen name="(requester)" />
         <Stack.Screen name="(vendor)" />
         <Stack.Screen name="+not-found" />

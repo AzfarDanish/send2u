@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
+import { SkeletonForm } from '@/components/ui/LoadingBlocks';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -58,7 +59,7 @@ function validate(fullName: string, studentId: string, phoneNumber: string): For
 }
 
 export default function EditProfileScreen() {
-  const { user, profile, updateProfile } = useAuth();
+  const { user, profile, updateProfile, isLoading } = useAuth();
   const [fullName, setFullName] = useState(profile?.fullName ?? profile?.displayName ?? '');
   const [studentId, setStudentId] = useState(profile?.studentId ?? '');
   const [phoneNumber, setPhoneNumber] = useState(profile?.phoneNumber ?? '');
@@ -197,6 +198,20 @@ export default function EditProfileScreen() {
       setSaveError(err instanceof Error ? err.message : 'Could not save your changes. Try again.');
       setSaving(false);
     }
+  }
+
+  // The form is prefilled from the profile row and re-syncs on focus, so
+  // rendering it before identity resolves would hand the user empty fields
+  // that mutate under them. Replace the whole form with the placeholder.
+  if (isLoading) {
+    return (
+      <>
+        <GlassHeader title="Edit Profile" />
+        <Screen beneathHeader>
+          <SkeletonForm fields={4} label="Loading your profile" />
+        </Screen>
+      </>
+    );
   }
 
   return (

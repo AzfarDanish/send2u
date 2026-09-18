@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { useMyOrders } from '@/hooks/useMyOrders';
@@ -31,8 +31,8 @@ export default function ReportIssueScreen() {
           Issues can be reported on delivered requests. Pick one below to open it.
         </Text>
         {status === 'loading' ? (
-          <Card style={styles.stateCard}>
-            <LoadingState message="Checking your requests…" />
+          <Card style={styles.listCard}>
+            <SkeletonList rows={3} lines={2} thumb={44} label="Checking your requests" />
           </Card>
         ) : null}
         {status === 'error' ? (

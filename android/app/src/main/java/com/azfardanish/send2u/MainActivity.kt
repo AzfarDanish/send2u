@@ -1,4 +1,4 @@
-package com.anonymous.send2u
+package com.azfardanish.send2u
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

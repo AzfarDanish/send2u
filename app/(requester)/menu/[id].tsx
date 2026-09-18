@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -83,8 +83,9 @@ export default function MenuItemDetailScreen() {
       <>
         <GlassHeader title="Item details" />
         <Screen beneathHeader>
+          {/* Item detail shape: visual, name/price, vendor meta, order card. */}
           {status === 'loading' ? (
-            <LoadingState message="Loading item…" />
+            <SkeletonDetail blocks={2} rows={2} label="Loading item" />
           ) : loadFailed ? (
             <ErrorState
               title="Couldn't load this item"

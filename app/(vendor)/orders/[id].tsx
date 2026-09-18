@@ -7,7 +7,7 @@ import { TransactionRecord } from '@/components/TransactionRecord';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -104,7 +104,7 @@ export default function VendorOrderDetailScreen() {
     return (
       <Screen>
         {status === 'loading' ? (
-          <LoadingState message="Loading order…" />
+          <SkeletonDetail hero={false} blocks={2} rows={3} label="Loading order" />
         ) : (
           <ErrorState
             title="Order not found"

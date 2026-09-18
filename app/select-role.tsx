@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonProfile } from '@/components/ui/LoadingBlocks';
 import { OptionCard } from '@/components/ui/OptionCard';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -34,7 +34,7 @@ export default function SelectRoleScreen() {
   if (isLoading) {
     return (
       <Screen>
-        <LoadingState message="Loading your account…" />
+        <SkeletonProfile rows={2} label="Loading your account" />
       </Screen>
     );
   }
@@ -44,7 +44,7 @@ export default function SelectRoleScreen() {
   }
 
   if (role) {
-    return <Redirect href="/" />;
+    return <Redirect href={role === 'vendor' ? '/(vendor)' : '/(requester)'} />;
   }
 
   const retry = async () => {

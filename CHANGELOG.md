@@ -3056,3 +3056,74 @@ and `8cbd3d16`).
   existing [function grants](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable),
   [password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection),
   and [index/policy](https://supabase.com/docs/guides/database/database-linter) notices (unchanged).
+
+## 2026-09-19 — UX: layout-matched loading data everywhere, post-signup onboarding, launch screen is no longer a redirect
+
+- Change (loading data): new `components/ui/LoadingBlocks.tsx` —
+  `SkeletonList`, `SkeletonDetail`, `SkeletonForm`, `SkeletonProfile`,
+  `SkeletonBlock`, `SkeletonKeyValueRows`, `SkeletonHero`, `SkeletonRow`,
+  `SkeletonThumb`. Each mirrors the geometry of the screen it stands in for
+  (thumb + text lines, key/value rows, field stacks, avatar header) inside one
+  accessible `progressbar` region, motion-free by construction. Applied to
+  every data-fetching screen — all 22 requester/vendor screens, plus
+  `HelperPortalGuard`, `RequesterPaymentCard`, `HelperIdentity` (new explicit
+  `loading` prop), `OrderRatingSection` and `NotificationCenter`. The three
+  bespoke inline skeletons (home vendor list, Active/History request lists,
+  helper job rows) now use the shared primitives, so one treatment exists.
+- Reason: a bare centered spinner says nothing about what is arriving, and
+  every screen re-flowed on load. design.md §2/§6 expect each state
+  (loading, empty, error, refresh) to be designed, not decorated.
+- Details (loading): `components/ui/LoadingState.tsx` deleted — no
+  full-screen spinner remains in the app. `(requester)` and `(vendor)`
+  layouts render the list placeholder while identity resolves instead of
+  `null`, so no blank frame appears between launch and the tabs.
+- Change (profile loading): requester Profile, Settings, Edit Profile, Helper
+  Portal Profile and Vendor Profile rendered personal data — or the
+  "Campus requester" / "Stall operator" / "Not set" fallbacks — before the
+  profile row resolved. They now gate on the auth identity flag (`isLoading`,
+  which is true for session restore *and* the profile fetch) or
+  `useMyVendor().status`. Edit Profile replaces the whole form: empty fields
+  that mutate under the user is the bug being fixed, not a cosmetic gap.
+- Change (launch screen): `app/index.tsx` is no longer a redirect gate. It
+  renders real content — signed out: brand hero, three capability rows, Sign in
+  / Create an account (the second opens sign-in with `?mode=sign-up`); signed
+  in without a usable role: account-recovery entry; signed in: an explicit
+  "Continue to Send2U". `select-role` and the `(vendor)` layout now send an
+  account to the application that serves it rather than bouncing through `/`.
+  Sign-in and sign-up keep their forward behaviour as the one exception:
+  `lib/authEntry.ts` marks an explicit sign-in and the launch screen consumes
+  that marker exactly once, so a cold start waits for a tap while a fresh
+  sign-in does not.
+- Change (onboarding): new `lib/onboarding.ts`
+  (AsyncStorage flag per account; absent means done, so only a signup records
+  "pending"), `components/OnboardingFlow.tsx` (three swipeable slides, dots,
+  Skip on every slide, Next/Get Started) and the route `app/onboarding.tsx`.
+  A freshly created account walks through it in place at `/` and lands in the
+  app — rendered, not pushed, so signup cannot race the routing. Signup with
+  email confirmation on still records pending, so the walkthrough opens on the
+  first sign-in that follows. Signing in to an existing account never opens it.
+- Config (breaking for existing installs): application id renamed to
+  `com.azfardanish.send2u` — `app.json` (`android.package`,
+  `ios.bundleIdentifier`), `android/app/build.gradle` (namespace and
+  applicationId) and the committed Kotlin sources moved to
+  `android/app/src/main/java/com/azfardanish/send2u/`. Applied to the native
+  project by hand because the committed `android/` folder makes EAS skip
+  prebuild sync, so `app.json` alone would not reach the build. A different
+  application id installs as a separate app; it does not update over the
+  previous build.
+- Validation: `npx tsc --noEmit` exit 0; `npm run lint` (`expo lint`) 0
+  problems; `npx expo export -p web` bundles every route including the new
+  `/onboarding`; `npx expo-doctor` 19/21. Behaviour checked against the static
+  web export in headless Chrome: `/` renders the welcome screen (no sign-in
+  bounce), `/sign-in` renders the form, `/onboarding` signed out shows
+  "Sign in to continue" with no redirect, `/select-role` signed out redirects
+  to sign-in. Welcome screen inspected at 390px with no horizontal overflow
+  (`documentElement.scrollWidth === clientWidth`); walkthrough slide 1
+  inspected the same way.
+- Known limitations: `expo-doctor` keeps the pre-existing non-CNG warning
+  (native folder + `app.json` native config → EAS will not sync those
+  properties) and a pre-existing patch-version drift (6 expo packages one
+  patch behind the SDK expectation; no dependency changed here). Only slide 1
+  of the walkthrough was captured visually; slides 2 and 3 come from the same
+  paged component and were not separately screenshotted. The walkthrough and
+  the post-signup path were not exercised against a live account on a device.

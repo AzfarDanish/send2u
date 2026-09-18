@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -13,6 +13,8 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import { markFreshAuthEntry } from '@/lib/authEntry';
+import { markOnboardingPending } from '@/lib/onboarding';
 import type { UserRole } from '@/types/domain';
 
 type Mode = 'sign-in' | 'sign-up';
@@ -26,7 +28,9 @@ type Mode = 'sign-in' | 'sign-up';
  */
 export default function SignInScreen() {
   const { user, isSupabaseEnabled, authError, signUp, signIn } = useAuth();
-  const [mode, setMode] = useState<Mode>('sign-in');
+  // Opened with ?mode=sign-up from the welcome screen's "Create an account".
+  const { mode: requestedMode } = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<Mode>(requestedMode === 'sign-up' ? 'sign-up' : 'sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('requester');
@@ -52,6 +56,11 @@ export default function SignInScreen() {
     try {
       if (mode === 'sign-up') {
         const result = await signUp(email, password, role);
+        // Recorded for BOTH signup outcomes: with confirmation on, there is no
+        // session yet, and the walkthrough must still open on the first
+        // sign-in that follows. Signing in to an existing account never
+        // records this, so the slides stay a signup-only, one-time event.
+        await markOnboardingPending(result.user.id);
         if (result.status === 'confirmation-required') {
           // No session exists yet: stay put and say so. Entering the app
           // here would bypass email verification.
@@ -59,6 +68,9 @@ export default function SignInScreen() {
         }
       } else {
         await signIn(email, password);
+        // Sign-in is the flow allowed to forward the user straight in (see
+        // lib/authEntry.ts) — the root route consumes this once.
+        markFreshAuthEntry();
       }
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Authentication failed.');

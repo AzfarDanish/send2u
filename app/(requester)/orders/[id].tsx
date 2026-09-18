@@ -14,8 +14,8 @@ import { GlassHeader } from '@/components/GlassHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { ListRow } from '@/components/ui/ListRow';
-import { LoadingState } from '@/components/ui/LoadingState';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -440,7 +440,7 @@ export default function OrderDetailScreen() {
         <GlassHeader title="Request Detail" />
         <Screen beneathHeader>
           {status === 'loading' ? (
-            <LoadingState message="Loading request…" />
+            <SkeletonDetail label="Loading request" />
           ) : loadFailed ? (
             <ErrorState
               title="Couldn't load the request"

@@ -12,7 +12,7 @@ import { VendorMark } from '@/components/VendorMark';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { SlideToConfirm } from '@/components/ui/SlideToConfirm';
 import { Text } from '@/components/ui/Text';
@@ -580,7 +580,7 @@ export default function PortalJobDetailScreen() {
         <GlassHeader title="Delivery" fallbackHref="/(requester)" right={<HeaderBell />} />
         <Screen beneathHeader>
           {status === 'loading' ? (
-            <LoadingState message="Loading job…" />
+            <SkeletonDetail label="Loading this job" />
           ) : (
             <ErrorState
               title="Job not available"

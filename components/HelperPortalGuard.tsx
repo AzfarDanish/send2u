@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { GlassHeader } from '@/components/GlassHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -28,7 +28,9 @@ export function HelperPortalGuard({ title, children }: HelperPortalGuardProps) {
       <>
         <GlassHeader title={title} />
         <Screen beneathHeader>
-          <LoadingState message="Checking helper access…" />
+          {/* Capability resolves with the session/profile rows; the portal's
+              screens are lists, so hold the list geometry behind the header. */}
+          <SkeletonList rows={3} lines={3} thumb={56} round label="Checking helper access" />
         </Screen>
       </>
     );

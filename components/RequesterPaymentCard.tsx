@@ -5,7 +5,7 @@ import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonBlock, SkeletonKeyValueRows } from '@/components/ui/LoadingBlocks';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useTransaction } from '@/hooks/useTransaction';
@@ -29,7 +29,14 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
   const { context, status, error, reloading, retry } = useTransaction(orderId, refreshToken);
 
   if (status === 'loading') {
-    return <LoadingState message="Loading payment…" />;
+    // Same bordered card as the loaded state (method, status, breakdown rows),
+    // so the payment section never collapses to a spinner and re-expands.
+    return (
+      <Card style={styles.card}>
+        <SkeletonBlock lines={2} label="Loading payment" />
+        <SkeletonKeyValueRows rows={3} />
+      </Card>
+    );
   }
   if (status === 'error' || !context) {
     return (

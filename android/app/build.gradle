@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.send2u'
+    namespace 'com.azfardanish.send2u'
     defaultConfig {
-        applicationId 'com.anonymous.send2u'
+        applicationId 'com.azfardanish.send2u'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

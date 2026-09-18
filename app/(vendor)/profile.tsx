@@ -4,6 +4,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { SkeletonHero } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -11,22 +12,28 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMyVendor } from '@/hooks/useMyVendor';
 
 export default function VendorProfileScreen() {
-  const { user, signOut } = useAuth();
-  const { vendor } = useMyVendor();
+  const { user, signOut, isLoading } = useAuth();
+  const { vendor, status } = useMyVendor();
 
   return (
     <Screen underTabs>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <MaterialIcons name="storefront" size={28} color={colors.primary} />
+      {isLoading || status === 'loading' ? (
+        // Stall name and account email both arrive with the row — hold the
+        // header's geometry rather than flashing the fallback name.
+        <SkeletonHero label="Loading your stall profile" />
+      ) : (
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <MaterialIcons name="storefront" size={28} color={colors.primary} />
+          </View>
+          <Text variant="subtitle">{vendor?.name ?? 'Stall operator'}</Text>
+          {user?.email && (
+            <Text variant="caption" color="secondary" numberOfLines={1}>
+              {user.email}
+            </Text>
+          )}
         </View>
-        <Text variant="subtitle">{vendor?.name ?? 'Stall operator'}</Text>
-        {user?.email && (
-          <Text variant="caption" color="secondary" numberOfLines={1}>
-            {user.email}
-          </Text>
-        )}
-      </View>
+      )}
 
       <Card style={styles.section}>
         <Text variant="caption" color="muted">

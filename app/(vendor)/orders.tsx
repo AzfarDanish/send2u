@@ -4,7 +4,7 @@ import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
@@ -59,7 +59,9 @@ export default function VendorOrdersScreen() {
           onRetry={dismissAdvanceError}
         />
       ) : null}
-      {status === 'loading' ? <LoadingState message="Loading stall orders…" /> : null}
+      {status === 'loading' ? (
+        <SkeletonList rows={3} lines={3} thumb={0} trailing label="Loading stall orders" />
+      ) : null}
       {status === 'error' ? (
         <ErrorState
           title="Couldn't load orders"

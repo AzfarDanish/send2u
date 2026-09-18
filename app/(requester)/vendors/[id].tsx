@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
@@ -119,7 +119,9 @@ export default function VendorPageScreen() {
       <>
         <GlassHeader title="Vendor" />
         <Screen beneathHeader>
-          <LoadingState message="Loading vendor…" />
+          {/* The loaded body is this stall's menu list; these rows hold its
+              rhythm (name, price, description) under the glass header. */}
+          <SkeletonList rows={3} lines={3} thumb={72} label="Loading vendor menu" />
         </Screen>
       </>
     );

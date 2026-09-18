@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
@@ -78,9 +78,7 @@ export default function VendorMenuScreen() {
       }>
       <SectionHeader eyebrow="Menu" title="Your menu" />
       {status === 'loading' ? (
-        <Card style={styles.stateCard}>
-          <LoadingState message="Loading your menu…" />
-        </Card>
+        <SkeletonList rows={4} lines={2} thumb={56} trailing label="Loading your menu" />
       ) : null}
       {status === 'error' ? (
         <Card style={styles.stateCard}>

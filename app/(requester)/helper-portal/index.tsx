@@ -9,10 +9,10 @@ import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { VendorMark } from '@/components/VendorMark';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useAvailableJobs } from '@/hooks/useAvailableJobs';
 import { useHelperAvailability } from '@/hooks/useHelperAvailability';
 import { useMyDeliveries } from '@/hooks/useMyDeliveries';
@@ -72,19 +72,6 @@ function JobRow({ job, status, isLast = false, onPress }: JobRowProps) {
         <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
       </View>
     </Pressable>
-  );
-}
-
-function JobRowSkeleton() {
-  return (
-    <View style={styles.row} accessibilityRole="progressbar" accessibilityLabel="Loading jobs">
-      <Skeleton width={56} height={56} radius={radii.full} />
-      <View style={styles.rowText}>
-        <Skeleton width="60%" height={18} />
-        <Skeleton width="40%" height={16} />
-        <Skeleton width="75%" height={14} />
-      </View>
-    </View>
   );
 }
 
@@ -203,11 +190,7 @@ export default function HelperJobsScreen() {
               </Text>
             </View>
           ) : status === 'loading' ? (
-            <>
-              <JobRowSkeleton />
-              <JobRowSkeleton />
-              <JobRowSkeleton />
-            </>
+            <SkeletonList rows={3} lines={3} thumb={56} round label="Loading open jobs" />
           ) : status === 'error' ? (
             <ErrorState
               title="Couldn't load open jobs"

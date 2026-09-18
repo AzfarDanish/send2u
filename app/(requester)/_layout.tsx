@@ -4,6 +4,8 @@ import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UnreadSync } from '@/components/UnreadSync';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
+import { Screen } from '@/components/ui/Screen';
 import { colors, navigation, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -18,7 +20,16 @@ export default function RequesterLayout() {
   const { user, role, isLoading } = useAuth();
   const insets = useSafeAreaInsets();
 
-  if (isLoading) return null;
+  // Identity is still resolving (session restore + the profile row). Render a
+  // designed placeholder rather than a blank frame, so nothing flashes white
+  // between the launch screen and the tabs.
+  if (isLoading) {
+    return (
+      <Screen underTabs>
+        <SkeletonList rows={3} lines={2} label="Loading Send2U" />
+      </Screen>
+    );
+  }
   if (!user) return <Redirect href="/(auth)/sign-in" />;
   // Verified helpers use this same main app (Helper Portal is nested under
   // Profile). Only vendors leave for their own experience.

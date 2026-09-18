@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonBlock, SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
@@ -59,9 +59,16 @@ export default function VendorStallScreen() {
       }>
       <SectionHeader eyebrow="Stall" title="Your stall" />
       {status === 'loading' ? (
-        <Card style={styles.stateCard}>
-          <LoadingState message="Loading your stall…" />
-        </Card>
+        // Two cards, mirroring the loaded screen: identity + open badge row,
+        // then the description block.
+        <>
+          <Card>
+            <SkeletonList rows={1} lines={2} thumb={0} trailing label="Loading your stall" />
+          </Card>
+          <Card>
+            <SkeletonBlock lines={3} label="Loading your stall" />
+          </Card>
+        </>
       ) : null}
       {status === 'error' ? (
         <Card style={styles.stateCard}>

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ListRow } from '@/components/ui/ListRow';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -24,7 +25,7 @@ function Value({ children }: { children: string }) {
  * Account values are edited in Edit Profile; rows navigate there.
  */
 export default function SettingsScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const appVersion = Constants.expoConfig?.version ?? '—';
 
   return (
@@ -34,40 +35,48 @@ export default function SettingsScreen() {
       <Text variant="subtitle" style={styles.groupTitle}>
         Account
       </Text>
-      <Card style={styles.groupCard}>
-        <View style={styles.divider}>
+      {isLoading ? (
+        // Email, student ID, and phone come from the session/profile rows;
+        // "Not set" would be a lie until they resolve.
+        <Card style={styles.groupCard}>
+          <SkeletonList rows={4} lines={1} thumb={44} label="Loading your account" />
+        </Card>
+      ) : (
+        <Card style={styles.groupCard}>
+          <View style={styles.divider}>
+            <ListRow
+              icon="mail-outline"
+              title="Email"
+              right={<Value>{user?.email ?? 'Not available'}</Value>}
+              accessibilityLabel={`Email, ${user?.email ?? 'not available'}`}
+            />
+          </View>
+          <View style={styles.divider}>
+            <ListRow
+              icon="badge"
+              title="Student ID"
+              right={<Value>{profile?.studentId?.trim() || 'Not set'}</Value>}
+              accessibilityLabel={`Student ID, ${profile?.studentId?.trim() || 'not set'}`}
+              onPress={() => router.push('/(requester)/edit-profile')}
+            />
+          </View>
+          <View style={styles.divider}>
+            <ListRow
+              icon="phone"
+              title="Phone Number"
+              right={<Value>{profile?.phoneNumber?.trim() || 'Not set'}</Value>}
+              accessibilityLabel={`Phone number, ${profile?.phoneNumber?.trim() || 'not set'}`}
+              onPress={() => router.push('/(requester)/edit-profile')}
+            />
+          </View>
           <ListRow
-            icon="mail-outline"
-            title="Email"
-            right={<Value>{user?.email ?? 'Not available'}</Value>}
-            accessibilityLabel={`Email, ${user?.email ?? 'not available'}`}
+            icon="lock-outline"
+            title="Change Password"
+            accessibilityLabel="Change password"
+            onPress={() => router.push('/(requester)/settings/change-password')}
           />
-        </View>
-        <View style={styles.divider}>
-          <ListRow
-            icon="badge"
-            title="Student ID"
-            right={<Value>{profile?.studentId?.trim() || 'Not set'}</Value>}
-            accessibilityLabel={`Student ID, ${profile?.studentId?.trim() || 'not set'}`}
-            onPress={() => router.push('/(requester)/edit-profile')}
-          />
-        </View>
-        <View style={styles.divider}>
-          <ListRow
-            icon="phone"
-            title="Phone Number"
-            right={<Value>{profile?.phoneNumber?.trim() || 'Not set'}</Value>}
-            accessibilityLabel={`Phone number, ${profile?.phoneNumber?.trim() || 'not set'}`}
-            onPress={() => router.push('/(requester)/edit-profile')}
-          />
-        </View>
-        <ListRow
-          icon="lock-outline"
-          title="Change Password"
-          accessibilityLabel="Change password"
-          onPress={() => router.push('/(requester)/settings/change-password')}
-        />
-      </Card>
+        </Card>
+      )}
 
       <Text variant="subtitle" style={styles.groupTitle}>
         Preferences

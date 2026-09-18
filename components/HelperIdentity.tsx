@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { helperLabel, type HelperIdentity as HelperIdentityData } from '@/services/helperIdentity';
@@ -13,6 +14,12 @@ interface HelperIdentityProps {
   caption?: string;
   onRetry?: () => void;
   loadFailed?: boolean;
+  /**
+   * Identity fetch still in flight. Must be passed explicitly: a null
+   * `identity` alone also means "no label to show" (ready), so the row
+   * would otherwise have to guess.
+   */
+  loading?: boolean;
 }
 
 function initialsFor(label: string): string {
@@ -30,8 +37,13 @@ function initialsFor(label: string): string {
  * short-id fallback — never a fabricated name, never a Verified badge the
  * backend cannot confirm).
  */
-export function HelperIdentity({ identity, helperId, caption, onRetry, loadFailed }: HelperIdentityProps) {
+export function HelperIdentity({ identity, helperId, caption, onRetry, loadFailed, loading }: HelperIdentityProps) {
   const label = helperLabel(identity, helperId);
+  // Row-shaped placeholder while the name is in flight — the avatar and the
+  // text column hold their geometry, so the real name lands in place.
+  if (loading) {
+    return <SkeletonList rows={1} lines={2} thumb={52} round label="Loading helper details" />;
+  }
   return (
     <View style={styles.row}>
       <View style={styles.avatar} accessibilityRole="image" accessibilityLabel={`Avatar for ${label}`}>

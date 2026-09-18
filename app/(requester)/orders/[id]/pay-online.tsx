@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonBlock, SkeletonKeyValueRows } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
@@ -62,7 +62,10 @@ export default function PayOnlineScreen() {
       <GlassHeader title="Online Payment" />
       <Screen beneathHeader>
         {status === 'loading' ? (
-          <LoadingState message="Loading payment…" />
+          <Card>
+            <SkeletonBlock lines={2} label="Loading payment" />
+            <SkeletonKeyValueRows rows={4} />
+          </Card>
         ) : status === 'error' || !context ? (
           <ErrorState
             title="Couldn't load payment"

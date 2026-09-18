@@ -7,7 +7,7 @@ import { RatingInput, RatingStars } from '@/components/RatingStars';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonBlock } from '@/components/ui/LoadingBlocks';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -134,7 +134,7 @@ export function OrderRatingSection({ order, refreshToken = 0, requesterForm = 'l
         <ErrorState title="Couldn't load ratings" message={loadError} retryTitle="Try again" onRetry={() => void load()} />
       ) : null}
       {ratings === null && !loadError ? (
-        <LoadingState message="Loading ratings…" />
+        <SkeletonBlock lines={3} label="Loading ratings" />
       ) : null}
       {mine ? (
         <View style={styles.block}>

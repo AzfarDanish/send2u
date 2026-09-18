@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { GlassHeader } from '@/components/GlassHeader';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -161,7 +161,7 @@ export default function OrderConfirmScreen() {
       <Screen beneathHeader>
         {status === 'loading' || !order ? (
           status === 'loading' ? (
-            <LoadingState message="Loading request…" />
+            <SkeletonDetail label="Loading request" />
           ) : loadFailed ? (
             <ErrorState
               title="Couldn't load the request"

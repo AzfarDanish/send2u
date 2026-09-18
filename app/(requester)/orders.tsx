@@ -6,34 +6,13 @@ import { MainHeader } from '@/components/MainHeader';
 import { RequestCard } from '@/components/RequestCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useMyOrderHistory } from '@/hooks/useMyOrderHistory';
 import { useMyOrders } from '@/hooks/useMyOrders';
 import type { OrderWithDetails } from '@/types/domain';
-
-function LoadingSkeletons() {
-  return (
-    <View accessibilityRole="progressbar" accessibilityLabel="Loading requests">
-      {[0, 1, 2].map((row) => (
-        <View key={row} style={styles.skeletonCard}>
-          <Skeleton width={56} height={56} radius={radii.md} />
-          <View style={styles.skeletonText}>
-            <Skeleton width="45%" height={14} />
-            <Skeleton width="80%" height={18} />
-            <Skeleton width="65%" height={14} />
-          </View>
-          <View style={styles.skeletonRight}>
-            <Skeleton width={72} height={22} radius={radii.full} />
-            <Skeleton width={56} height={18} />
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
 
 export default function RequesterOrdersScreen() {
   const active = useMyOrders();
@@ -60,7 +39,9 @@ export default function RequesterOrdersScreen() {
           <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
             ACTIVE REQUESTS
           </Text>
-          {active.status === 'loading' ? <LoadingSkeletons /> : null}
+          {active.status === 'loading' ? (
+            <SkeletonList rows={3} lines={3} thumb={56} trailing label="Loading requests" />
+          ) : null}
           {active.status === 'error' ? (
             <ErrorState
               title="Couldn't load orders"
@@ -97,7 +78,9 @@ export default function RequesterOrdersScreen() {
           <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
             HISTORY
           </Text>
-          {history.status === 'loading' ? <LoadingSkeletons /> : null}
+          {history.status === 'loading' ? (
+            <SkeletonList rows={3} lines={3} thumb={56} trailing label="Loading past requests" />
+          ) : null}
           {history.status === 'error' ? (
             <ErrorState
               title="Couldn't load past requests"
@@ -132,7 +115,4 @@ export default function RequesterOrdersScreen() {
 const styles = StyleSheet.create({
   section: { paddingTop: spacing.lg },
   sectionHead: { marginBottom: spacing.sm },
-  skeletonCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  skeletonText: { flex: 1, gap: spacing.sm },
-  skeletonRight: { alignItems: 'flex-end', gap: spacing.sm },
 });

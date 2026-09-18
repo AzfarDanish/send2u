@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/constants/theme';
@@ -30,9 +30,11 @@ export default function LocationPickerScreen() {
         <Text color="secondary">
           Choose where your helper should deliver this request.
         </Text>
+        {/* Rows land in the same card the loaded list uses; ListRow geometry
+            is a 44px icon chip plus title and subtitle. */}
         {locations.status === 'loading' ? (
-          <Card style={styles.stateCard}>
-            <LoadingState message="Loading drop-off points…" />
+          <Card style={styles.locationsCard}>
+            <SkeletonList rows={3} lines={2} thumb={44} label="Loading drop-off points" />
           </Card>
         ) : null}
         {locations.status === 'error' ? (

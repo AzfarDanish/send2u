@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -200,9 +200,11 @@ export default function CreateRequestScreen() {
               </View>
               <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
             </Pressable>
+            {/* Mirrors the drop-off summary row above: leading icon chip,
+                point name, and its hint line. */}
             {locations.status === 'loading' ? (
-              <Card style={styles.stateCard}>
-                <LoadingState message="Loading drop-off points…" />
+              <Card>
+                <SkeletonList rows={1} lines={2} thumb={44} label="Loading drop-off points" />
               </Card>
             ) : null}
             {locations.status === 'error' ? (

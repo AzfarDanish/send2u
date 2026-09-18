@@ -13,8 +13,10 @@ export function parsePriceToCents(raw: string): number {
   // Commas are accepted only as well-formed thousands separators
   // ("1,234.56"). Stripping them unconditionally would silently turn a
   // comma-decimal typo like "6,50" into RM 650.00 — a 100x misread on a
-  // price field, so a misplaced separator must fail loudly instead.
-  if (cleaned.includes(',') && !/^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(cleaned)) {
+  // price field, so a misplaced separator must fail loudly instead. The
+  // leading group must be 1-3 non-zero-led digits, so "0,123" and
+  // "00,123" are rejected as well.
+  if (cleaned.includes(',') && !/^[1-9]\d{0,2}(,\d{3})+(\.\d{1,2})?$/.test(cleaned)) {
     throw new Error('Enter a valid price, e.g. 6.50.');
   }
   const normalized = cleaned.replace(/,/g, '');

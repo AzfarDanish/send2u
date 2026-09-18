@@ -52,6 +52,15 @@ test('parsePriceToCents rejects a misplaced comma instead of misreading the amou
   assert.throws(() => parsePriceToCents('1,2345'));
 });
 
+test('parsePriceToCents rejects a zero-led grouping as malformed', () => {
+  // "0,123" is not a well-formed thousands separator, so it must not be
+  // quietly read as RM 123.00.
+  assert.throws(() => parsePriceToCents('0,123'));
+  assert.throws(() => parsePriceToCents('00,123'));
+  assert.throws(() => parsePriceToCents('0,001.5'));
+  assert.throws(() => parsePriceToCents('0,000'));
+});
+
 test('formatPriceInput round-trips cents into a price-input string', () => {
   assert.equal(formatPriceInput(650), '6.50');
   assert.equal(formatPriceInput(5), '0.05');

@@ -10,6 +10,86 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-18 — Fix sweep iteration 1: QA findings closed
+
+Follow-up to the entry below (adversarial QA pass over commits `282dae3b`
+and `8cbd3d16`).
+
+- Fixed (app, `app/(requester)/orders/[id].tsx`): the Order Summary caption
+  told every non-COD requester "Paid in Send2U (simulated for this demo)"
+  regardless of payment state, so an online order still `unpaid` claimed to
+  be paid while the status card, the payment card ("Payment due") and the
+  "Continue to Payment" button on the same screen said otherwise. The
+  caption now follows the real state — cash collected / cash due for COD,
+  and paid / refunded / "Not paid yet — pay in Send2U when your order is
+  ready" for online. Same defect class as the already-fixed
+  `paymentStatusLabel` case, found by QA 80 lines away.
+- Fixed (app, `lib/money.ts`): the new thousands-separator rule still
+  accepted a zero-led leading group, so "0,123", "00,123" and "0,001.5"
+  were read as RM 123.00 / RM 123.00 / RM 1.50. The leading group must now
+  be 1-3 non-zero-led digits; those inputs raise the validation error.
+- Fixed (tests, `lib/unread.test.ts`): the previous version asserted only
+  that calls did not throw — the whole file passed even with
+  `setUnreadCount` replaced by a total no-op. It now reads the store back
+  through the real public API (`useSharedUnreadCount`, via
+  `react-dom/server`'s `renderToString`) and asserts the rendered count,
+  clamping, persistence and replacement. Verified by mutation: the no-op
+  mutation now fails 5 tests instead of passing.
+- Changed (config): `@types/node` (^26.6.1) and `@types/react-dom`
+  (~19.2.0) are now declared devDependencies. The suite cannot type-check
+  without them, and `@types/node` was previously resolving only
+  transitively — a `TS2688` whole-project failure waiting to happen.
+- Reason: QA of the sweep found the same copy-defect class the sweep had
+  just fixed, a too-permissive price rule, and a test file that could not
+  fail.
+- Validation: `npx tsc --noEmit` clean; `npm test` 43/43 pass;
+  `npx expo lint` clean; `npx expo export -p web` pass. Mutation check on
+  `lib/unread.ts` (no-op writer) fails 5 tests, then reverted clean.
+- Limits/decisions: `setUnreadCount` still stores non-integer input
+  verbatim (unreachable from the app's four call sites — unread counts are
+  integers), and subscriber-notification is not observable from a server
+  render, so it stays untested. On-device tap-through still pending.
+
+## 2026-09-18 — Fix sweep iteration 1: QA findings closed
+
+Follow-up to the entry below (adversarial QA pass over commits `282dae3b`
+and `8cbd3d16`).
+
+- Fixed (app, `app/(requester)/orders/[id].tsx`): the Order Summary caption
+  told every non-COD requester "Paid in Send2U (simulated for this demo)"
+  regardless of payment state, so an online order still `unpaid` claimed to
+  be paid while the status card, the payment card ("Payment due") and the
+  "Continue to Payment" button on the same screen said otherwise. The
+  caption now follows the real state — cash collected / cash due for COD,
+  and paid / refunded / "Not paid yet — pay in Send2U when your order is
+  ready" for online. Same defect class as the already-fixed
+  `paymentStatusLabel` case, found by QA 80 lines away.
+- Fixed (app, `lib/money.ts`): the new thousands-separator rule still
+  accepted a zero-led leading group, so "0,123", "00,123" and "0,001.5"
+  were read as RM 123.00 / RM 123.00 / RM 1.50. The leading group must now
+  be 1-3 non-zero-led digits; those inputs raise the validation error.
+- Fixed (tests, `lib/unread.test.ts`): the previous version asserted only
+  that calls did not throw — the whole file passed even with
+  `setUnreadCount` replaced by a total no-op. It now reads the store back
+  through the real public API (`useSharedUnreadCount`, via
+  `react-dom/server`'s `renderToString`) and asserts the rendered count,
+  clamping, persistence and replacement. Verified by mutation: the no-op
+  mutation now fails 5 tests instead of passing.
+- Changed (config): `@types/node` (^26.6.1) and `@types/react-dom`
+  (~19.2.0) are now declared devDependencies. The suite cannot type-check
+  without them, and `@types/node` was previously resolving only
+  transitively — a `TS2688` whole-project failure waiting to happen.
+- Reason: QA of the sweep found the same copy-defect class the sweep had
+  just fixed, a too-permissive price rule, and a test file that could not
+  fail.
+- Validation: `npx tsc --noEmit` clean; `npm test` 43/43 pass;
+  `npx expo lint` clean; `npx expo export -p web` pass. Mutation check on
+  `lib/unread.ts` (no-op writer) fails 5 tests, then reverted clean.
+- Limits/decisions: `setUnreadCount` still stores non-integer input
+  verbatim (unreachable from the app's four call sites — unread counts are
+  integers), and subscriber-notification is not observable from a server
+  render, so it stays untested. On-device tap-through still pending.
+
 ## 2026-09-18 — Fix sweep: money/state defects + first test suite
 
 - Fixed (app, `lib/orders.ts`): `paymentStatusLabel` now takes an optional

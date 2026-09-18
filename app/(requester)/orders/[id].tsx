@@ -574,8 +574,14 @@ export default function OrderDetailScreen() {
           />
           <Text variant="caption" color="muted">
             {order.paymentMethod === 'cod'
-              ? 'Cash due on delivery — pay your helper when the food arrives.'
-              : 'Paid in Send2U (simulated for this demo).'}
+              ? order.paymentStatus === 'collected'
+                ? 'Cash collected on delivery.'
+                : 'Cash due on delivery — pay your helper when the food arrives.'
+              : order.paymentStatus === 'paid'
+                ? 'Paid in Send2U (simulated for this demo).'
+                : order.paymentStatus === 'refunded'
+                  ? 'Refunded by Send2U.'
+                  : 'Not paid yet — pay in Send2U when your order is ready.'}
           </Text>
         </Card>
 

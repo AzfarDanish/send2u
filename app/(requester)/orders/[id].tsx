@@ -480,6 +480,7 @@ export default function OrderDetailScreen() {
     if (terminal) return null;
     if (order.paymentStatus === 'paid') return 'Paid in Send2U (simulated for this demo).';
     if (order.paymentStatus === 'collected') return 'Cash collected on delivery.';
+    if (order.paymentStatus === 'refunded') return 'Refunded by Send2U.';
     if (order.paymentMethod === 'cod') {
       return 'Cash due on delivery — pay your helper when the food arrives.';
     }

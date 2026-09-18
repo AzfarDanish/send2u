@@ -10,6 +10,37 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-18 — Fix sweep iteration 3: review follow-through
+
+Follow-up to the entries below (second independent review, of `a496ff07`).
+
+- Fixed (app, `app/(requester)/orders/[id].tsx`): restored the
+  `paymentStatus === 'refunded'` branch in the Order Summary payment
+  caption. Iteration 1's state matrix had dropped it, so a refunded
+  non-terminal order would have read "Not paid yet — pay in Send2U when
+  your order is ready". The loop-back path is narrow (refunds accompany
+  cancelled/disputed orders, and only a withdrawn dispute returns to a
+  non-terminal state), so this is a correctness restore rather than an
+  observed defect — the matrix is a superset of the one it replaced again.
+- Corrected (docs, in place, this entry's siblings below): the sweep entry
+  claimed "the tested modules use only erased type-only imports" — true
+  for four of the five, false for `lib/unread.ts`, which runtime-imports
+  `react`. It also listed `useSharedUnreadCount` as out of scope while
+  iteration 1 then tested it through its own public API. Both statements
+  are corrected in place (the changelog must not contradict the
+  implementation) and the reconciliation is stated there.
+- Reason: the second review verified both iteration-2 fixes exactly (a
+  section-level multiset diff proved the de-duplication removed only
+  byte-identical duplicates, and a 3 statuses x 3 methods x 12 payment
+  statuses sweep proved the caption is correct and null for terminal
+  orders), but found one iteration-1 item silently dropped and one branch
+  lost.
+- Validation: `npx tsc --noEmit` clean; `npm test` 43/43 pass;
+  `npx expo lint` clean; `npx expo export -p web` pass.
+- Limits/decisions: unchanged from the entries below — no DB work,
+  on-device tap-through still pending, duplicate-case changelog paths
+  left for a CEO decision.
+
 ## 2026-09-18 — Fix sweep iteration 2: review findings closed
 
 Follow-up to the two entries below (independent manager review of commit
@@ -103,9 +134,12 @@ and `8cbd3d16`).
 - Added (tests): the project's first test suite — 40 tests over the pure
   money/state logic in `lib/` (`money`, `orders`, `orderEvents`, `dedupe`,
   `unread`), run by Node's built-in test runner (`npm test`,
-  `npm run test:watch`). No new dependencies: Node 22 strips TypeScript
-  natively and the tested modules use only erased type-only imports, so no
-  bundler/Jest/RN transform was added.
+  `npm run test:watch`). No bundler, no Jest and no RN transform was added:
+  Node 22 strips TypeScript natively, and the tested modules need no
+  component environment — four of the five use only erased type-only
+  imports, while `lib/unread.ts` runtime-imports `react`, which resolves
+  from the repo's own node_modules. (`@types/node` and `@types/react-dom`
+  were declared later; see the iteration 1 entry above.)
 - Changed (config): `tsconfig.json` gains `"types": ["node", "react"]`
   (TypeScript 6 no longer auto-includes `@types/node`, which the suite's
   `node:test`/`node:assert` imports require) and
@@ -120,8 +154,10 @@ and `8cbd3d16`).
 - Limits/decisions: no Supabase schema, RPC, policy, or migration change
   (DB untouched); legacy write-dead columns (`pickup_code`,
   `payment_qr_path`, `evidence_path`) retained. Unit scope is pure `lib/`
-  logic only — `useSharedUnreadCount` and all React/RN/Supabase modules
-  stay out (no RN test environment added). Node prints a harmless
+  logic; `services/`, `hooks/`, components, and the Supabase/push/maps
+  modules stay out (no RN or database environment was added).
+  `useSharedUnreadCount` was later covered through its own public API —
+  see the iteration 1 entry above. Node prints a harmless
   `MODULE_TYPELESS_PACKAGE_JSON` warning because the app is not an ESM
   package; adding `"type": "module"` would break the Expo build, so it is
   left as-is. On-device tap-through still pending.

@@ -126,3 +126,33 @@ A failing build is an environmental failure, not an implementation error —
 document it in `changelog.md` instead of chasing it (see the validation loop above).
 `[CXX5304] This version only understands SDK XML versions up to 3 ...` is a
 benign cmake-version warning, not a failure.
+
+## Repository gotchas
+
+- **`CHANGELOG.md` and `changelog.md` are one inode** (case-insensitive
+  filesystem) but **two tracked paths**, and history commits both. Appending
+  writes one file; `git add` then refreshes only one index entry and the other
+  sits permanently "modified". After appending, force both entries to the same
+  blob before committing:
+  `git update-index --cacheinfo 100644,$(git hash-object CHANGELOG.md),CHANGELOG.md`
+  — then confirm `git status` shows both staged with no unstaged changelog line.
+- **The application id lives in the native project, not in `app.json`.** With
+  `android/` committed, EAS Build ignores `android.package` (it says so in the
+  build log). A rename must also edit `android/app/build.gradle` (`namespace` +
+  `applicationId`) and move `android/app/src/main/java/<dotted path>/`, including
+  the `package` line in each file. Verify on the artifact with
+  `~/Library/Android/sdk/build-tools/*/aapt2 dump badging <apk> | head -1`.
+- **Loading states are centralised in `components/ui/LoadingBlocks.tsx`.** Every
+  data-fetching screen uses a layout-matched primitive (list → `SkeletonList`,
+  detail → `SkeletonDetail`, form → `SkeletonForm`, profile → `SkeletonProfile`,
+  key/value → `SkeletonKeyValueRows`); a new fetching screen must do the same.
+  `components/ui/LoadingState.tsx` was deleted — do not reintroduce a bare
+  full-screen spinner. Screens reading `profile` from `useAuth()` gate on
+  `isLoading` (true for session restore *and* the profile fetch) so no
+  "Campus requester" / "Not set" fallback is shown mid-load.
+- **Verifying UI or routing without a device:** `npx expo export -p web`, serve
+  `dist/` so extensionless paths resolve to `<route>.html`, then headless Chrome
+  `--dump-dom` with `--virtual-time-budget` (the export ships shells, so text
+  only appears after JS). For a phone-width screenshot, load the page in an
+  iframe — headless Chrome clamps its window to ~500px on macOS — and check
+  `documentElement.scrollWidth === clientWidth` for overflow instead of eyeballing.

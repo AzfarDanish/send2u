@@ -9,11 +9,19 @@ export function formatMYR(priceCents: number): string {
  * feedback only — the server re-validates every price it stores.
  */
 export function parsePriceToCents(raw: string): number {
-  const cleaned = raw.trim().toUpperCase().replace(/^RM\s*/, '').replace(/,/g, '');
-  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) {
+  const cleaned = raw.trim().toUpperCase().replace(/^RM\s*/, '');
+  // Commas are accepted only as well-formed thousands separators
+  // ("1,234.56"). Stripping them unconditionally would silently turn a
+  // comma-decimal typo like "6,50" into RM 650.00 — a 100x misread on a
+  // price field, so a misplaced separator must fail loudly instead.
+  if (cleaned.includes(',') && !/^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(cleaned)) {
     throw new Error('Enter a valid price, e.g. 6.50.');
   }
-  const cents = Math.round(Number.parseFloat(cleaned) * 100);
+  const normalized = cleaned.replace(/,/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
+    throw new Error('Enter a valid price, e.g. 6.50.');
+  }
+  const cents = Math.round(Number.parseFloat(normalized) * 100);
   if (!Number.isSafeInteger(cents) || cents < 0 || cents > 999999) {
     throw new Error('Enter a price between RM 0.00 and RM 9999.99.');
   }

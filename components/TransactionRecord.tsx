@@ -32,7 +32,7 @@ export function TransactionRecord({ orderId }: { orderId: string }) {
       <Text variant="subtitle">Transaction Record</Text>
       <View style={styles.rows}>
         <Row label="Method" value={paymentMethodLabel(context.paymentMethod)} />
-        <Row label="Payment" value={paymentStatusLabel(context.paymentStatus)} />
+        <Row label="Payment" value={paymentStatusLabel(context.paymentStatus, context.paymentMethod)} />
         <Row label="Amount" value={formatMYR(context.totalCents)} numeric />
         {context.paymentMethod === 'cod' && context.codCollectedCents != null ? (
           <Row label="Cash collected" value={formatMYR(context.codCollectedCents)} numeric />

@@ -10,6 +10,102 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-18 — Fix sweep: money/state defects + first test suite
+
+- Fixed (app, `lib/orders.ts`): `paymentStatusLabel` now takes an optional
+  `method` and disambiguates `unpaid` — COD reads "Cash due on delivery",
+  online reads "Payment due". Previously every unpaid order was labelled
+  "Cash due on delivery", including online orders awaiting in-app payment,
+  contradicting the same card's "Pay in Send2U now" copy; the vendor order
+  detail rendered "Online Payment · Cash due on delivery". All three call
+  sites (`RequesterPaymentCard`, `TransactionRecord`, vendor `orders/[id]`)
+  now pass the order's method. Method changes no other state's label.
+- Fixed (app, `lib/orders.ts`): `orderStatusLabel` title-cased every word
+  ("Ready For Pickup", "Out For Delivery") for each multi-word status it
+  falls back on. Now sentence case, matching the hand-written labels
+  elsewhere. Affected the helper-portal deliveries list (visible text and
+  its accessibility label).
+- Fixed (app, `lib/money.ts`): `parsePriceToCents` stripped commas
+  anywhere, so a comma-decimal typo ("6,50") was silently read as
+  RM 650.00 — a 100x misread on the vendor menu price field. Commas are now
+  accepted only as well-formed thousands separators ("1,234.56"); a
+  misplaced separator raises the existing validation error instead of
+  changing the amount. Client-side fast feedback only — the server still
+  re-validates every stored price.
+- Added (tests): the project's first test suite — 40 tests over the pure
+  money/state logic in `lib/` (`money`, `orders`, `orderEvents`, `dedupe`,
+  `unread`), run by Node's built-in test runner (`npm test`,
+  `npm run test:watch`). No new dependencies: Node 22 strips TypeScript
+  natively and the tested modules use only erased type-only imports, so no
+  bundler/Jest/RN transform was added.
+- Changed (config): `tsconfig.json` gains `"types": ["node", "react"]`
+  (TypeScript 6 no longer auto-includes `@types/node`, which the suite's
+  `node:test`/`node:assert` imports require) and
+  `"allowImportingTsExtensions": true` (Node ESM needs explicit `.ts`
+  extensions on the test files' relative imports).
+- Reason: the ratings-eligibility repair in the entry above is sound; this
+  sweep closes the remaining copy and price-parsing defects found in the
+  money/state path and locks the behaviour down with tests.
+- Validation: `npx tsc --noEmit` clean; `npm test` 40/40 pass;
+  `npx expo lint` clean; `npx expo export -p web` pass (all routes,
+  including pay-online and vendor orders).
+- Limits/decisions: no Supabase schema, RPC, policy, or migration change
+  (DB untouched); legacy write-dead columns (`pickup_code`,
+  `payment_qr_path`, `evidence_path`) retained. Unit scope is pure `lib/`
+  logic only — `useSharedUnreadCount` and all React/RN/Supabase modules
+  stay out (no RN test environment added). Node prints a harmless
+  `MODULE_TYPELESS_PACKAGE_JSON` warning because the app is not an ESM
+  package; adding `"type": "module"` would break the Expo build, so it is
+  left as-is. On-device tap-through still pending.
+
+## 2026-09-18 — Fix sweep: money/state defects + first test suite
+
+- Fixed (app, `lib/orders.ts`): `paymentStatusLabel` now takes an optional
+  `method` and disambiguates `unpaid` — COD reads "Cash due on delivery",
+  online reads "Payment due". Previously every unpaid order was labelled
+  "Cash due on delivery", including online orders awaiting in-app payment,
+  contradicting the same card's "Pay in Send2U now" copy; the vendor order
+  detail rendered "Online Payment · Cash due on delivery". All three call
+  sites (`RequesterPaymentCard`, `TransactionRecord`, vendor `orders/[id]`)
+  now pass the order's method. Method changes no other state's label.
+- Fixed (app, `lib/orders.ts`): `orderStatusLabel` title-cased every word
+  ("Ready For Pickup", "Out For Delivery") for each multi-word status it
+  falls back on. Now sentence case, matching the hand-written labels
+  elsewhere. Affected the helper-portal deliveries list (visible text and
+  its accessibility label).
+- Fixed (app, `lib/money.ts`): `parsePriceToCents` stripped commas
+  anywhere, so a comma-decimal typo ("6,50") was silently read as
+  RM 650.00 — a 100x misread on the vendor menu price field. Commas are now
+  accepted only as well-formed thousands separators ("1,234.56"); a
+  misplaced separator raises the existing validation error instead of
+  changing the amount. Client-side fast feedback only — the server still
+  re-validates every stored price.
+- Added (tests): the project's first test suite — 40 tests over the pure
+  money/state logic in `lib/` (`money`, `orders`, `orderEvents`, `dedupe`,
+  `unread`), run by Node's built-in test runner (`npm test`,
+  `npm run test:watch`). No new dependencies: Node 22 strips TypeScript
+  natively and the tested modules use only erased type-only imports, so no
+  bundler/Jest/RN transform was added.
+- Changed (config): `tsconfig.json` gains `"types": ["node", "react"]`
+  (TypeScript 6 no longer auto-includes `@types/node`, which the suite's
+  `node:test`/`node:assert` imports require) and
+  `"allowImportingTsExtensions": true` (Node ESM needs explicit `.ts`
+  extensions on the test files' relative imports).
+- Reason: the ratings-eligibility repair in the entry above is sound; this
+  sweep closes the remaining copy and price-parsing defects found in the
+  money/state path and locks the behaviour down with tests.
+- Validation: `npx tsc --noEmit` clean; `npm test` 40/40 pass;
+  `npx expo lint` clean; `npx expo export -p web` pass (all routes,
+  including pay-online and vendor orders).
+- Limits/decisions: no Supabase schema, RPC, policy, or migration change
+  (DB untouched); legacy write-dead columns (`pickup_code`,
+  `payment_qr_path`, `evidence_path`) retained. Unit scope is pure `lib/`
+  logic only — `useSharedUnreadCount` and all React/RN/Supabase modules
+  stay out (no RN test environment added). Node prints a harmless
+  `MODULE_TYPELESS_PACKAGE_JSON` warning because the app is not an ESM
+  package; adding `"type": "module"` would break the Expo build, so it is
+  left as-is. On-device tap-through still pending.
+
 ## 2026-09-18 — Load states: ratings gate fix + coverage audit
 
 - Fixed (bug): `OrderRatingSection` and the rate screen gated on legacy

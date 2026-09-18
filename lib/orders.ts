@@ -125,12 +125,16 @@ export function orderStatusTone(status: OrderStatus): 'info' | 'success' | 'warn
   }
 }
 
-/** Human label, e.g. "ready_for_pickup" → "Ready for pickup". */
+/**
+ * Human label for a raw status key, e.g. "ready_for_pickup" → "Ready for
+ * pickup". Sentence case, not title case: only the first word is
+ * capitalised, so multi-word keys read as English ("Out for delivery",
+ * not "Out For Delivery"). Hand-written labels elsewhere follow the same
+ * convention — this generic fallback must match them.
+ */
 export function orderStatusLabel(status: OrderStatus): string {
-  return status
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  const [first, ...rest] = status.split('_');
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(' ');
 }
 
 /**
@@ -175,8 +179,14 @@ export function paymentStatusTone(status: PaymentStatus): 'info' | 'success' | '
   }
 }
 
-/** Human label for the payment state. */
-export function paymentStatusLabel(status: PaymentStatus): string {
+/**
+ * Human label for the payment state. `method` disambiguates states that
+ * mean different things per rail: `unpaid` is a cash-due state on COD but
+ * a plain outstanding payment on an online order — labelling an online
+ * order "Cash due on delivery" is wrong copy. Pass the order's method
+ * wherever it is known; omit it only when the rail genuinely is not.
+ */
+export function paymentStatusLabel(status: PaymentStatus, method?: PaymentMethod | null): string {
   switch (status) {
     case 'submitted':
       return 'Verification pending';
@@ -185,7 +195,7 @@ export function paymentStatusLabel(status: PaymentStatus): string {
     case 'rejected':
       return 'Payment rejected';
     case 'unpaid':
-      return 'Cash due on delivery';
+      return method === 'cod' ? 'Cash due on delivery' : 'Payment due';
     case 'pending':
       return 'Payment processing';
     case 'paid':

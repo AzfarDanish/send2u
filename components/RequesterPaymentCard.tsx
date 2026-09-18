@@ -63,7 +63,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
         />
       ) : (
         <Text variant="caption" color="secondary">
-          {paymentStatusLabel(context.paymentStatus)}
+          {paymentStatusLabel(context.paymentStatus, context.paymentMethod)}
         </Text>
       )}
       <OrderBreakdown

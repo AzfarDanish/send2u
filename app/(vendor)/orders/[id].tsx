@@ -131,7 +131,7 @@ export default function VendorOrderDetailScreen() {
         {orderItemsTitle(order.items)}
       </Text>
       <Text variant="caption" color="secondary">
-        {paymentMethodLabel(order.paymentMethod)} · {paymentStatusLabel(order.paymentStatus)}
+        {paymentMethodLabel(order.paymentMethod)} · {paymentStatusLabel(order.paymentStatus, order.paymentMethod)}
         {order.helperId ? ' · helper assigned' : ' · waiting for helper'}
       </Text>
 

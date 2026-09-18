@@ -10,6 +10,160 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-18 — Audit: post-migration transaction hardening + doc cleanup
+
+- Fixed (backend, migrations `vendor_payments_select_policy`,
+  `cancel_settlement_state_and_revoke_settle`, `revoke_anon_new_money_rpcs`):
+  vendors can SELECT own-stall payment rows (realtime leg for vendor
+  detail); paid-online cancel now lands `cancelled`/`refunded`/`reversed`
+  instead of leaving settlement `pending`; `send2u_settle_order` and
+  `send2u_maybe_complete` are no longer directly callable (completion flow
+  only); explicit anon EXECUTE revoked on all new money RPCs (default
+  grants had survived the PUBLIC revoke — verified denied live).
+- Fixed (app): `ready_for_pickup` no longer claims picked-up/on-the-way in
+  `RequestProgress`; helper queue emitter matches the widened queue;
+  removed the duplicate Payment-record card under `TransactionRecord` on
+  request detail + vendor detail (single source per screen); multi-order
+  confirmation hints at per-order online payment; `frontedCents` renamed
+  `coveredCents`; requester "Food purchased" → "Food secured";
+  notification icons for `order.preparing`/`order.ready_for_pickup`;
+  deleted dead `PrivateImage.tsx`.
+- Fixed (docs): README + `docs/design.md` payment/transaction language
+  rewritten to the platform model (old QR/receipt flow described as
+  current); README route map, lifecycle, backend overview corrected.
+- Decided (legacy columns): `pickup_code`, `payment_qr_path`,
+  `evidence_path` stay in the DB (history risk) but are write-dead and
+  render-dead — no active UI reads them, no flow writes them.
+- Validation: `tsc` clean, `expo lint` clean, `expo export -p web` pass,
+  `expo-doctor` 19/21 (same 2 pre-existing env failures); live RPC —
+  state-independence matrix (COD unpaid/pending, online paid/pending),
+  8 invalid-transition/post-terminal guards with zero drift, COD
+  collect-then-cancel coherence (disputed, no settlement), cancel
+  regression (refunded/reversed, settle/pay-after blocked), direct-write
+  denial, anon denial, realtime publication + config verified; zero
+  residue. Full legacy-term sweep: only role identifiers, defensive
+  legacy-status cases, COD cash-handover wording, and retired-flow doc
+  notes remain.
+- Limits/decisions: vendor push fan-out stays requester/helper-only by
+  design (vendor queue is realtime-live); on-device tap-through pending.
+
+
+## 2026-09-18 — build/env: native Android build aborted by a full disk (ENOSPC)
+
+- Fixed (environment, no source change): `npx expo run:android` ended after
+  9m 3s with FOUR failures, only the first of which is real —
+  `:expo-modules-core:copyDebugJniLibsProjectOnly` →
+  `.../library_jni/debug/copyDebugJniLibsProjectOnly/jni/arm64-v8a/libexpo-modules-core.so:
+  No space left on device`. The other three (`:react-native-reanimated:buildCMakeDebug[arm64-v8a][reanimated]`,
+  `:app:configureCMakeDebug[arm64-v8a]`,
+  `:react-native-gesture-handler:configureCMakeDebug[arm64-v8a]`) are only
+  `Build cancelled` cascades from the same abort.
+- Cause: the data volume was at 892 MB free of 245 GB. Not code, not Gradle,
+  not the NDK. The terminal output never shows it — it stops mid-CMake — so
+  the failure is invisible on screen.
+- Fixed by freeing 4.7 GB of pure caches (`~/.cache`: codex-runtimes, uv,
+  whisper; `~/.npm/_cacache`; Homebrew cache), then re-running. Rebuild was
+  incremental off the aborted state: `BUILD SUCCESSFUL in 2m 2s`
+  (26 executed, 312 up-to-date), APK 82 MB, installed and launched on the
+  connected device, Metro bundling 2033 modules.
+- Details: the authoritative error log is
+  `~/.gradle/daemon/<gradle-version>/daemon-<pid>.out.log`, not the terminal.
+  A non-interactive shell must export `ANDROID_HOME=$HOME/Library/Android/sdk`
+  (from `~/.zprofile`) and `JAVA_HOME=/opt/homebrew/opt/openjdk@17` (from
+  `~/.zshrc`) — `android/local.properties` does not exist, so the SDK path
+  comes only from the environment. `--device <serial>` is rejected with
+  `Could not find device with name: <serial>`; omit it when exactly one
+  device is attached.
+- Validation: `expo run:android` BUILD SUCCESSFUL; `app-debug.apk` 82 MB
+  (22:00); `adb shell pidof com.anonymous.send2u` → live pid;
+  `https://localhost:8081/status` → 200.
+- Known limitation: the volume is still 98% full. Kept deliberately: 3.7 GB of
+  Gradle caches for unused versions (`~/.gradle/caches/{8.14.3,9.2.0}`) and
+  ~5 GB of prebuilt native intermediates under `node_modules/*/android/{build,.cxx}`.
+  Those are the next reclaim targets if a clean build, an AGP/Gradle upgrade,
+  or a `--release` build hits ENOSPC again. The native link/package stage needs
+  several GB free, so check free space before a from-scratch build.
+- Known limitation: `[CXX5304] This version only understands SDK XML versions up
+  to 3 ... version 4 was encountered` is a benign warning from cmake 3.22.1
+  against the newer SDK/build-tools 36.0.0. It repeats per native module and is
+  not a failure.
+
+## 2026-09-18 — Transaction architecture: platform-managed Online/COD system
+
+- Changed (backend, migrations `platform_managed_transactions_schema`,
+  `platform_managed_transaction_rpcs`, `ratings_accept_platform_payments`,
+  `accept_from_prepared_states`, `notify_copy_platform_model`,
+  `harden_new_transaction_rpcs`): orders carry independent `payment_method`
+  (online/cod), `payment_status`
+  (unpaid/pending/paid/failed/collected/refunded/…), and `settlement_status`;
+  new `send2u_settlements` ledger (vendor/helper/platform splits, UNIQUE per
+  order) + `send2u_app_config` (`commission_bps=0`, fee RM2.00); order states
+  gain vendor `preparing`/`ready_for_pickup`; cancellations and
+  food-unavailable now preserve rows as `cancelled` (paid online →
+  simulated `refunded`) instead of hard-deleting; single legacy order row
+  reset per approval (vendors/menus/profiles untouched).
+- Changed (backend RPCs, all SECURITY DEFINER + server-derived amounts +
+  anon EXECUTE revoked): `place_orders` records method + payment row at
+  birth; `initiate/complete_payment` simulate online pay with idempotent
+  provider refs; `vendor_advance` (paid-gated prep); `accept_order` from
+  pending/preparing/ready (prep preserved); `confirm_cod_collection`
+  (exact-amount, double-tap safe); `settle_order` (one split row,
+  advisory-locked, duplicate-safe); `maybe_complete` converges
+  confirm+pay/collect into completed+settled; `payment_context` drops helper
+  QR/pickup code, adds transaction+settlement view; ratings accept
+  paid/collected; notify copy rewritten + prep notifications added.
+- Changed (app): checkout gains an Online/COD picker; new `pay-online`
+  screen (simulated processing → success/failed-retry, dev failure toggle);
+  request detail + confirmation branch by method; new `TransactionRecord`
+  (method/payment/splits) on completed/cancelled records; helper workspace
+  shows "covered by Send2U", COD cash-due/collect confirm with
+  earning-vs-cash distinction, settled-earnings footer; new vendor Orders
+  tab (prep queue + detail + prepare/ready actions, own-stall RLS);
+  realtime extended to payments/settlements; help/terms/privacy rewritten.
+- Removed: helper-QR rail (`payment-qr` screen + route + profile row,
+  `setPaymentQrPath`, QR/receipt storage pickers, `DownloadableQR`,
+  `ReceiptEvidenceView`, `StagedFileCard`, `usePaymentFlow`,
+  `send2u_submit_payment`); old `payment`/`receipt` screens are redirects;
+  `send2u_place_orders(uuid,jsonb)` overload dropped.
+- Reason: helper must never finance food; Send2U manages every transaction
+  for both payment methods (competition prototype — simulated, no real
+  money, no wallet).
+- Validation: `tsc` clean, `expo lint` clean, `expo export -p web` pass
+  (incl. new pay-online + vendor orders routes); live RPC E2E — Flow B COD
+  full chain + double-collect + double-settle + rating, Flow A online happy
+  path + replay idempotency + unpaid vendor gate, Flow C failure→retry with
+  single payment row, Flow F paid→refunded / COD→cancelled with history
+  preserved — all pass with zero residue; security advisors show only the
+  pre-existing definer-function + password-protection classes.
+- Limits/decisions: commission RM0 via configurable `commission_bps`;
+  COD short-pay unsupported (exact-amount confirm only); `pickup_code` and
+  `payment_qr_path` columns retained unread; `expo-doctor` 19/21 (same 2
+  pre-existing environmental failures); on-device tap-through pending.
+
+
+## 2026-09-18 — DB audit: drop unused push_tokens.platform (no other drops)
+
+- Audited all 10 tables / 107 columns against app code (explicit
+  selects, no star-selects), RPC bodies, triggers, RLS policies, and
+  the edge function. Result: every table live; every other column
+  read somewhere (`read_at` drives mark-read/unread;
+  `resolved_by`/`pickup_code`/`image_url`/`availability_updated_at`
+  each serve a live RPC or read path). Sole exception:
+  `send2u_push_tokens.platform` — written at registration, never
+  read by app, fan-out (selects token only), policies, or fns.
+- Changed (migration `drop_unused_push_token_platform`): dropped
+  the column with its CHECK/default. Client: `registerPushToken`
+  no longer sends it; removed now-unused `PushPlatform` /
+  `normalizePlatform` (`lib/push.ts`, both call sites).
+- Validation: `tsc`, `lint`, `expo export -p web` — pass; column
+  confirmed gone; platform-less upsert verified in a rolled-back
+  probe (no residue); fan-out untouched.
+- Observed (not caused here): auth roster changed out-of-band —
+  all requester/helper dev accounts are gone (incl. prior keepers),
+  replaced by 3 Gmail users + 6 email-less users; 9 profiles,
+  1 order, 1 token remain with zero dangling references (cascades
+  held). No action taken; flagging instead of papering over.
+
 ## 2026-09-17 — DB: drop 4 dev users, realistic personas, schema audit (no schema changes)
 
 - Audited: all 10 tables live (offer subsystem already retired;
@@ -2707,3 +2861,28 @@ only. No secrets are ever recorded here.
   a production build would reproduce the unconfigured-app failure. Do not assume
   production shares preview's values (it may point at a different Supabase
   project).
+
+## 2026-09-17 — Auth: prevent transient account-setup screen after signup
+
+- Fixed (`contexts/AuthContext.tsx`): auth events previously exposed a user
+  with no role while profile lookup ran, with loading already false. New
+  account sessions now keep routing behind the existing loading screen until
+  lookup completes; sign-in/signup results finish the same loading phase.
+- Details: subscribe before restoration; defer profile queries outside the
+  auth callback; invalidate stale profile requests on session changes and
+  successful explicit loads. Same-account refreshes keep existing content.
+- Changed (`app/select-role.tsx`): failed lookups show an error with retry and
+  sign-out rather than falsely offering missing-profile setup. Retry clears
+  errors on success; genuine missing profiles retain one-time recovery.
+- Validation: temporary deterministic hook harness reproduced the original
+  flash for immediate/delayed signup and sign-in, then passed 14 checks on
+  the fix (including stale responses, sign-out, confirmation-required,
+  restoration, missing/failed lookup, retry, and unmount). TypeScript, lint,
+  web export, and diff whitespace checks passed. No dependencies or backend
+  resources changed.
+- Limits: harness mocks React hooks/services, not device rendering; physical
+  signup tap-through remains pending. Expo Doctor passed 20/21, with the
+  existing native-folder/app-config sync warning. Supabase advisors retain
+  existing [function grants](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable),
+  [password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection),
+  and [index/policy](https://supabase.com/docs/guides/database/database-linter) notices (unchanged).

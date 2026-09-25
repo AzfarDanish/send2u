@@ -23,7 +23,7 @@ interface MainHeaderProps {
  */
 export function MainHeader({ title, subtitle, leading, showSettings = false }: MainHeaderProps) {
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessibilityRole="header" accessibilityLabel={title}>
       {leading}
       <View style={styles.titles}>
         <Text variant="title" numberOfLines={1}>

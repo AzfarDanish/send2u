@@ -27,11 +27,10 @@ export default function VendorLayout() {
     );
   }
   if (!user) return <Redirect href="/(auth)/sign-in" />;
-  // Send each account to the application that can actually serve it: a
-  // requester to the main app, a role-less account to account recovery. The
-  // root route is a content screen, not a bouncing gate.
+  // Send each account to the application that can actually serve it. A
+  // role-less account returns to Sign In; the root entry signs it out.
   if (role !== 'vendor') {
-    return <Redirect href={role ? '/(requester)' : '/select-role'} />;
+    return <Redirect href={role ? '/(requester)' : '/(auth)/sign-in'} />;
   }
 
   return (

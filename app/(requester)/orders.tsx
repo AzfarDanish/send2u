@@ -34,7 +34,7 @@ export default function RequesterOrdersScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
         }>
-        <MainHeader title="Requests" />
+        <MainHeader title="My Orders" />
         <View style={styles.section}>
           <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
             ACTIVE REQUESTS

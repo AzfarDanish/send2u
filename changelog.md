@@ -10,6 +10,71 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Home header: collapse can no longer ratchet the header away
+
+- Fixed (app, `app/(requester)/index.tsx`): the collapsing Home header stayed
+  collapsed after scrolling back up. Root cause taken from the Metro device
+  log, not inferred: the block was collapsed by animating a clip's `height`,
+  so its children were re-measured against the shrunken box on every frame and
+  that measurement fed straight back into the animation —
+  `[home-measure] h=134`, `132`, `126`, … `100`, `h=0`. At 0 the previous
+  guard returned a style with no `height` key at all, leaving nothing to
+  restore, so the header never came back (the search bar sits outside that
+  block, which is why only it survived — matching the report).
+- Correction to the entry below: the JS-thread offset syncs added there could
+  not have fixed this. The scroll offset was never the problem; the device log
+  shows it returning to `y=0` on every cycle. The same entry's "defaults to
+  full-open until the block is measured" guard is the branch that made the
+  collapse permanent once the measured height reached 0.
+- Details: the block now collapses by transform plus negative margin
+  (`translateY: -p·H`, `marginBottom: -p·H`) while keeping its own natural
+  height, so it can never be squeezed and re-measured smaller. The worklet
+  returns identical style keys every frame (a view that switches which keys it
+  is given can be left holding the last height it was handed), a transient
+  zero measurement is ignored instead of stored, the offset is clamped inside
+  the scroll worklet, and the ineffective JS-thread offset writes are removed.
+  `overflow: 'hidden'` moved from the clip wrapper to the header itself.
+- Verified (device ELP-NX9 over Metro, hot reload): swiped down (header
+  collapses to the search pill, content clipped cleanly at the sheet edge),
+  swiped back to the top, then compared frames byte-for-byte by converting
+  both screenshots to BMP and diffing three bands. Against the collapsed frame
+  54.9% / 70.7% / 61.5% of bytes differ; against the settled baseline
+  **0.000%** on every band — the header and list return pixel-identical, not
+  merely "visible again".
+- Validation: `npx tsc --noEmit` clean across the tree, `npx eslint` clean on
+  the changed file.
+- Limits: reduced motion is deliberately not special-cased — the collapse is
+  driven 1:1 by the scroll offset (direct manipulation, no independent
+  animation), and a finger-linked slide has no shorter equivalent. Verified on
+  one device (density 520); only the measured block height is device-dependent.
+
+## 2026-09-26 — Home error hunt: scroll crash + stuck-collapsed header fixed
+
+- Fixed (app, `app/(requester)/index.tsx`): every scroll on Home threw
+  "Uncaught Error: Object is not a function" in `_handleScroll` (43
+  logged errors on-device) — the Reanimated scroll handler from
+  `useAnimatedScrollHandler` was attached to a plain `ScrollView`, which
+  cannot invoke the worklet object. The white sheet is now an
+  `Animated.ScrollView`; scrolling is error-free.
+- Fixed (config, `babel.config.js`, new): the project had no Babel
+  config, so Reanimated worklets never compiled — the collapse animation
+  never ran and the header rendered stuck-collapsed (logo, greeting, and
+  location missing). Added the standard `babel-preset-expo` config.
+  Collapse style now also defaults to full-open until the header block
+  is measured, so a missed measurement can never hide the header.
+- Verified (device, ELP_NX9 via metro): force-stopped and reloaded the
+  app, screenshotted expanded Home (full red header: logo, greeting,
+  location chevron, pill search, rounded white sheet) and scrolled state
+  (search-only red header, content clipped cleanly at the sheet edge);
+  zero JS errors in logcat across scrolls. Metro left running for
+  continued on-device work.
+- Validation: `npx tsc --noEmit` clean; `npx expo lint` clean;
+  `npm test` 43/43 pass; `npx expo export -p web` pass. `expo-doctor`
+  19/21 — same 2 pre-existing environmental failures (non-CNG sync
+  notice, SDK patch drift).
+- Known limitations: on-device animation smoothness judged from static
+  screenshots only; uncommitted by request.
+
 ## 2026-09-26 — Home refresh + nav revert: collapsing header, pill search, docked bar
 
 - Reverted (navigation): the floating Liquid Glass island

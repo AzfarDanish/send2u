@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 
@@ -17,8 +18,8 @@ interface SegmentedControlProps<T extends string> {
 
 /**
  * Generic N-segment control in the ActiveHistoryToggle visual language:
- * gray track, white selected pill, brand selected text. Compact 40pt
- * segments so four options fit small phones without overflow.
+ * gray track, white selected pill, brand selected text. 44pt segments
+ * (Apple minimum touch target) so every option stays tappable.
  */
 export function SegmentedControl<T extends string>({
   options,
@@ -31,17 +32,18 @@ export function SegmentedControl<T extends string>({
       {options.map((option) => {
         const selected = option.value === value;
         return (
-          <Pressable
+          <PressableScale
             key={option.value}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={option.label}
             onPress={() => onChange(option.value)}
-            style={({ pressed }) => [styles.segment, selected && styles.selected, pressed && styles.pressed]}>
+            haptic="selection"
+            style={[styles.segment, selected && styles.selected]}>
             <Text variant="caption" style={[styles.label, selected && styles.labelSelected]}>
               {option.label}
             </Text>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </View>
@@ -58,14 +60,13 @@ const styles = StyleSheet.create({
   },
   segment: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
   },
   selected: { backgroundColor: colors.surface },
-  pressed: { opacity: 0.7 },
   label: { fontWeight: '600', color: colors.secondary },
   labelSelected: { color: colors.primary },
 });

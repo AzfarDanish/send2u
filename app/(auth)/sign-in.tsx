@@ -1,77 +1,42 @@
-import { Redirect, useLocalSearchParams } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { BrandHeader } from '@/components/BrandHeader';
-import { Badge } from '@/components/ui/Badge';
+import { AuthField } from '@/components/auth/AuthField';
+import { AuthLink } from '@/components/auth/AuthLink';
+import { AuthScreen } from '@/components/auth/AuthScreen';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { OptionCard } from '@/components/ui/OptionCard';
-import { Screen } from '@/components/ui/Screen';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
-import { markFreshAuthEntry } from '@/lib/authEntry';
-import { markOnboardingPending } from '@/lib/onboarding';
-import type { UserRole } from '@/types/domain';
 
-type Mode = 'sign-in' | 'sign-up';
-
-/**
- * Production-style account entry: real email/password signup and login.
- * New accounts are always requesters; the Helper Portal capability is
- * granted manually out-of-band (never self-selected at signup).
- * Navigation after entry is declarative — `(auth)/_layout` redirects
- * authenticated users to `/`, which routes by role.
- */
 export default function SignInScreen() {
-  const { user, isSupabaseEnabled, authError, signUp, signIn } = useAuth();
-  // Opened with ?mode=sign-up from the welcome screen's "Create an account".
-  const { mode: requestedMode } = useLocalSearchParams<{ mode?: string }>();
-  const [mode, setMode] = useState<Mode>(requestedMode === 'sign-up' ? 'sign-up' : 'sign-in');
+  const { user, isSupabaseEnabled, authError, signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('requester');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [confirmationSent, setConfirmationSent] = useState(false);
 
   if (user) {
     return <Redirect href="/" />;
   }
 
-  const switchMode = (next: Mode) => {
-    setMode(next);
-    setFormError(null);
-    setConfirmationSent(false);
-  };
+  if (!isSupabaseEnabled) {
+    return (
+      <AuthScreen title="Sign in" description="Continue to your Send2U account">
+        <Text variant="caption" color="error" accessibilityRole="alert">
+          Authentication is not configured.
+        </Text>
+      </AuthScreen>
+    );
+  }
 
   const submit = async () => {
     if (busy) return;
     setBusy(true);
     setFormError(null);
-    setConfirmationSent(false);
     try {
-      if (mode === 'sign-up') {
-        const result = await signUp(email, password, role);
-        // Recorded for BOTH signup outcomes: with confirmation on, there is no
-        // session yet, and the walkthrough must still open on the first
-        // sign-in that follows. Signing in to an existing account never
-        // records this, so the slides stay a signup-only, one-time event.
-        await markOnboardingPending(result.user.id);
-        if (result.status === 'confirmation-required') {
-          // No session exists yet: stay put and say so. Entering the app
-          // here would bypass email verification.
-          setConfirmationSent(true);
-        }
-      } else {
-        await signIn(email, password);
-        // Sign-in is the flow allowed to forward the user straight in (see
-        // lib/authEntry.ts) — the root route consumes this once.
-        markFreshAuthEntry();
-      }
+      await signIn(email, password);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Authentication failed.');
     } finally {
@@ -80,124 +45,89 @@ export default function SignInScreen() {
   };
 
   return (
-    <Screen>
-      <BrandHeader />
-      <SectionHeader
-        eyebrow={mode === 'sign-up' ? 'Create account' : 'Welcome back'}
-        title={mode === 'sign-up' ? 'Join Send2U' : 'Sign in to Send2U'}
+    <AuthScreen
+      title="Sign in"
+      description="Continue to your Send2U account"
+      footer={
+        <View style={styles.footerRow}>
+          <Text color="secondary">Don&apos;t have an account? </Text>
+          <AuthLink title="Create Account" onPress={() => router.push('/(auth)/create-account')} />
+        </View>
+      }>
+      {authError ? (
+        <Text variant="caption" color="error" accessibilityRole="alert">
+          {authError}
+        </Text>
+      ) : null}
+      <AuthField
+        icon="mail-outline"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="Email"
+        accessibilityLabel="Email address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
+        textContentType="username"
+        editable={!busy}
       />
-
-      {!isSupabaseEnabled && (
-        <Card>
-          <Badge label="Setup needed" tone="warning" />
-          <Text variant="subtitle">Supabase not configured</Text>
-          <Text color="secondary">
-            Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to enable authentication.
-          </Text>
-        </Card>
-      )}
-
-      {authError && (
-        <Card>
-          <Badge label="Notice" tone="error" />
-          <Text variant="subtitle">Session restore issue</Text>
-          <Text color="secondary">{authError}</Text>
-        </Card>
-      )}
-
-      {isSupabaseEnabled && (
-        <>
-          <Card>
-            <Text variant="subtitle">Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@campus.edu"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType={mode === 'sign-up' ? 'emailAddress' : 'username'}
-              editable={!busy}
-              style={styles.input}
-              accessibilityLabel="Email address"
-            />
-            <Text variant="subtitle">Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder={mode === 'sign-up' ? 'At least 6 characters' : 'Your password'}
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              textContentType={mode === 'sign-up' ? 'newPassword' : 'password'}
-              editable={!busy}
-              style={styles.input}
-              accessibilityLabel="Password"
-            />
-          </Card>
-
-          {mode === 'sign-up' && (
-            <View style={styles.roleBlock}>
-              <Text variant="subtitle">You join as a requester</Text>
-              <OptionCard
-                icon="shopping-bag"
-                title="I'm ordering food"
-                selected
-                disabled={busy}
-                onPress={() => setRole('requester')}
-              />
-            </View>
-          )}
-
-          {formError && (
-            <Card>
-              <ErrorState
-                title={mode === 'sign-up' ? 'Could not create account' : 'Could not sign in'}
-                message={formError}
-              />
-            </Card>
-          )}
-
-          {confirmationSent && (
-            <Card>
-              <Badge label="Check your inbox" tone="info" />
-              <Text variant="subtitle">Confirm your email</Text>
-              <Text color="secondary">
-                Your account was created. Open the confirmation email, then come back and sign in.
-              </Text>
-            </Card>
-          )}
-
-          <Button
-            title={busy ? 'Working…' : mode === 'sign-up' ? 'Create account' : 'Sign in'}
-            onPress={() => void submit()}
-            disabled={busy}
-            loading={busy}
-          />
-          <Button
-            title={mode === 'sign-up' ? 'Have an account? Sign in' : 'New here? Create an account'}
-            variant="tertiary"
-            onPress={() => switchMode(mode === 'sign-up' ? 'sign-in' : 'sign-up')}
-            disabled={busy}
-          />
-        </>
-      )}
-    </Screen>
+      <AuthField
+        icon="lock-outline"
+        value={password}
+        onChangeText={setPassword}
+        placeholder="Password"
+        accessibilityLabel="Password"
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry
+        secureToggle
+        textContentType="password"
+        editable={!busy}
+      />
+      <AuthLink
+        title="Forgot password?"
+        align="right"
+        onPress={() => router.push('/(auth)/forgot-password')}
+      />
+      <Button
+        title={busy ? 'Working…' : 'Sign In'}
+        onPress={() => void submit()}
+        disabled={busy}
+        loading={busy}
+        style={styles.primaryButton}
+      />
+      {formError ? (
+        <Text variant="caption" color="error" accessibilityRole="alert" style={styles.formError}>
+          {formError}
+        </Text>
+      ) : null}
+      <View style={styles.divider} accessibilityElementsHidden>
+        <View style={styles.dividerLine} />
+        <Text variant="caption" color="muted" style={styles.dividerText}>
+          or
+        </Text>
+        <View style={styles.dividerLine} />
+      </View>
+    </AuthScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  roleBlock: { gap: spacing.sm },
-  input: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.surface,
+  primaryButton: { minHeight: 56 },
+  formError: { marginTop: spacing.sm },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.divider,
+  },
+  dividerText: { marginHorizontal: spacing.md },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

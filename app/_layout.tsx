@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import 'react-native-url-polyfill/auto';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CartProvider } from '@/contexts/CartContext';
@@ -52,16 +53,16 @@ function AuthedProviders() {
   }, [user?.id]);
   const cartKey = user?.id ?? lastUserId ?? 'guest';
   return (
-    <CartProvider key={cartKey}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="select-role" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(requester)" />
-        <Stack.Screen name="(vendor)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-    </CartProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <CartProvider key={cartKey}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(requester)" />
+          <Stack.Screen name="(vendor)" />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+      </CartProvider>
+    </GestureHandlerRootView>
   );
 }

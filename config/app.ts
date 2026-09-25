@@ -11,7 +11,8 @@ export const appConfig = {
 
 export const routes = {
   auth: '/(auth)/sign-in',
-  selectRole: '/select-role',
+  createAccount: '/(auth)/create-account',
+  forgotPassword: '/(auth)/forgot-password',
   requesterHome: '/(requester)',
   helperPortal: '/(requester)/helper-portal',
 } as const;

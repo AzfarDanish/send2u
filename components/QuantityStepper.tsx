@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 
@@ -16,25 +17,29 @@ interface QuantityStepperProps {
 export function QuantityStepper({ value, onChange, min = 1, max = 99 }: QuantityStepperProps) {
   return (
     <View style={styles.container}>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel="Decrease quantity"
         disabled={value <= min}
         onPress={() => onChange(value - 1)}
-        style={({ pressed }) => [styles.stepper, value <= min && styles.disabled, pressed && styles.pressed]}>
+        haptic="selection"
+        hitSlop={8}
+        style={[styles.stepper, value <= min && styles.disabled]}>
         <MaterialIcons name="remove" size={20} color={value <= min ? colors.disabled : colors.primary} />
-      </Pressable>
+      </PressableScale>
       <Text variant="subtitle" style={styles.value} accessibilityRole="text">
         {value}
       </Text>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel="Increase quantity"
         disabled={value >= max}
         onPress={() => onChange(value + 1)}
-        style={({ pressed }) => [styles.stepper, value >= max && styles.disabled, pressed && styles.pressed]}>
+        haptic="selection"
+        hitSlop={8}
+        style={[styles.stepper, value >= max && styles.disabled]}>
         <MaterialIcons name="add" size={20} color={value >= max ? colors.disabled : colors.primary} />
-      </Pressable>
+      </PressableScale>
     </View>
   );
 }
@@ -55,6 +60,5 @@ const styles = StyleSheet.create({
     borderColor: colors.disabledBackground,
     backgroundColor: colors.surfaceSecondary,
   },
-  pressed: { opacity: 0.7 },
   value: { minWidth: 32, textAlign: 'center' },
 });

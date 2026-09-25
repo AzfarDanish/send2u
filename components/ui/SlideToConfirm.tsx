@@ -1,14 +1,28 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Animated, PanResponder, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/Text';
+import { pressDurationMs, project, rubberband, springDefault, springFlick } from '@/constants/motion';
 import { colors, radii, spacing } from '@/constants/theme';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const TRACK_HEIGHT = 56;
 const THUMB_SIZE = 48;
 const TRACK_PADDING = 4;
 const COMPLETE_FRACTION = 0.7;
+/** A fast fling toward the end commits even before the 70% mark. */
+const FLING_VELOCITY = 800;
 
 interface SlideToConfirmProps {
   /** Idle label, e.g. "Slide to accept". */
@@ -29,11 +43,30 @@ interface SlideToConfirmProps {
   onConfirm: () => void;
 }
 
+function tick(): void {
+  try {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  } catch {
+    // Best-effort.
+  }
+}
+
+function succeed(): void {
+  try {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  } catch {
+    // Best-effort.
+  }
+}
+
 /**
  * Consequential confirmation control: the caller drags the thumb past
- * ~70% of the track to confirm. Releasing early springs back with
- * nothing committed. Screen-reader users get an equivalent tap action.
- * Used for job acceptance; ordinary navigation never uses this weight.
+ * ~70% of the track (or flings toward it) to confirm. Apple fluid rules:
+ * 1:1 tracking with grab continuity, interruptible springs from the live
+ * value, release-velocity handoff, momentum projection to pick the
+ * landing point, rubber-band past the end, progress-linked track fill.
+ * Releasing early springs back with nothing committed. Screen-reader
+ * users get an equivalent tap action.
  */
 export function SlideToConfirm({
   label,
@@ -44,45 +77,92 @@ export function SlideToConfirm({
   busy = false,
   onConfirm,
 }: SlideToConfirmProps) {
-  const [slide] = useState(() => new Animated.Value(0));
   const [trackWidth, setTrackWidth] = useState(0);
+  const reduced = useReducedMotion();
   const locked = disabled || busy;
   const maxDx = Math.max(trackWidth - THUMB_SIZE - TRACK_PADDING * 2, 1);
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => !locked,
-        onMoveShouldSetPanResponder: (_, gesture) => !locked && Math.abs(gesture.dx) > 4,
-        onPanResponderGrant: () => {
-          slide.stopAnimation();
-        },
-        onPanResponderMove: (_, gesture) => {
-          if (locked) return;
-          slide.setValue(Math.min(Math.max(gesture.dx, 0), maxDx));
-        },
-        onPanResponderRelease: (_, gesture) => {
-          if (locked) {
-            Animated.spring(slide, { toValue: 0, useNativeDriver: false }).start();
-            return;
-          }
-          if (gesture.dx >= maxDx * COMPLETE_FRACTION) {
-            Animated.timing(slide, { toValue: maxDx, duration: 120, useNativeDriver: false }).start(
-              ({ finished }) => {
-                if (finished) onConfirm();
-                slide.setValue(0);
-              },
-            );
-          } else {
-            Animated.spring(slide, { toValue: 0, useNativeDriver: false }).start();
-          }
-        },
-        onPanResponderTerminate: () => {
-          Animated.spring(slide, { toValue: 0, useNativeDriver: false }).start();
-        },
-      }),
-    [locked, maxDx, onConfirm, slide],
-  );
+  const x = useSharedValue(0);
+  const crossed = useSharedValue(false);
+  const confirmed = useSharedValue(false);
+
+  const fireConfirm = useCallback(() => {
+    succeed();
+    onConfirm();
+    // Reset for the next use after the caller clears `busy`.
+    // Reanimated shared-value writes — intended API.
+    // eslint-disable-next-line react-hooks/immutability
+    x.value = withSpring(0, { ...springDefault });
+    // eslint-disable-next-line react-hooks/immutability
+    confirmed.value = false;
+  }, [confirmed, onConfirm, x]);
+
+  const pan = Gesture.Pan()
+    .enabled(!locked)
+    .activeOffsetX([-8, 8])
+    .failOffsetY([-12, 12])
+    .onStart(() => {
+      // Reanimated worklet writes — intended API.
+      crossed.value = false;
+      // eslint-disable-next-line react-hooks/immutability
+      confirmed.value = false;
+    })
+    .onUpdate((event) => {
+      const raw = event.translationX;
+      if (raw <= maxDx) {
+        // eslint-disable-next-line react-hooks/immutability
+        x.value = Math.max(raw, 0);
+      } else {
+        // Rubber-band past the end instead of a hard stop (Apple §9).
+        x.value = maxDx + rubberband(raw - maxDx, maxDx);
+      }
+      const past = x.value >= maxDx * COMPLETE_FRACTION;
+      if (past && !crossed.value) {
+        crossed.value = true;
+        runOnJS(tick)();
+      } else if (!past && crossed.value) {
+        crossed.value = false;
+      }
+    })
+    .onEnd((event) => {
+      if (confirmed.value) return;
+      const velocity = event.velocityX ?? 0;
+      // Momentum projection (Apple §6): land where the gesture is going,
+      // then commit when the projected point clears the threshold — a
+      // fling commits early, a slow drag must travel the distance.
+      const projected = x.value + project(velocity);
+      const fling = velocity > FLING_VELOCITY && x.value > maxDx * 0.3;
+      const commit = x.value >= maxDx * COMPLETE_FRACTION || projected >= maxDx * COMPLETE_FRACTION || fling;
+      if (commit) {
+        // eslint-disable-next-line react-hooks/immutability
+        confirmed.value = true;
+        // eslint-disable-next-line react-hooks/immutability
+        x.value = reduced
+          ? withTiming(maxDx, { duration: pressDurationMs }, (finished) => {
+              if (finished) runOnJS(fireConfirm)();
+            })
+          : withSpring(maxDx, { ...springFlick, velocity }, (finished) => {
+              if (finished) runOnJS(fireConfirm)();
+            });
+      } else {
+        // Velocity handoff (Apple §5): continue at the finger's exact
+        // velocity so there is no seam between drag and spring.
+        x.value = reduced
+          ? withTiming(0, { duration: pressDurationMs })
+          : withSpring(0, { ...springDefault, velocity });
+      }
+    });
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: TRACK_PADDING + x.value }],
+  }));
+  const fillStyle = useAnimatedStyle(() => ({
+    width: TRACK_PADDING * 2 + THUMB_SIZE + x.value,
+    opacity: interpolate(x.value, [0, maxDx], [0, 0.35]),
+  }));
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(x.value, [0, maxDx * 0.6], [1, 0.25]),
+  }));
 
   const shownLabel = busy ? busyLabel : disabled && disabledLabel ? disabledLabel : label;
   const filled = tone === 'filled';
@@ -99,36 +179,43 @@ export function SlideToConfirm({
         if (!locked) onConfirm();
       }}
       onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
-      style={[styles.track, filled && styles.trackFilled, soft && styles.trackSoft, (disabled || busy) && styles.trackDisabled]}
-      {...panResponder.panHandlers}>
-      <Text
-        variant="secondary"
-        style={[
-          styles.label,
-          filled && styles.labelFilled,
-          soft && styles.labelSoft,
-          disabled && !busy && styles.labelDisabled,
-        ]}
-        numberOfLines={1}>
-        {shownLabel}
-      </Text>
+      style={[styles.track, filled && styles.trackFilled, soft && styles.trackSoft, (disabled || busy) && styles.trackDisabled]}>
       <Animated.View
-        style={[
-          styles.thumb,
-          filled && styles.thumbFilled,
-          { transform: [{ translateX: Animated.add(TRACK_PADDING, slide) }] },
-          disabled && !busy && styles.thumbDisabled,
-        ]}>
-        {busy ? (
-          <ActivityIndicator color={filled || idle ? colors.onPrimary : colors.primary} />
-        ) : (
-          <MaterialIcons
-            name="chevron-right"
-            size={28}
-            color={filled && idle ? colors.primary : colors.onPrimary}
-          />
-        )}
+        style={[styles.fill, filled && styles.fillFilled, fillStyle]}
+        pointerEvents="none"
+      />
+      <Animated.View style={labelStyle} pointerEvents="none">
+        <Text
+          variant="secondary"
+          style={[
+            styles.label,
+            filled && styles.labelFilled,
+            soft && styles.labelSoft,
+            disabled && !busy && styles.labelDisabled,
+          ]}
+          numberOfLines={1}>
+          {shownLabel}
+        </Text>
       </Animated.View>
+      <GestureDetector gesture={pan}>
+        <Animated.View
+          style={[
+            styles.thumb,
+            filled && styles.thumbFilled,
+            thumbStyle,
+            disabled && !busy && styles.thumbDisabled,
+          ]}>
+          {busy ? (
+            <ActivityIndicator color={filled || idle ? colors.onPrimary : colors.primary} />
+          ) : (
+            <MaterialIcons
+              name="chevron-right"
+              size={28}
+              color={filled && idle ? colors.primary : colors.onPrimary}
+            />
+          )}
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
 }
@@ -150,6 +237,17 @@ const styles = StyleSheet.create({
   },
   trackSoft: {
     backgroundColor: colors.primarySoft,
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: radii.full,
+    backgroundColor: colors.primary,
+  },
+  fillFilled: {
+    backgroundColor: colors.onPrimary,
   },
   label: { fontWeight: '600', color: colors.secondary, paddingHorizontal: spacing.xxxl },
   labelFilled: { color: colors.onPrimary },

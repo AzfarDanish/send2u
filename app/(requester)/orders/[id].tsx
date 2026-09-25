@@ -1,7 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from 'react-native-reanimated';
 
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { OrderRatingSection } from '@/components/OrderRatingSection';
@@ -16,6 +18,7 @@ import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { ListRow } from '@/components/ui/ListRow';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -561,14 +564,22 @@ export default function OrderDetailScreen() {
               {order.helperId ? ` · ${helperLabel(helperIdentity, order.helperId)}` : ''}
             </Text>
           </View>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel="More actions"
-            onPress={() => setMenuOpen((open) => !open)}
-            style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
+            onPress={() => {
+              try {
+                void Haptics.selectionAsync();
+              } catch {
+                // Best-effort.
+              }
+              setMenuOpen((open) => !open);
+            }}
+            haptic={null}
+            style={styles.menuButton}
             hitSlop={8}>
             <MaterialIcons name="more-vert" size={22} color={colors.text} />
-          </Pressable>
+          </PressableScale>
         </View>
 
         <RequestProgress order={order} />
@@ -783,22 +794,32 @@ export default function OrderDetailScreen() {
         ) : null}
       </Screen>
 
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} accessibilityLabel="Close menu">
-          <View style={styles.menuCard}>
-            {menuItems.map((item) => (
-              <Pressable
-                key={item.key}
-                accessibilityRole="button"
-                accessibilityLabel={item.title}
-                onPress={item.onPress}
-                style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
-                <MaterialIcons name={item.icon} size={20} color={colors.text} />
-                <Text variant="secondary">{item.title}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
+      <Modal visible={menuOpen} transparent animationType="none" onRequestClose={() => setMenuOpen(false)}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.menuBackdropWrap}>
+          <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} accessibilityLabel="Close menu">
+            {/* Origin-aware popover: scales from the top-right trigger (Apple §7)
+                with a symmetric enter/exit path — no disconnected fade. */}
+            <Animated.View
+              entering={ZoomIn.springify().damping(28).stiffness(320)}
+              exiting={ZoomOut.duration(200)}
+              style={styles.menuCardOrigin}>
+              <View style={styles.menuCard}>
+                {menuItems.map((item) => (
+                  <PressableScale
+                    key={item.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
+                    onPress={item.onPress}
+                    haptic="selection"
+                    style={styles.menuItem}>
+                    <MaterialIcons name={item.icon} size={20} color={colors.text} />
+                    <Text variant="secondary">{item.title}</Text>
+                  </PressableScale>
+                ))}
+              </View>
+            </Animated.View>
+          </Pressable>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -822,7 +843,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: { opacity: 0.7 },
+  menuBackdropWrap: { flex: 1 },
   menuBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.25)',
@@ -830,6 +851,8 @@ const styles = StyleSheet.create({
     paddingTop: 120,
     paddingRight: spacing.lg,
   },
+  // Origin at the top-right trigger so enter/exit scale along one path.
+  menuCardOrigin: { alignItems: 'flex-end' },
   menuCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,

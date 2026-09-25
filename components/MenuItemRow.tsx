@@ -1,8 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Badge } from '@/components/ui/Badge';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 import { formatMYR } from '@/lib/money';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -22,11 +23,12 @@ interface MenuItemRowProps {
 export function MenuItemRow({ item, showVendor = false, onPress, thumbnail = false, onAdd }: MenuItemRowProps) {
   const dimmed = !item.isAvailable;
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${item.name}, ${formatMYR(item.priceCents)}${item.isAvailable ? '' : ', unavailable'}`}
       onPress={() => onPress(item)}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      haptic="selection"
+      style={styles.card}>
       {thumbnail ? (
         <View style={styles.imageWrap}>
           <PlaceholderImage style={styles.image} />
@@ -50,30 +52,27 @@ export function MenuItemRow({ item, showVendor = false, onPress, thumbnail = fal
         </View>
         <View style={styles.actionRow}>
           {onAdd ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Add ${item.name} to cart`}
               accessibilityState={{ disabled: !item.isAvailable }}
               onPress={() => onAdd(item)}
               disabled={!item.isAvailable}
-              hitSlop={4}
-              style={({ pressed: innerPressed }) => [
-                styles.addButton,
-                !item.isAvailable && styles.addDisabled,
-                innerPressed && item.isAvailable && styles.pressed,
-              ]}>
+              hitSlop={8}
+              haptic="light"
+              style={[styles.addButton, !item.isAvailable && styles.addDisabled]}>
               <MaterialIcons
                 name="add"
                 size={22}
                 color={item.isAvailable ? colors.onPrimary : colors.disabled}
               />
-            </Pressable>
+            </PressableScale>
           ) : (
             <MaterialIcons name="chevron-right" size={24} color={dimmed ? colors.disabled : colors.muted} />
           )}
         </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 const styles = StyleSheet.create({
@@ -91,7 +90,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  pressed: { opacity: 0.7 },
   imageWrap: {
     aspectRatio: 16 / 9,
     backgroundColor: colors.surfaceSecondary,

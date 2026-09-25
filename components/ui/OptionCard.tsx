@@ -1,7 +1,8 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Pressable, StyleSheet, View, type PressableProps } from 'react-native';
+import { StyleSheet, View, type PressableProps } from 'react-native';
 
 import { colors, spacing } from '@/constants/theme';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 
 interface OptionCardProps extends Omit<PressableProps, 'style'> {
@@ -15,14 +16,11 @@ interface OptionCardProps extends Omit<PressableProps, 'style'> {
 /** Large tappable choice row (role picker, request type, etc.). Flat layout with clear selection state. */
 export function OptionCard({ icon, title, description, selected = false, loading = false, ...rest }: OptionCardProps) {
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ selected, busy: loading }}
-      style={({ pressed }) => [
-        styles.card,
-        selected && styles.selected,
-        pressed && styles.pressed,
-      ]}
+      haptic="selection"
+      style={[styles.card, selected && styles.selected]}
       {...rest}>
       <View style={[styles.iconWrap, selected && styles.iconWrapSelected]}>
         <MaterialIcons name={icon} size={26} color={selected ? colors.onPrimary : colors.primary} />
@@ -40,7 +38,7 @@ export function OptionCard({ icon, title, description, selected = false, loading
         size={24}
         color={selected ? colors.primary : colors.muted}
       />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -52,7 +50,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   selected: { backgroundColor: colors.primarySoft },
-  pressed: { opacity: 0.85 },
   iconWrap: {
     width: 52,
     height: 52,

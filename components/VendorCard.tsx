@@ -1,7 +1,8 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import type { Vendor } from '@/types/domain';
@@ -26,11 +27,11 @@ export function vendorInitials(name: string): string {
  */
 export function VendorCard({ vendor, onPress }: VendorCardProps) {
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${vendor.name}${vendor.isOpen ? '' : ', closed'}`}
       onPress={() => onPress(vendor)}
-      style={({ pressed }) => [pressed && styles.pressed]}
+      haptic="selection"
     >
       <View style={styles.row}>
         <View style={styles.tile}>
@@ -62,14 +63,11 @@ export function VendorCard({ vendor, onPress }: VendorCardProps) {
           color={colors.primary}
         />
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  pressed: {
-    opacity: 0.7,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

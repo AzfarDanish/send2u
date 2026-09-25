@@ -1,5 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HeaderBack } from '@/components/HeaderBack';
@@ -32,9 +33,11 @@ interface GlassHeaderProps {
  * chevron, absolutely-centered title, optional right action. Screens using
  * it hide the native header and render `Screen beneathHeader` so content
  * starts below the glass and slides behind it on scroll.
- * 
- * Updated: Soft, faded background treatment with minimal blur for a cleaner look.
- * The header blends naturally into the white app background without visible boundaries.
+ *
+ * Material levels (documented, light-only): default chrome is
+ * `BlurView intensity 15 + rgba(255,255,255,0.85)` veil; the vendor dock
+ * bar is the strong level (`intensity 85`). Opacity cross-fade on enter
+ * is the reduced-motion-safe materialize.
  */
 export function GlassHeader({
   title,
@@ -49,7 +52,8 @@ export function GlassHeader({
   const insets = useSafeAreaInsets();
   const dark = tone === 'dark';
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(200)}
       style={[styles.position, { height: insets.top + GLASS_HEADER_ROW }]}
       accessibilityRole="header"
       accessibilityLabel={accessibilityLabel ?? title}
@@ -94,7 +98,7 @@ export function GlassHeader({
         <View style={[styles.side, styles.right]}>{right}</View>
       </View>
       {/* Subtle separator at bottom edge - removed for cleaner floating appearance */}
-    </View>
+    </Animated.View>
   );
 }
 

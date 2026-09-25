@@ -19,7 +19,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, radii, spacing, touchTargets } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
@@ -73,6 +73,18 @@ function firstNameOf(value: string | null | undefined): string | null {
  */
 export default function RequesterHomeScreen() {
   const insets = useSafeAreaInsets();
+  // The requester tab bar floats over the sheet, so the scroll content has to
+  // clear its full height plus the bottom inset or the last card ends up half
+  // behind it. Mirrors `Screen`'s under-tabs clearance, but inset-aware because
+  // the bar's height includes the gesture inset.
+  //
+  // The collapse hold is added on top of it: past the collapse the content is
+  // drawn COLLAPSE_DISTANCE lower than its layout position for the rest of the
+  // scroll, and that much trailing padding is consumed by the shift so it is
+  // never seen. Without it the last card sits permanently below the scrollable
+  // range and cannot be scrolled into view.
+  const sheetBottomPadding =
+    COLLAPSE_DISTANCE + touchTargets.tabBar + Math.max(insets.bottom, 8) + spacing.xl;
   const { sections, status, error, refreshing, retry, refresh } = useMenu();
   const { profile, user } = useAuth();
   const { locations } = useDeliveryLocations();
@@ -296,7 +308,8 @@ export default function RequesterHomeScreen() {
         {/* One wrapper so the whole sheet can be held back by the collapse
             driver; the sheet's own spacing lives here, not on the scroll
             container, so the hold moves content and gap together. */}
-        <Animated.View style={[styles.sheetBody, contentShiftStyle]}>
+        <Animated.View
+          style={[styles.sheetBody, contentShiftStyle, { paddingBottom: sheetBottomPadding }]}>
         {status === 'loading' ? (
           <View style={styles.stateBlock}>
             <SkeletonList rows={4} lines={2} thumb={72} label="Loading menu" />
@@ -520,7 +533,9 @@ const styles = StyleSheet.create({
   sheetBody: {
     flexGrow: 1,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xxxl,
+    // No bottom padding here on purpose: the tab-bar clearance is computed at
+    // render time (bar height + gesture inset) and applied inline, so a device
+    // with a taller floating bar still scrolls its last card fully into view.
     gap: spacing.xxl,
   },
   stateBlock: { paddingHorizontal: spacing.xl },

@@ -10,6 +10,36 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Home: last card no longer hides behind the floating tab bar
+
+- Fixed (app, `app/(requester)/index.tsx`): the last vendor card sat half behind
+  the requester tab bar, both on the default home list and after "See all".
+  The sheet's content ended in `spacing.xxxl` (32) of padding while the bar is
+  absolutely positioned at `touchTargets.tabBar + max(insets.bottom, 8)`. The
+  content now ends in a render-time clearance of that bar height, plus the
+  gesture inset, plus 20.
+- The non-obvious half: the collapse hold draws the content up to
+  `COLLAPSE_DISTANCE` below its layout position for the rest of the scroll (that
+  is what keeps the carried motion and the 1:1 scrolling continuous), so the
+  trailing padding must absorb that shift as well. Sizing the clearance alone
+  changed nothing visible — the card was still ~140pt short of the scrollable
+  range, which is why the first attempt at this fix appeared to do nothing.
+- Verified (device ELP-NX9, after a full reload so the bundle under test is the
+  current one): scrolled to the end of the list — the last card renders complete
+  with ~117pt of white between its bottom edge and the bar, in the default list
+  and in the expanded "See all" list whose last card is `Selera Barat Palsu`.
+  Scroll position confirmed to be the maximum by frame comparison (0.000% change
+  after five further flings).
+- Checked and left alone: the other tab roots use `Screen underTabs`, whose
+  clearance (32 + 70) already exceeds the bar height on this device, and none of
+  them carry the collapse shift.
+- Validation: `npx tsc --noEmit` clean, `npx eslint` clean on the changed file.
+- Limits: the clearance is a composition of theme tokens plus the live inset; if
+  the tab bar's height changes, this value has to change with it. Fast Refresh
+  did not re-apply edits reliably in this session (an intermediate attempt was
+  verified against a stale bundle), so on-device verification now always starts
+  from a force-stop plus start.
+
 ## 2026-09-26 — Home header: the content rides the header (blank band removed)
 
 - Changed (app, `app/(requester)/index.tsx`): `CONTENT_HOLD` now defaults to

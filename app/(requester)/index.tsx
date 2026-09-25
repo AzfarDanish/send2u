@@ -72,21 +72,38 @@ export default function RequesterHomeScreen() {
     }, []),
   );
 
-  // Collapse driver: scroll offset + measured full height of the
-  // collapsible block (logo row, greeting, location).
+  // Collapse driver: scroll offset + the block's own natural height.
+  //
+  // The block is collapsed by sliding it up under the search bar (translate +
+  // negative margin), NOT by animating a clip's height around it. Squeezing
+  // the block's container re-measured its children against the shrunken box on
+  // every frame, and that measurement fed straight back into the animation:
+  // 134 -> 132 -> ... -> 0, at which point the header was gone for good and
+  // scrolling back up had nothing left to restore. Keeping the block's height
+  // its own means it can be measured once and stays stable.
   const scrollY = useSharedValue(0);
   const collapseHeight = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-    },
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    // Clamp at the source: overscroll (pull-to-refresh) is negative and must
+    // never run the animation backwards.
+    scrollY.value = Math.max(0, event.contentOffset.y);
   });
   const collapseStyle = useAnimatedStyle(() => {
-    const distance = Math.min(Math.max(scrollY.value, 0), COLLAPSE_DISTANCE);
-    const progress = COLLAPSE_DISTANCE <= 0 ? 0 : distance / COLLAPSE_DISTANCE;
+    const blockHeight = collapseHeight.value;
+    // Before the first measurement the block renders at its natural height
+    // (progress 0), and every frame returns the same style keys — a view that
+    // switches which keys it is given can be left holding the last height it
+    // was handed mid-collapse.
+    const progress =
+      blockHeight <= 0
+        ? 0
+        : Math.min(Math.max(scrollY.value, 0), COLLAPSE_DISTANCE) / COLLAPSE_DISTANCE;
     return {
-      height: collapseHeight.value * (1 - progress),
-      opacity: Math.max(0, 1 - progress * 1.4),
+      // Hides exactly the space the block slides out of, so the search bar
+      // below it travels up by the same amount and meets its bottom edge.
+      marginBottom: -progress * blockHeight,
+      transform: [{ translateY: -progress * blockHeight }],
+      opacity: 1 - progress * 0.85,
     };
   });
 
@@ -165,10 +182,15 @@ export default function RequesterHomeScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Animated.View style={[styles.collapseClip, collapseStyle]}>
+        <Animated.View style={collapseStyle}>
           <View
             onLayout={(event) => {
-              collapseHeight.value = event.nativeEvent.layout.height;
+              // The block is never height-constrained now (no animated clip
+              // wraps it), so this is its true content height. A transient
+              // zero is ignored rather than stored — storing one is what used
+              // to leave the header permanently hidden.
+              const measured = event.nativeEvent.layout.height;
+              if (measured > 0) collapseHeight.value = measured;
             }}>
             <View style={styles.topRow}>
               <Image
@@ -222,7 +244,7 @@ export default function RequesterHomeScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.sheet}
         contentContainerStyle={styles.sheetBody}
         showsVerticalScrollIndicator={false}
@@ -365,7 +387,7 @@ export default function RequesterHomeScreen() {
             </View>
           </View>
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
       <CartFab aboveTabs />
     </View>
   );
@@ -373,12 +395,13 @@ export default function RequesterHomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.primary },
+  // Clips the collapsing block (logo row, greeting, location) as it slides up
+  // and out of the header; the search bar below it only moves because the
+  // block's negative margin gives up exactly the space it vacates.
   header: {
     backgroundColor: colors.primary,
+    overflow: 'hidden',
   },
-  // Clips the collapsing block (logo row, greeting, location) as it
-  // shrinks; the search below never moves.
-  collapseClip: { overflow: 'hidden' },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',

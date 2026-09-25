@@ -1,6 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import type { ColorValue } from 'react-native';
+import { StyleSheet, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UnreadSync } from '@/components/UnreadSync';
@@ -32,12 +32,15 @@ export default function RequesterLayout() {
   }
   if (!user) return <Redirect href="/(auth)/sign-in" />;
   // Verified helpers use this same main app (Helper Portal is nested under
-  // Profile). Only vendors leave for their own experience.
+  // Profile). Only vendors leave for their own experience. Role-less accounts
+  // return to Sign In; the root entry signs them out.
   if (role === 'vendor') return <Redirect href="/(vendor)" />;
+  if (role !== 'requester' && role !== 'helper') return <Redirect href="/(auth)/sign-in" />;
 
-  // The bar floats over scrolled content (which slides behind it) while
-  // still clearing the system gesture area: its height absorbs the bottom
-  // inset instead of sitting behind it.
+  // Docked bottom bar in normal flow (white, quiet, hairline separator):
+  // its height absorbs the bottom inset instead of sitting behind it.
+  // Three tabs only — Home, My Orders, Profile. Active is Send2U red,
+  // inactive is neutral gray. No floating bar, no pills, no colored bg.
   const tabBarBottom = Math.max(insets.bottom, 8);
 
   // Home, Requests, and Profile hide the native header and render the
@@ -58,13 +61,9 @@ export default function RequesterLayout() {
           tabBarActiveTintColor: navigation.tabActive,
           tabBarInactiveTintColor: navigation.tabInactive,
         tabBarStyle: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
           backgroundColor: navigation.tabBarBackground,
           borderTopColor: navigation.tabBarBorder,
-          borderTopWidth: 1,
+          borderTopWidth: StyleSheet.hairlineWidth,
           height: touchTargets.tabBar + tabBarBottom,
           paddingTop: 8,
           paddingBottom: tabBarBottom,
@@ -78,7 +77,7 @@ export default function RequesterLayout() {
       />
       <Tabs.Screen
         name="orders"
-        options={{ title: 'Requests', tabBarIcon: tabIcon('receipt-long'), headerShown: false }}
+        options={{ title: 'My Orders', tabBarIcon: tabIcon('receipt-long'), headerShown: false }}
       />
       <Tabs.Screen
         name="profile"
@@ -89,8 +88,9 @@ export default function RequesterLayout() {
           headerShown: false,
         }}
       />
-      {/* The tab bar lives only on Home, Requests, and Profile. Every
-        other requester route hides it so content owns the full screen. */}
+      {/* The tab bar shows on Home, My Orders, Profile, and the vendor
+        menu page (per the requester hierarchy). All other pushed routes
+        hide it so content owns the full screen. */}
       <Tabs.Screen
         name="create"
         options={{
@@ -124,7 +124,6 @@ export default function RequesterLayout() {
         options={{
           href: null,
           title: 'Vendor',
-          tabBarStyle: { display: 'none' },
           headerShown: false,
         }}
       />

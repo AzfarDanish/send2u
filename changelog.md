@@ -10,6 +10,165 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Home refresh + nav revert: collapsing header, pill search, docked bar
+
+- Reverted (navigation): the floating Liquid Glass island
+  (`components/GlassTabBar.tsx`, deleted) is replaced by the previous
+  docked white tab bar — full-width, hairline separator, Home / My Orders
+  / Profile, red active, gray inactive. Restored the matching `Screen`
+  clearance + separator, `CartFab` offset, and Home/vendor bottom
+  padding; removed the now-unused `islandNav` theme tokens. Also removed
+  the `expo-glass-effect` dependency (nothing else used it).
+- Changed (app, `app/(requester)/index.tsx`): location row gains a small
+  `keyboard-arrow-down` chevron connected to the label (same tappable
+  row, no button/pill container).
+- Changed (app, `app/(requester)/index.tsx`): Popular menu drops "See
+  all" and now picks one available-first item per vendor (up to 10), so
+  the shelf always spans the platform instead of one stall. Tile layout
+  unchanged.
+- Changed (app, `components/SearchBar.tsx`): new opt-in `pill` variant —
+  fully rounded, borderless, no shadow; Home uses it inside the red
+  header. Default appearance unchanged for any other consumer.
+- Changed (app, `app/(requester)/index.tsx`): Reanimated scroll-driven
+  collapsing header — logo row, greeting, and location shrink/fade over
+  140pt of scroll down to a search-only red header, and restore on
+  scroll-back; the pill search never moves or resizes. The white content
+  is now a sheet with rounded top corners overlapping the header bottom
+  by 20pt.
+- Reason: exact Home updates as specified; nav back to the docked design.
+- Validation: `npx tsc --noEmit` clean; `npx expo lint` clean;
+  `npm test` 43/43 pass; `npx expo export -p web` pass; headless web
+  shell boots to Sign In with no errors.
+- Known limitations: collapse animation needs on-device feel check;
+  popular shelf shows at most one dish per vendor even when a vendor has
+  many.
+
+## 2026-09-26 — Glass island fix: hidden-route overflow + viewport anchoring
+
+- Fixed (app, `components/GlassTabBar.tsx`): the island rendered every
+  route in the navigator state, including ~20 pushed screens with
+  `href={null}` — their titles concatenated into one overflowing string
+  ("Request detailsConfirm Delivery…"). It now skips routes whose
+  `tabBarItemStyle` is `display: 'none'` (the exact mechanism expo-router
+  uses to hide them from the stock bar), so only Home / My Orders /
+  Profile render. No route or navigation logic changed.
+- Fixed (app, `components/GlassTabBar.tsx`): replaced the unbounded
+  `minWidth` tabs + double-nested absolute layers with a fixed 288pt
+  island (`islandNav.width`), `flex: 1` per tab (equal, independent
+  areas), single-line centered labels, and stock-style viewport anchoring
+  (`absolute; left/right/bottom 0` + safe-area padding). Content can no
+  longer stretch the island, labels cannot merge or escape
+  (`overflow: hidden` retained as a second guarantee), and the island
+  stays fixed while pages scroll underneath.
+- Changed (theme, `constants/theme.ts`): `islandNav.tabMinWidth`
+  replaced by `islandNav.width: 288`.
+- Reason: the island is now a compact self-contained component with
+  three isolated destinations; glass treatment and behavior unchanged.
+- Validation: `npx tsc --noEmit` clean; `npx expo lint` clean;
+  `npm test` 43/43 pass; `npx expo export -p web` pass; headless web
+  shell boots to Sign In with no errors.
+- Known limitations: on-device visual check of the contained island
+  still pending.
+
+## 2026-09-26 — Requester nav: floating Liquid Glass island tab bar
+
+- Added (deps): `expo-glass-effect@~57.0.4` (`npx expo install`) for native
+  iOS 26 Liquid Glass; guarded by `isGlassEffectAPIAvailable()`.
+- Added (app, `components/GlassTabBar.tsx`): one persistent floating
+  island for all tab screens — content-width pill (64pt, radius 32,
+  ~272pt wide) centered 20pt above the bottom safe-area inset, overlaying
+  scrolled content with taps passing through everywhere else. iOS 26+
+  renders `GlassView` (`clear` + white tint); older iOS, Android, and web
+  render the same geometry on `expo-blur` (intensity 85, light tint,
+  `dimezisBlurViewSdk31Plus`) with a translucent white veil — never a
+  fake static background. Thin white edge highlight, soft low shadow on a
+  plain wrapper (never on the glass view itself). Three tabs, icon over
+  label, red active / dark-gray inactive, no pills/badges/fills; presses
+  emit `tabPress` and honor `defaultPrevented`, with selection haptic.
+  Routes with `tabBarStyle: { display: 'none' }` still hide it, so
+  show/hide logic is unchanged.
+- Changed (navigation, `app/(requester)/_layout.tsx`): `Tabs` now uses
+  `tabBar={(props) => <GlassTabBar {...props} />}` (navigator prop — Expo
+  Router 57 has no such screenOption); docked white bar styles removed.
+  Destinations, icons, tint tokens, and per-screen visibility untouched.
+  Types come from expo-router's vendored `BottomTabBarProps` via a
+  type-only deep import (erased, never bundled).
+- Changed (theme, `constants/theme.ts`): new `islandNav` tokens (height,
+  radius, bottom gap, tab width) shared by the island, clearances, and
+  FAB offset.
+- Changed (app, `Screen`, `CartFab`, Home, vendor page): bottom padding
+  now clears the island's top edge (inset + gap + height + rhythm step);
+  removed the docked separator hairline; cart FAB floats just above the
+  glass. Item detail untouched (tabs hidden, fixed CTA owns the bottom).
+- Reason: Apple-style floating Liquid Glass island replacing the
+  full-width fixed bar; visuals only, zero navigation-logic change.
+- Validation: `npx tsc --noEmit` clean; `npx expo lint` clean;
+  `npm test` 43/43 pass; `npx expo export -p web` pass; headless web
+  shell boots to Sign In with no errors.
+- Known limitations: true refraction needs iOS 26+ (older platforms get
+  the blur fallback; Android <12 a translucent fill); native rebuild
+  required for the new module; on-device glass/blur check pending.
+
+## 2026-09-25 — Requester UI redesign: red-header home, image-header vendor, sheet detail
+
+- Changed (app, `app/(requester)/index.tsx`): home is now a red-header
+  layout — white Send2U wordmark + white bell left/right over `primary`,
+  time-based greeting from the profile row (`Good morning, <first>`),
+  compact campus label from the cart's selected drop-off point (first
+  drop-off point, then "Campus"; taps through to Drop-off Locations), and
+  a white `SearchBar` ("Search for food or vendors") overlapping the
+  red/white seam. Below: horizontally scrolling Popular menu tiles
+  (rounded image, overlapping red + button, name, red price — no cards)
+  and a one-column Vendors list (full-width image rows with a dark
+  readability overlay, white name/subtitle, white chevron, rounded
+  corners — no white cards). Vendors preview 3 rows with a See-all toggle;
+  Popular See-all opens that dish's vendor page. Client-side search still
+  filters the loaded `useMenu()` data; no new queries or routes.
+- Changed (app, `app/(requester)/vendors/[id].tsx`): vendor page is now a
+  full-cover image header owning the status-bar area (no white header
+  above it) with overlaid back/bell in translucent dark circles, a bottom
+  `expo-linear-gradient` readability scrim, and overlaid name/location/
+  metadata. Category bar (All, Nasi, Mee, Snacks, Drinks, Others — present
+  buckets only, name-hint faceting, red active + thin indicator, sticky)
+  replaces the old search + pill chips; menu is a two-column grid of
+  borderless tiles (fixed 1:1 images, overlapping + quick-add, dark name,
+  red price). Removed `GlassHeader`/blur dock/`MenuItemRow` use here.
+- Changed (app, `app/(requester)/menu/[id].tsx`): detail is now a
+  full-cover food image (no white header) with overlaid back/favorite/
+  share circles, a rounded white sheet overlapping the image (drag
+  indicator, name, red price, vendor/location meta, gray description),
+  an Options section of real same-vendor add-on rows (name, +price,
+  checkbox, hairline separators — no cards), compact light-gray circular
+  quantity stepper, and a fixed bottom white bar with a red Add to Cart
+  button (label left, live total right) that writes the item + checked
+  add-ons to the cart and routes to Review Request. Favorite is local
+  state only; share uses RN `Share` (best-effort). Removed `GlassHeader`,
+  vendor `Card`, just-added card, and `CartFab` here.
+- Changed (navigation, `app/(requester)/_layout.tsx`): tab bar is now
+  docked white with a hairline separator — no floating/absolute bar, no
+  pills. Three tabs: Home, My Orders (renamed from Requests), Profile;
+  active Send2U red, inactive neutral gray. The vendor page now keeps the
+  tab bar (per the requester hierarchy); item detail still hides it.
+  `app/(requester)/orders.tsx` header retitled to match.
+- Details: status-bar content follows the header via focused-screen
+  `StatusBar.setStyle` (expo-status-bar v57 API): light over the red home
+  header and image headers, dark over plain/loading states. Imagery stays
+  on the existing `PlaceholderImage` asset (vendor/item `imageUrl` is
+  unused in the MVP); brand red `#DA0A1B` unchanged; no new dependencies.
+- Reason: image-driven three-screen requester hierarchy (red header →
+  Popular → Vendors → tabs; cover image → categories → 2-col grid →
+  tabs; cover image → sheet → options/quantity → fixed CTA).
+- Validation: `npx tsc --noEmit` clean; `npx expo lint` clean;
+  `npm test` 43/43 pass; `npx expo export -p web` pass; headless web
+  shell boots to Sign In with no errors. `npx expo-doctor` 19/21 — the 2
+  failures are pre-existing and environmental (non-CNG native folders vs
+  app.json sync; 7 patch-level SDK drifts), untouched by this change.
+- Known limitations: vendor rating value/review count/ETA have no backend
+  columns, so the cover metadata shows real dish count, open state, and
+  hours instead of invented scores; item Options are same-vendor dishes
+  (or "No add-ons") since no modifier columns exist; on-device
+  tap-through still pending.
+
 ## 2026-09-18 — Fix sweep iteration 3: review follow-through
 
 Follow-up to the entries below (second independent review, of `a496ff07`).
@@ -3127,3 +3286,76 @@ and `8cbd3d16`).
   of the walkthrough was captured visually; slides 2 and 3 come from the same
   paged component and were not separately screenshotted. The walkthrough and
   the post-signup path were not exercised against a live account on a device.
+
+## 2026-09-23 — Apple Design pilot: fluid motion foundations + 3 pilot surfaces
+
+- Change (motion, new): `constants/motion.ts` (critically-damped
+  `springDefault` + flick-only `springFlick`, `pressScale 0.97`,
+  Apple's `project()` momentum function and `rubberband()` boundary
+  helper) and `hooks/useReducedMotion.ts` (`AccessibilityInfo`-backed
+  flag). New `components/ui/PressableScale.tsx` press primitive:
+  instant scale on pointer-down, spring back from the live value,
+  opacity cross-fade fallback when reduced-motion is on, opt-in
+  selection/light haptic on commit.
+- Changed (pilot surfaces): `Button` (scale spring, style-function API
+  kept), `ListRow`, `VendorCard`, `MenuItemRow` (incl. quick-add
+  `hitSlop 4→8` + add-to-cart haptic), `QuantityStepper`,
+  `OptionCard`, `SegmentedControl` (`minHeight 40→44`, selection
+  haptic), `CartFab` (spring enter/exit, badge pop, press spring),
+  `GlassHeader` (documented blur levels + fade-in materialize),
+  `MainHeader` (`header` role), `OnboardingFlow` (dots follow settled
+  scroll — no eager index, spring dot layout, 44pt Skip,
+  `animated:!reducedMotion`), vendor `[id]` (chips via press
+  primitive + spring dock bar instead of binary pop), order `[id]`
+  (fade `Modal` → origin-aware spring popover with symmetric
+  enter/exit + open haptic), `SlideToConfirm` rewritten on
+  Gesture Handler + Reanimated (1:1 tracking, velocity handoff,
+  momentum-projection commit incl. fling, rubber-band past end,
+  progress fill, threshold/success haptics, reduced-motion timing
+  path; same props API).
+- Changed (config): `app/_layout.tsx` wraps the tree in
+  `GestureHandlerRootView` (gestures need it); `constants/theme.ts`
+  gains size-specific tracking (display/title tighten, body 0).
+- Reason: Apple fluid-interface pilot (interruptible, velocity-aware
+  motion; feedback on press-down; subtle haptics on commit only;
+  light-only theme kept). Docs consulted before coding:
+  `https://docs.expo.dev/versions/v57.0.0/` (+ haptics, reanimated,
+  gesture-handler, blur-view pages).
+- Validation: `npx tsc --noEmit` clean; `npx expo lint` clean
+  (targeted `react-hooks/immutability` disables on Reanimated
+  shared-value worklet writes — intended API, matches repo
+  disable precedent); `npm test` 43/43 pass; `npx expo export -p web`
+  pass (all routes bundle).
+- Known limitations: `npx expo-doctor` 19/21 — both failures
+  pre-existing and untouched (non-CNG native-folder sync warning;
+  6 expo packages one patch behind; no dependency changed here).
+  `@gorhom/bottom-sheet` approved but deferred: the pilot's only
+  sheet-like surface is a small top-right menu, better served by the
+  Reanimated origin-aware popover with no new native dep. On-device
+  tap-through still pending (no headless browser in this env either);
+  web export is layout-representative only.
+
+## 2026-09-25 — UI: minimal Apple-style welcome page
+
+- Change (app, `app/index.tsx`): the signed-out welcome screen now shows only
+  the Send2U brand lockup plus `Sign in` and `Create an account`. Removed the
+  welcome eyebrow, marketing headline/body, and three highlight cards; the
+  signed-out content is vertically centred with the existing scroll-safe
+  `Screen` shell.
+- Reason: Apple-style simplicity and purpose — the welcome route's job is
+  entry/wayfinding, not repeating product education that onboarding and the
+  auth flow already own.
+- Fix (`components/ui/Button.tsx`): primary buttons were not rendering their
+  background on the Android virtual device after the earlier motion pass
+  because an animated Pressable was given a function style. Button now passes
+  a normal style array to the animated Pressable, keeps press-scale spring,
+  and uses opacity cross-fade for reduced motion.
+- Validation: `npx tsc --noEmit` clean; `npx expo lint` clean; `npm test`
+  43/43 pass; `npx expo export -p web` pass; Android AVD `Pixel_9_Pro`
+  screenshot confirms the minimal welcome screen with both auth actions
+  visible. `npx expo-doctor` remains 19/21 with the same pre-existing
+  non-CNG and patch-version-drift checks.
+- Known limitations: no routing, auth, onboarding, tab, or shared marketing
+  copy changes were made. Direct `npx eslint .` still reports pre-existing
+  hook-rule findings outside this change; the project lint command
+  (`npx expo lint`) is clean.

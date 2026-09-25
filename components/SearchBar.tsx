@@ -9,6 +9,8 @@ interface SearchBarProps {
   onChangeText: (text: string) => void;
   placeholder: string;
   accessibilityLabel: string;
+  /** Pill variant: fully rounded, borderless, no shadow (e.g. on the red home header). */
+  pill?: boolean;
 }
 
 /**
@@ -29,10 +31,10 @@ export function matchesSearch(query: string, ...fields: readonly (string | null 
  * icon, input, and a clear button only while text exists. White surface
  * with a hairline border — no card, no shadow.
  */
-export function SearchBar({ value, onChangeText, placeholder, accessibilityLabel }: SearchBarProps) {
+export function SearchBar({ value, onChangeText, placeholder, accessibilityLabel, pill = false }: SearchBarProps) {
   const [focused, setFocused] = useState(false);
   return (
-    <View style={[styles.field, focused && styles.focused]}>
+    <View style={[styles.field, pill && styles.pill, focused && !pill && styles.focused]}>
       <MaterialIcons name="search" size={22} color={colors.secondary} />
       <TextInput
         value={value}
@@ -75,6 +77,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   focused: { borderColor: colors.primary },
+  pill: {
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 0,
+    borderRadius: radii.full,
+  },
   input: {
     flex: 1,
     paddingVertical: spacing.sm,

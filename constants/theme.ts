@@ -26,6 +26,8 @@ export const colors = {
   surfaceElevated: '#FDFCFC',
   /** Secondary surface for muted containers (e.g. quantity stepper bg, empty state bg). */
   surfaceSecondary: '#F1ECEA',
+  /** Filled auth input background. Auth-only; other surfaces keep their tokens. */
+  inputBackground: '#F5F5F5',
   /** Thin separator lines between rows or sections. */
   divider: '#E9E2E0',
 
@@ -52,9 +54,9 @@ export const colors = {
 export type ColorName = keyof typeof colors;
 
 export const typography = {
-  display: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
-  subtitle: { fontSize: 17, lineHeight: 24, fontWeight: '600' },
+  display: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.4 },
+  title: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.3 },
+  subtitle: { fontSize: 17, lineHeight: 24, fontWeight: '600', letterSpacing: -0.1 },
   body: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
   secondary: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },

@@ -10,6 +10,75 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Red-header redesign: My Orders, Profile, Notifications
+
+- Built (shared, `components/RedScreen.tsx`): one red-header shell for the
+  non-image-header tabs. Brand red extends behind the status bar, a white sheet
+  with 20pt rounded top corners overlaps the header bottom by 20pt, and content
+  scrolls inside it — the same header/sheet pairing Home uses, which is what
+  makes the four screens read as one app. `underTabs` applies the same tab-bar
+  clearance `components/ui/Screen.tsx` already used, now a shared constant in
+  `lib/layout.ts`, so tab roots end at one identical height.
+- Changed (My Orders, `app/(requester)/orders.tsx` + `components/RequestCard.tsx`):
+  active requests only. No status chips, no History section; `useMyOrders()` is
+  the only source, filtered against `isTerminalOrderStatus` as a second
+  guarantee. Each request is a section separated by whitespace and a hairline —
+  tinted thumbnail mark, item title, vendor, toned status label, the real
+  tracker, the current stage's real timestamp, total, the action hint where the
+  detail screen offers a real action, and a light-grey "View details" row with a
+  chevron. The thumbnail is a mark, not a photo: order items carry no image
+  column and the product has no food imagery.
+- Changed (tracker, `components/RequestProgress.tsx`): completed stages are
+  solid red with a white check, the current stage is solid red with a white
+  number inside a soft-tint halo, everything ahead is light grey with muted
+  numbers, joined by one thin line filled red up to the last completed stage.
+- Fixed (tracker): the current stage drew its number in on-primary white on the
+  grey `disabledBackground` dot — unreadable in practice. The current dot is now
+  red so the number reads.
+- Added (Past orders, `app/(requester)/orders/past.tsx`): finished requests need
+  a destination now that My Orders is active-only. Pushed screen in the existing
+  secondary-header language, reached from Profile, backed by the existing
+  `useMyOrderHistory` hook. Each row shows the terminal status with the
+  timestamp that actually closed it (`confirmedAt` / `cancelledAt` /
+  `disputedAt`, falling back to `createdAt`), never a synthesised date.
+- Changed (Notifications, `components/NotificationCenter.tsx`): the
+  All/Unread/Orders/System chips and their per-filter empty copy are gone. The
+  header is a compact red bar — back chevron, left-aligned title, and "Mark all
+  as read" only when something is unread. Rows group under Today / Yesterday /
+  a real date heading derived from each row's `created_at`, with a tinted
+  circular icon, the real title and body, a right-aligned relative time, and a
+  red unread dot; unread reads strong, read reads muted, rows separated by
+  hairlines. Realtime, mark-read-on-tap, role routing and pull-to-refresh are
+  unchanged.
+- Changed (Profile, `app/(requester)/profile.tsx`): red header with the bell and
+  gear in on-primary white; identity row (real avatar/initials, name, email,
+  chevron into Personal information) against the red-to-white transition with no
+  container; Helper entry; six settings rows that all exist; the Dev section
+  untouched below them; log out as a quiet outlined control outside the settings
+  group.
+- Decided (Helper entry): a verified helper gets "Helper portal" with a chevron;
+  every other account gets "Be a helper" with the earn copy and no chevron,
+  because helper access is granted out of band and no self-serve application
+  exists. Nothing points at a flow the backend cannot honour.
+- Changed (header controls): `HeaderBell`/`NotificationBell` take `color` and
+  `dotColor`, `HeaderSettings` takes `color`; all default to the previous
+  near-black/red, so white-header callers are unaffected.
+- Verified (device ELP-NX9, after a full reload): My Orders draws the red header
+  with the status bar behind it, bell legible in white, and shows the empty
+  state while all three seeded orders are terminal; Profile draws identity,
+  helper, six rows, Dev section and log out with Profile active in the tab bar;
+  Notifications draws the compact red header with no chips, one dated group and
+  a real read row. The active path itself could not be seen live: every seeded
+  order is terminal, so My Orders legitimately renders its empty state. A draft
+  request was assembled in the app (one cart item, Block A chosen) and left
+  unsubmitted, so no order was written to the database.
+- Validation: `npx tsc --noEmit` clean, `npx eslint` clean on every changed file,
+  `npm test` 43/43.
+- Limits: Past orders keeps the glass secondary header every other pushed screen
+  uses rather than the red one. `components/ActiveHistoryToggle.tsx` and
+  `components/ui/SegmentedControl.tsx` are now unreferenced (both jobs removed by
+  request) and were left in the tree rather than deleted.
+
 ## 2026-09-26 — Home: last card no longer hides behind the floating tab bar
 
 - Fixed (app, `app/(requester)/index.tsx`): the last vendor card sat half behind

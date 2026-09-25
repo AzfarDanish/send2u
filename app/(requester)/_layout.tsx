@@ -145,6 +145,17 @@ export default function RequesterLayout() {
           headerShown: false,
         }}
       />
+      {/* Finished requests, reached from Profile: My Orders holds active work
+          only, so the terminal records need their own destination. */}
+      <Tabs.Screen
+        name="orders/past"
+        options={{
+          href: null,
+          title: 'Past orders',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
       <Tabs.Screen
         name="orders/[id]/pay-online"
         options={{

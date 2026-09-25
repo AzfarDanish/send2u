@@ -1,118 +1,84 @@
 import { router } from 'expo-router';
 import { useCallback } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { RefreshControl } from 'react-native';
 
-import { MainHeader } from '@/components/MainHeader';
+import { HeaderBell } from '@/components/HeaderBell';
+import { RedScreen } from '@/components/RedScreen';
 import { RequestCard } from '@/components/RequestCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
-import { Screen } from '@/components/ui/Screen';
-import { Text } from '@/components/ui/Text';
-import { colors, spacing } from '@/constants/theme';
-import { useMyOrderHistory } from '@/hooks/useMyOrderHistory';
+import { colors } from '@/constants/theme';
 import { useMyOrders } from '@/hooks/useMyOrders';
+import { isTerminalOrderStatus } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
 
+/**
+ * My Orders: the requester's live requests and nothing else. Completed,
+ * cancelled, and disputed orders are records — they belong to the history
+ * view — so this screen offers no filter and no history section: everything
+ * on it is active by construction, and the tab answers one question, "what
+ * is happening with my orders right now".
+ */
 export default function RequesterOrdersScreen() {
   const active = useMyOrders();
-  const history = useMyOrderHistory();
 
   const openOrder = useCallback((order: OrderWithDetails) => {
     router.push({ pathname: '/(requester)/orders/[id]', params: { id: order.id } });
   }, []);
 
-  const refreshing = active.refreshing || history.refreshing;
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([active.refresh(), history.refresh()]);
-  }, [active, history]);
+  // `useMyOrders` already scopes its query to active rows; filtering here as
+  // well keeps the guarantee on the surface that depends on it, since a row
+  // patched by a cancel/confirm can turn terminal between renders.
+  const orders = active.orders.filter((order) => !isTerminalOrderStatus(order.status));
+  // Ready with nothing left to show means the last active row left while the
+  // screen was open; an empty active list is the empty state, not a blank page.
+  const nothingActive = active.status === 'empty' || (active.status === 'ready' && orders.length === 0);
 
   return (
-    <>
-      <Screen
-        underTabs
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
-        }>
-        <MainHeader title="My Orders" />
-        <View style={styles.section}>
-          <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
-            ACTIVE REQUESTS
-          </Text>
-          {active.status === 'loading' ? (
-            <SkeletonList rows={3} lines={3} thumb={56} trailing label="Loading requests" />
-          ) : null}
-          {active.status === 'error' ? (
-            <ErrorState
-              title="Couldn't load orders"
-              message={active.error ?? 'Check your connection and try again.'}
-              retryTitle="Try again"
-              onRetry={active.retry}
+    <RedScreen
+      underTabs
+      title="My Orders"
+      right={
+        <HeaderBell role="requester" color={colors.onPrimary} dotColor={colors.surface} />
+      }
+      refreshControl={
+        <RefreshControl
+          refreshing={active.refreshing}
+          onRefresh={() => void active.refresh()}
+          tintColor={colors.primary}
+        />
+      }>
+      {active.status === 'loading' ? (
+        <SkeletonList rows={3} lines={3} thumb={56} trailing label="Loading your orders" />
+      ) : null}
+      {active.status === 'error' ? (
+        <ErrorState
+          title="Couldn't load orders"
+          message={active.error ?? 'Check your connection and try again.'}
+          retryTitle="Try again"
+          onRetry={active.retry}
+        />
+      ) : null}
+      {nothingActive ? (
+        <EmptyState
+          icon="receipt-long"
+          title="Nothing active right now"
+          message="Orders in progress appear here with live progress. Past orders are kept in your Profile."
+          actionTitle="Browse menu"
+          onAction={() => router.push('/(requester)')}
+        />
+      ) : null}
+      {active.status === 'ready' && orders.length > 0
+        ? orders.map((order, index) => (
+            <RequestCard
+              key={order.id}
+              order={order}
+              isLast={index === orders.length - 1}
+              onPress={openOrder}
             />
-          ) : null}
-          {active.status === 'empty' ? (
-            <EmptyState
-              icon="receipt-long"
-              title={history.orders.length > 0 ? 'No active requests' : 'No orders yet'}
-              message={
-                history.orders.length > 0
-                  ? 'Your active requests will appear here after you submit one.'
-                  : 'New orders appear here.'
-              }
-              actionTitle="Browse menu"
-              onAction={() => router.push('/(requester)')}
-            />
-          ) : null}
-          {active.status === 'ready'
-            ? active.orders.map((order, index) => (
-                <RequestCard
-                  key={order.id}
-                  order={order}
-                  isLast={index === active.orders.length - 1}
-                  onPress={openOrder}
-                />
-              ))
-            : null}
-        </View>
-        <View style={styles.section}>
-          <Text variant="eyebrow" color="muted" style={styles.sectionHead}>
-            HISTORY
-          </Text>
-          {history.status === 'loading' ? (
-            <SkeletonList rows={3} lines={3} thumb={56} trailing label="Loading past requests" />
-          ) : null}
-          {history.status === 'error' ? (
-            <ErrorState
-              title="Couldn't load past requests"
-              message={history.error ?? 'Check your connection and try again.'}
-              retryTitle="Try again"
-              onRetry={history.retry}
-            />
-          ) : null}
-          {history.status === 'empty' ? (
-            <EmptyState
-              icon="history"
-              title="No past requests"
-              message="Completed orders will appear here."
-            />
-          ) : null}
-          {history.status === 'ready'
-            ? history.orders.map((order, index) => (
-                <RequestCard
-                  key={order.id}
-                  order={order}
-                  isLast={index === history.orders.length - 1}
-                  onPress={openOrder}
-                />
-              ))
-            : null}
-        </View>
-      </Screen>
-    </>
+          ))
+        : null}
+    </RedScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  section: { paddingTop: spacing.lg },
-  sectionHead: { marginBottom: spacing.sm },
-});

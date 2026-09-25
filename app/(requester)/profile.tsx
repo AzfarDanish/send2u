@@ -5,21 +5,29 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
-import { MainHeader } from '@/components/MainHeader';
-import { Card } from '@/components/ui/Card';
+import { HeaderBell } from '@/components/HeaderBell';
+import { HeaderSettings } from '@/components/HeaderSettings';
+import { RedScreen } from '@/components/RedScreen';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListRow } from '@/components/ui/ListRow';
 import { SkeletonProfile } from '@/components/ui/LoadingBlocks';
-import { Screen } from '@/components/ui/Screen';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing, touchTargets, typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
+/**
+ * Settings-style destinations that actually exist. Helper is deliberately not
+ * in this list: it is a capability of this same app, presented on its own
+ * above. "Payment methods" and an About page do not exist, so no rows pretend
+ * they do.
+ */
 const MENU_ROWS = [
-  { icon: 'person-outline', title: 'Edit Profile', href: '/(requester)/edit-profile' },
-  { icon: 'place', title: 'Saved Locations', href: '/(requester)/locations' },
+  { icon: 'person-outline', title: 'Personal information', href: '/(requester)/edit-profile' },
+  { icon: 'history', title: 'Past orders', href: '/(requester)/orders/past' },
+  { icon: 'place', title: 'Saved locations', href: '/(requester)/locations' },
   { icon: 'notifications-none', title: 'Notifications', href: '/(requester)/notifications' },
-  { icon: 'help-outline', title: 'Help Center', href: '/(requester)/help' },
+  { icon: 'help-outline', title: 'Help & Support', href: '/(requester)/help' },
   { icon: 'description', title: 'Terms & Privacy', href: '/(requester)/terms' },
 ] as const;
 
@@ -44,69 +52,102 @@ export default function RequesterProfileScreen() {
     profile?.fullName?.trim() || profile?.displayName?.trim() || 'Campus requester';
 
   return (
-    <Screen underTabs>
-      <MainHeader title="Profile" showSettings />
+    <RedScreen
+      title="Profile"
+      // Two header controls only: the bell (which must stay reachable from
+      // every primary page) and the gear, both in on-primary white.
+      right={
+        <>
+          <HeaderBell role="requester" color={colors.onPrimary} dotColor={colors.surface} />
+          <HeaderSettings href="/(requester)/settings" color={colors.onPrimary} />
+        </>
+      }
+      underTabs
+      contentStyle={styles.content}>
       {isLoading ? (
         // The avatar, name, and email all come from the session/profile rows:
         // placeholder personal data here would be wrong twice over.
         <SkeletonProfile rows={5} label="Loading your profile" />
       ) : (
         <>
-          <View style={styles.header}>
-            <Avatar name={displayName} path={profile?.avatarPath} size={72} />
-            <Text variant="subtitle" style={styles.name} numberOfLines={2}>
-              {displayName}
-            </Text>
-            {user?.email ? (
-              <Text variant="caption" color="secondary" numberOfLines={1}>
-                {user.email}
+          {/* Identity sits against the header/white transition with no
+              container around it, so the row itself reads as the control.
+              Name and email are the real profile and session values. */}
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={`Profile details for ${displayName}. Opens personal information.`}
+            haptic="selection"
+            style={styles.identity}
+            onPress={() => router.push('/(requester)/edit-profile')}>
+            <Avatar name={displayName} path={profile?.avatarPath} size={64} />
+            <View style={styles.identityText}>
+              <Text variant="subtitle" numberOfLines={2}>
+                {displayName}
               </Text>
-            ) : null}
+              {user?.email ? (
+                <Text variant="caption" color="secondary" numberOfLines={1}>
+                  {user.email}
+                </Text>
+              ) : null}
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={colors.muted} />
+          </PressableScale>
+
+          <View>
+            {isVerifiedHelper ? (
+              <ListRow
+                icon="delivery-dining"
+                title="Helper portal"
+                subtitle="Available jobs, your deliveries, and cash collection."
+                accessibilityLabel="Helper portal. Available jobs, your deliveries, and cash collection."
+                onPress={() => router.push('/(requester)/helper-portal')}
+              />
+            ) : (
+              // Helper access is granted by the Send2U team out of band, and no
+              // self-serve application exists. So this stays a plain
+              // informational row (no chevron, no action) rather than pointing
+              // at a flow the backend cannot honour.
+              <ListRow
+                icon="delivery-dining"
+                title="Be a helper"
+                subtitle="Earn by delivering orders around campus. Helper access is granted by the Send2U team."
+                accessibilityLabel="Be a helper. Earn by delivering orders around campus. Helper access is granted by the Send2U team."
+              />
+            )}
           </View>
 
-          <Card style={styles.section}>
-            {MENU_ROWS.map((row) => (
-              <ListRow
+          <View>
+            {MENU_ROWS.map((row, index) => (
+              <View
                 key={row.href}
-                icon={row.icon}
-                title={row.title}
-                onPress={() => router.push(row.href)}
-              />
-            ))}
-          </Card>
-
-          {isVerifiedHelper ? (
-            <View style={styles.helperSection}>
-              <Text variant="subtitle">Helper</Text>
-              <Text variant="caption" color="secondary">
-                Your delivery capability — queue, active jobs, and deliveries.
-              </Text>
-              <Card style={styles.section}>
+                style={index < MENU_ROWS.length - 1 ? styles.divider : undefined}>
                 <ListRow
-                  icon="delivery-dining"
-                  title="Helper Portal"
-                  subtitle="Available jobs and your deliveries"
-                  onPress={() => router.push('/(requester)/helper-portal')}
+                  icon={row.icon}
+                  title={row.title}
+                  accessibilityLabel={row.title}
+                  onPress={() => router.push(row.href)}
                 />
-              </Card>
-            </View>
-          ) : null}
+              </View>
+            ))}
+          </View>
         </>
       )}
 
+      {/* Dev tooling stays where it was, below the production rows: real test
+          accounts read from the database, never hidden and never rebuilt. */}
       <DevProfileSwitcher />
 
       {signOutError ? (
-        <Card style={styles.section}>
-          <ErrorState
-            title="Could not sign out"
-            message={signOutError}
-            retryTitle="Dismiss"
-            onRetry={() => setSignOutError(null)}
-          />
-        </Card>
+        <ErrorState
+          title="Could not sign out"
+          message={signOutError}
+          retryTitle="Dismiss"
+          onRetry={() => setSignOutError(null)}
+        />
       ) : null}
 
+      {/* Outside the settings group and visually quiet: log out is available,
+          never the loudest thing on the screen. */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Log out"
@@ -119,19 +160,23 @@ export default function RequesterProfileScreen() {
           {signingOut ? 'Signing out…' : 'Log Out'}
         </Text>
       </Pressable>
-    </Screen>
+    </RedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
+  // No top padding: the identity row starts at the sheet's first pixel, which
+  // puts it directly against the red-to-white transition.
+  content: { paddingTop: 0, gap: spacing.xxl },
+  identity: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingBottom: spacing.md,
+    gap: spacing.md,
+    minHeight: touchTargets.listRow,
+    paddingVertical: spacing.lg,
   },
-  name: { textAlign: 'center' },
-  section: { gap: 0 },
-  helperSection: { gap: spacing.xs },
+  identityText: { flex: 1, gap: spacing.xs },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   logOut: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -10,6 +10,10 @@ import type { OrderWithDetails } from '@/types/domain';
 const STAGE_LABELS = ['Placed', 'Helper', 'Pickup', 'On the way', 'Delivered', 'Done'] as const;
 
 const DOT_SIZE = 28;
+// Every cell reserves the halo the current stage paints, so all six dot
+// centres stay on one line and the connector never moves between states.
+const RING_SIZE = 34;
+const TRACK_TOP = RING_SIZE / 2 - 1;
 
 /**
  * Derives the tracker position from the real backend status. Returns the
@@ -65,9 +69,13 @@ export function progressPosition(order: OrderWithDetails): { reached: number; cu
 /**
  * Horizontal 6-stage progress tracker for the real fulfilment lifecycle:
  * requested → helper accepted → collecting → on the way → delivered →
- * completed. Done stages show a filled check, the current stage a numbered
- * chip, upcoming stages muted numbers. Labels wrap to two lines so narrow
- * screens never overlap. Terminal requests highlight nothing as current.
+ * completed. Completed stages are solid Send2U red with a white check; the
+ * current stage is red as well but sits inside a soft-tint halo, which is
+ * what separates "in progress" from "finished" at a glance; everything
+ * ahead is light gray with muted numbering. One thin line connects all six,
+ * tinted red up to the last completed stage. Labels wrap to two lines so
+ * narrow screens never overlap. Terminal requests highlight nothing as
+ * current.
  */
 export function RequestProgress({ order }: { order: OrderWithDetails }) {
   const { reached, current } = progressPosition(order);
@@ -94,15 +102,20 @@ export function RequestProgress({ order }: { order: OrderWithDetails }) {
             return (
               <View key={label} style={styles.dotCell}>
                 <View
-                  style={[styles.dot, done && styles.dotDone, isCurrent && styles.dotCurrent]}
+                  style={[styles.ring, isCurrent && styles.ringCurrent]}
                   accessibilityLabel={`${label}, ${done ? 'completed' : isCurrent ? 'current' : 'upcoming'}`}>
-                  {done ? (
-                    <MaterialIcons name="check" size={16} color={colors.onPrimary} />
-                  ) : (
-                    <Text variant="caption" color={isCurrent ? 'primary' : 'muted'} style={styles.dotNumber}>
-                      {index + 1}
-                    </Text>
-                  )}
+                  <View style={[styles.dot, done && styles.dotDone, isCurrent && styles.dotCurrent]}>
+                    {done ? (
+                      <MaterialIcons name="check" size={16} color={colors.onPrimary} />
+                    ) : (
+                      <Text
+                        variant="caption"
+                        color={isCurrent ? 'onPrimary' : 'muted'}
+                        style={styles.dotNumber}>
+                        {index + 1}
+                      </Text>
+                    )}
+                  </View>
                 </View>
               </View>
             );
@@ -118,7 +131,7 @@ export function RequestProgress({ order }: { order: OrderWithDetails }) {
               key={label}
               variant="caption"
               color={done || isCurrent ? 'primary' : 'muted'}
-              style={[styles.label, (done || isCurrent) && styles.labelActive]}
+              style={[styles.label, done && styles.labelReached, isCurrent && styles.labelCurrent]}
               numberOfLines={2}>
               {label}
             </Text>
@@ -136,7 +149,7 @@ const styles = StyleSheet.create({
   trackWrap: { position: 'relative' },
   track: {
     position: 'absolute',
-    top: DOT_SIZE / 2 - 1,
+    top: TRACK_TOP,
     left: `${100 / (STAGE_LABELS.length * 2)}%`,
     right: `${100 / (STAGE_LABELS.length * 2)}%`,
     height: 2,
@@ -145,7 +158,7 @@ const styles = StyleSheet.create({
   },
   filled: {
     position: 'absolute',
-    top: DOT_SIZE / 2 - 1,
+    top: TRACK_TOP,
     left: `${100 / (STAGE_LABELS.length * 2)}%`,
     height: 2,
     backgroundColor: colors.primary,
@@ -153,6 +166,16 @@ const styles = StyleSheet.create({
   },
   dots: { flexDirection: 'row' },
   dotCell: { flex: 1, alignItems: 'center' },
+  ring: {
+    width: RING_SIZE,
+    height: RING_SIZE,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Halo behind the active dot: brand red on a soft red wash reads as
+  // "here now" without claiming the stage is done.
+  ringCurrent: { backgroundColor: colors.primarySoft },
   dot: {
     width: DOT_SIZE,
     height: DOT_SIZE,
@@ -162,15 +185,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dotDone: { backgroundColor: colors.primary },
-  dotCurrent: {
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
+  // The current dot is brand red too, so its white number stays readable;
+  // what marks it as "here now" rather than "finished" is the halo plus the
+  // bold label beneath it, not a second shade of red.
+  dotCurrent: { backgroundColor: colors.primary },
   dotNumber: { fontWeight: '700' },
   labels: { flexDirection: 'row', marginTop: spacing.xs },
   // 11px keeps the widest labels ("Requested", "Delivered") inside their
   // sixth-of-row cell so neighbours never overlap on narrow screens.
   label: { flex: 1, textAlign: 'center', minHeight: 30, fontSize: 11, lineHeight: 15 },
-  labelActive: { fontWeight: '600' },
+  labelReached: { fontWeight: '600' },
+  labelCurrent: { fontWeight: '700' },
 });

@@ -73,9 +73,11 @@ navigation.
 - **Cards (visual).** The `Card` component is a spacing wrapper, not a
   visual container — do not give it surfaces, borders, or shadows, and
   do not stack bordered boxes to simulate dashboards.
-- **Decorative tabs / segmented controls beyond their two jobs.**
-  `ActiveHistoryToggle` (Active/History lists) and the notification
-  filter are the only segmented controls. No decorative tab bars.
+- **Decorative tabs / segmented controls.** The My Orders status chips and the
+  notification filters were removed on 2026-09-26 and nothing else may add
+  chips; the only segmented-control jobs that ever existed here are gone. The
+  only tab-shaped navigation permitted is the application's real bottom
+  navigation.
 - **Excessive containers, borders, separators.** One divider system
   (`border`, hairline) between list content; no boxes around boxes, no
   separators after every element by default — only where they
@@ -104,7 +106,9 @@ finished.
 
 ## 4. Headers
 
-Three header treatments exist, one per screen class:
+Four header treatments exist, one per screen class. Since the 2026-09-26
+red-header redesign, the three requester primary screens (My Orders, Profile,
+Notifications) use the red brand header described last:
 
 1. **Bottom-tab roots** use the native header or a custom in-screen
    header: Home and Requests hide the native header and render their
@@ -119,6 +123,14 @@ Three header treatments exist, one per screen class:
    never grows.
 3. **Dialog-level chrome** (overflow menu, delete confirm) is inline,
    never a second header.
+4. **Red brand header** (`components/RedScreen.tsx`) — the requester primary
+   screens: My Orders, Profile, Notifications. Brand red extends behind the
+   status bar, a large white title sits left-aligned in a 48pt row with white
+   header controls, and a white sheet with 20pt top corners overlaps the header
+   bottom by 20pt and owns all content. It sizes to its content (title plus any
+   subtitle), so it reads as chrome rather than a banner: no gradients, no
+   shadows, no decoration, and no empty red area. Secondary screens keep
+   `GlassHeader` (item 2) even inside a red-header screen's family.
 
 Back behavior is uniform: `canGoBack() ? back() : replace(fallbackHref)`,
 one chevron per screen, never duplicated. Header actions sit at right:

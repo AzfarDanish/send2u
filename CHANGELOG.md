@@ -10,6 +10,31 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Home header: the content rides the header (blank band removed)
+
+- Changed (app, `app/(requester)/index.tsx`): `CONTENT_HOLD` now defaults to
+  `'ride'`, superseding the `'hold'` default in the entry below. `'hold'` froze
+  the list while the header collapsed, which left the height the header freed
+  visible as a large blank white band above the popular shelf — reported from
+  the device and plainly visible in a screenshot. The list is now carried up
+  with the header, glued to the sheet's top edge: it never scrolls ahead of the
+  collapse, never slides under the header, and no gap opens.
+- Verified (device ELP-NX9 over Metro, per-band frame-shift measurement against
+  a baseline captured at the top): a slow partial drag moves the header band and
+  the content band by exactly the same amount, -156 px (-48.0 dp), the two bands
+  agreeing to the pixel; a near-full collapse gives -324 px (-99.7 dp) for both.
+  Identical movement in both bands is the proof of a rigid carry — the content
+  follows the header rather than scrolling — and gluing to the sheet edge is why
+  no blank band appears.
+- Rejected alternative (`CONTENT_HOLD = 'hold'`, kept in the file): a completely
+  stationary list, which is what produced the blank band. Do not make it the
+  default again without a way to fill that height.
+- Validation: `npx tsc --noEmit` clean, `npx eslint` clean on the changed file.
+- Limits: the dev client's status-bar inset reads 0 for a moment after a fast
+  refresh, so the verification screenshots show the header content over the
+  clock; that cancels out in frame-to-frame comparison and the app session with
+  the bundle already loaded renders the inset correctly. Verified on one device.
+
 ## 2026-09-26 — Home header: the drag finishes the collapse before the list moves
 
 - Changed (app, `app/(requester)/index.tsx`): while the header is collapsing the

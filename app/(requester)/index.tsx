@@ -44,15 +44,15 @@ const COLLAPSE_DISTANCE = 140;
  * TWICE the finger speed (its box rises while it also scrolls) and dives under
  * the header.
  *
- * 'hold' — the list is held still for exactly the offset the collapse costs,
- *          then scrolls. The drag collapses the header first and only then
- *          moves the list, so nothing slides under the header while the
- *          collapse is running. The space the header gave up shows as white
- *          sheet above the list during that phase.
- * 'ride' — the list follows the finger 1:1 from the first pixel, riding the
- *          header edge down (the iOS large-title feel, no gap).
+ * 'ride' — the list is carried up WITH the header, glued to the sheet's top
+ *          edge: it never scrolls ahead of the collapse and never slides under
+ *          the header, and no gap opens. The drag collapses the header and
+ *          carries the list in the same motion, then the list scrolls.
+ * 'hold' — the list stays completely still while the header collapses, which
+ *          leaves the height the header freed visible as blank sheet above the
+ *          list. Rejected: the blank band reads as a bug.
  */
-const CONTENT_HOLD: 'hold' | 'ride' = 'hold';
+const CONTENT_HOLD: 'hold' | 'ride' = 'ride';
 
 function greetingForHour(hour: number): string {
   if (hour < 12) return 'Good morning';

@@ -27,6 +27,12 @@ interface RedScreenProps {
   subtitle?: string;
   /** Extra content under the title, still inside the red area. */
   below?: ReactNode;
+  /**
+   * `display` (28pt) is the default large tab title. A narrow header that also
+   * carries a back control and a text action passes `title` (22pt): at 360pt,
+   * "Notifications" plus both slots cannot hold 28pt without truncating.
+   */
+  titleSize?: 'display' | 'title';
   children: ReactNode;
   /** Pull-to-refresh control for data screens. */
   refreshControl?: ReactElement<RefreshControlProps>;
@@ -59,6 +65,7 @@ export function RedScreen({
   right,
   subtitle,
   below,
+  titleSize = 'display',
   children,
   refreshControl,
   underTabs = false,
@@ -76,7 +83,7 @@ export function RedScreen({
         accessibilityLabel={title}>
         <View style={styles.titleRow}>
           {leading ? <View style={styles.leading}>{leading}</View> : null}
-          <Text variant="display" color="onPrimary" style={styles.title} numberOfLines={1}>
+          <Text variant={titleSize} color="onPrimary" style={styles.title} numberOfLines={1}>
             {title}
           </Text>
           {right ? <View style={styles.right}>{right}</View> : null}

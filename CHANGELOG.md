@@ -63,6 +63,11 @@ only. No secrets are ever recorded here.
 - Changed (header controls): `HeaderBell`/`NotificationBell` take `color` and
   `dotColor`, `HeaderSettings` takes `color`; all default to the previous
   near-black/red, so white-header callers are unaffected.
+- Changed (`RedScreen`): the title takes an optional `titleSize`. The
+  notification header uses the 22pt `title` token rather than the 28pt
+  `display` default, because a back chevron plus a text action leaves about
+  180pt of title room at 360pt and "Notifications" at 28pt would ellipsize
+  there. The two tab roots keep the large title.
 - Verified (device ELP-NX9, after a full reload): My Orders draws the red header
   with the status bar behind it, bell legible in white, and shows the empty
   state while all three seeded orders are terminal; Profile draws identity,

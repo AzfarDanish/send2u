@@ -259,8 +259,12 @@ export function NotificationCenter({ role, header = 'section' }: NotificationCen
 
   if (header === 'custom') {
     return (
+      // 22pt rather than the shell's 28pt default: the back chevron plus
+      // "Mark all as read" leaves roughly 180pt of title room at 360pt, where
+      // "Notifications" at 28pt ellipsizes. The tab roots keep the large title.
       <RedScreen
         title="Notifications"
+        titleSize="title"
         leading={
           <HeaderBack
             fallbackHref={role === 'helper' ? '/(requester)/helper-portal' : '/(requester)'}

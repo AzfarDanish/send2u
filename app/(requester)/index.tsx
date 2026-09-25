@@ -36,6 +36,24 @@ const VENDOR_PREVIEW_COUNT = 3;
 /** Scroll distance over which the header fully collapses. */
 const COLLAPSE_DISTANCE = 140;
 
+/**
+ * What the sheet's content does while the header is still collapsing.
+ *
+ * The header frees `freed` points of layout as it collapses, and the sheet's
+ * box grows by the same amount — so without compensation the content moves at
+ * TWICE the finger speed (its box rises while it also scrolls) and dives under
+ * the header.
+ *
+ * 'hold' — the list is held still for exactly the offset the collapse costs,
+ *          then scrolls. The drag collapses the header first and only then
+ *          moves the list, so nothing slides under the header while the
+ *          collapse is running. The space the header gave up shows as white
+ *          sheet above the list during that phase.
+ * 'ride' — the list follows the finger 1:1 from the first pixel, riding the
+ *          header edge down (the iOS large-title feel, no gap).
+ */
+const CONTENT_HOLD: 'hold' | 'ride' = 'hold';
+
 function greetingForHour(hour: number): string {
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
@@ -105,6 +123,23 @@ export default function RequesterHomeScreen() {
       transform: [{ translateY: -progress * blockHeight }],
       opacity: 1 - progress * 0.85,
     };
+  });
+
+  // Held-back content driver. It reads the same scroll offset as the collapse,
+  // so the two can never drift: the hold grows with the collapse and stops the
+  // moment the header is done, letting the list take over the rest of the drag.
+  const contentShiftStyle = useAnimatedStyle(() => {
+    const blockHeight = collapseHeight.value;
+    const offset = Math.min(Math.max(scrollY.value, 0), COLLAPSE_DISTANCE);
+    // Nothing measured means nothing has collapsed yet, so the list must keep
+    // its normal 1:1 response instead of being held back for no reason.
+    if (blockHeight <= 0) return { transform: [{ translateY: 0 }] };
+    const freed =
+      blockHeight * (COLLAPSE_DISTANCE <= 0 ? 0 : offset / COLLAPSE_DISTANCE);
+    // 'hold' cancels both the space the header gave up and the scroll the drag
+    // already spent, so the list is motionless and the header does all the
+    // moving; 'ride' cancels only the doubled box movement, keeping 1:1.
+    return { transform: [{ translateY: CONTENT_HOLD === 'hold' ? offset + freed : offset }] };
   });
 
   const openVendor = useCallback((vendor: Vendor) => {
@@ -246,7 +281,7 @@ export default function RequesterHomeScreen() {
 
       <Animated.ScrollView
         style={styles.sheet}
-        contentContainerStyle={styles.sheetBody}
+        contentContainerStyle={styles.sheetOuter}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         onScroll={scrollHandler}
@@ -258,6 +293,10 @@ export default function RequesterHomeScreen() {
             tintColor={colors.primary}
           />
         }>
+        {/* One wrapper so the whole sheet can be held back by the collapse
+            driver; the sheet's own spacing lives here, not on the scroll
+            container, so the hold moves content and gap together. */}
+        <Animated.View style={[styles.sheetBody, contentShiftStyle]}>
         {status === 'loading' ? (
           <View style={styles.stateBlock}>
             <SkeletonList rows={4} lines={2} thumb={72} label="Loading menu" />
@@ -387,6 +426,7 @@ export default function RequesterHomeScreen() {
             </View>
           </View>
         ) : null}
+        </Animated.View>
       </Animated.ScrollView>
       <CartFab aboveTabs />
     </View>
@@ -473,11 +513,15 @@ const styles = StyleSheet.create({
     marginTop: -SHEET_OVERLAP,
     overflow: 'hidden',
   },
+  // Scroll container: only stretches, so short content still fills the sheet.
+  sheetOuter: { flexGrow: 1 },
+  // The sheet's content stack. Carries the collapse driver's transform, so the
+  // held-back offset moves the spacing with the content instead of stretching it.
   sheetBody: {
+    flexGrow: 1,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xxxl,
     gap: spacing.xxl,
-    flexGrow: 1,
   },
   stateBlock: { paddingHorizontal: spacing.xl },
   section: { gap: spacing.md },

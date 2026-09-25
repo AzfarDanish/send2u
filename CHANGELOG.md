@@ -10,6 +10,38 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Home header: the drag finishes the collapse before the list moves
+
+- Changed (app, `app/(requester)/index.tsx`): while the header is collapsing the
+  list no longer moves. The sheet's box grows as the header gives up height, so
+  the content was travelling at TWICE the finger speed (its box rose while it
+  also scrolled), which is what dragged the popular shelf under the header
+  mid-collapse. The sheet content now carries a held-back transform equal to the
+  offset the drag spent on the collapse, so the gesture completes the header
+  first and only then scrolls the list.
+- Details: the hold and the collapse read the same scroll offset, so they cannot
+  drift apart; the hold clamps at the collapse distance, so it stops growing the
+  moment the header is done; nothing is held back before the block has been
+  measured. The sheet's children now sit in a single wrapper that carries the
+  transform (the sheet's spacing moved onto that wrapper), so the hold moves
+  content and gaps together rather than stretching the gap.
+- Alternative kept, one constant: `CONTENT_HOLD = 'ride'` restores the iOS
+  large-title feel (the list follows the finger 1:1 from the first pixel, riding
+  the header edge, no white band). `'hold'` is the default because it is the
+  requested behaviour.
+- Verified (device ELP-NX9 over Metro): a slow partial drag (350 device px over
+  1.5 s) leaves the sheet content pixel-identical — a best-alignment search puts
+  the content at dy = +0 px with residual 0.24, i.e. no movement at all, while
+  the header band moved 156 px up — and a full scroll-down / back-to-top cycle
+  returns the screen to a byte-identical match with the baseline on both bands
+  (0.000%).
+- Validation: `npx tsc --noEmit` clean, `npx eslint` clean on the changed file.
+- Limits: `hold` deliberately trades the white sheet band (the height the header
+  freed) for a stationary list; that band is the visible cost of the list
+  waiting. Screenshots were taken while the dev client's status-bar inset was
+  still 0 after a fast refresh, which shifts the whole layout but cancels out in
+  frame-to-frame comparison. Verified on one device only.
+
 ## 2026-09-26 — Home header: collapse can no longer ratchet the header away
 
 - Fixed (app, `app/(requester)/index.tsx`): the collapsing Home header stayed

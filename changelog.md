@@ -10,6 +10,110 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Locations: Set Location single page + structured backend
+
+- Change: `app/(requester)/set-location.tsx` is now the full single page
+  (replacing the stub): fixed-height `DeliveryMap` region with an RN centre
+  pin overlay that never moves, scrollable form (heading, Building with
+  campus-dataset autocomplete + OS nearby-place suggestion, Block,
+  Floor/Level, Room/Unit, instructions textarea with 500-char counter,
+  data-driven 7-option label selector with conditional custom name, summary
+  card with icon/resolved text/coords and an Edit-fields scroll jump, pin
+  accuracy note), and a docked Save footer that stays reachable while
+  scrolling. Validates building + label (+ custom name, pin) before enabling
+  Save; creates or updates via the saved-location writers, then goes back.
+- Reason: the stub held only the route; the form fields had no storage and
+  the map had no centre-reporting, so end-to-end save/edit was impossible.
+- Details: `lib/maps/types.ts` + `lib/maps/mapHtml.ts` gain a
+  `center-changed` event (moveend-gated: user drags/pinches and `centerOn`
+  jumps report; fits and the initial world view never do); `locateControl`
+  is the recenter button and OSM tiles carry landmark labels.
+  `lib/maps/geocode.ts` wraps `expo-location.reverseGeocodeAsync` (Expo SDK
+  v57-confirmed API) as suggestion-only with graceful null on web/denied.
+  `lib/locationDetails.ts` holds the category vocabulary, generic
+  label/sub-details resolution, and validation, with `lib/locationDetails.test.ts`
+  (7 tests). Migration `supabase/migrations/2026-09-26_saved_location_details.sql`
+  adds building/block/floor/room/instructions/custom-label columns, widens
+  the type check (`class`, `hostel`), drops the old RPC overloads, and
+  replaces the create/update writers with field-validating versions;
+  `types/domain.ts` and `services/savedLocations.ts` extended to match, and
+  the sheet's icon map covers the new types (`school`, `hotel`).
+- Validation: `tsc` clean, `eslint` clean on all touched files (repo-wide 14
+  errors all pre-existing in untouched `hooks/`), `npm test` 50/50,
+  `expo-doctor` 18/21 (3 pre-existing env), `expo export -p web` pass;
+  headless-Chrome check shows the route bundles and behaves exactly like the
+  existing map route (auth redirect, no crash), and the inlined map JS passes
+  `node --check`.
+- Known limitations: BOTH migrations are written but NOT yet applied (needs
+  the Supabase SQL editor, in file order) — until then save/edit hits the
+  error path; both migration files are git-ignored by `supabase/` and need
+  `git add -f` to be tracked; no local Postgres here so the SQL is reviewed,
+  not executed; real pin placement still needs on-device verification.
+
+## 2026-09-26 — Locations: Deliver-to bottom sheet + saved-location backend
+
+- Change: new Deliver-to bottom sheet (`components/location/DeliverToSheet.tsx`)
+  opened from the home delivery-location display: drag handle, "Deliver to" header with close,
+  scrollable single-select radio list with per-type icons
+  (home/library/cafeteria/office/other), label + sub-details lines, per-row
+  edit, and a hairline-separated "Add new location" action routing to the new
+  `/(requester)/set-location` flow (stub holding the route and the edit-context
+  load; the full form lands next). Dismisses via close, backdrop, Android back,
+  or a downward drag/fling on the handle zone.
+- Reason: `send2u_delivery_locations` holds shared curated campus points with
+  no owner, no type, and no selected state, so the sheet's personal address
+  book needed its own backend rather than reusing that table.
+- Details: migration `supabase/migrations/2026-09-26_saved_delivery_locations.sql`
+  creates `send2u_saved_delivery_locations` (owner, label, sub-details,
+  location-type check, single-select flag, optional pin, timestamps) with
+  owner SELECT-only RLS, a partial unique index for one active row per user,
+  and four `send2u_*` SECURITY DEFINER mutators (create/update/delete/
+  set-active; the first row auto-selects, deleting the active row promotes the
+  oldest survivor). Wired via `types/domain.ts` (`SavedDeliveryLocation`,
+  `SavedLocationType`), `services/savedLocations.ts`,
+  `hooks/useSavedDeliveryLocations.ts`; the home header prefers the saved
+  active label with the shared-point fallback. No new dependencies (Modal +
+  gesture-handler + Reanimated already installed).
+- Validation: `tsc` clean, `eslint` clean on all touched files (repo-wide 14
+  errors all pre-existing in untouched `hooks/`), `npm test` 43/43,
+  `expo-doctor` 18/21 (3 pre-existing env: dual lockfiles, native-folder
+  config note, dep patch drift), `expo export -p web` pass with
+  `set-location.html` emitted.
+- Known limitations: the migration is written but NOT yet applied (needs the
+  Supabase SQL editor) — until then the sheet shows the error state with
+  retry; the Set Location full form (label/details/type/pin) is still to
+  build; the saved active selection is not yet bridged into the order draft
+  (`CartContext.locationId` still drives checkout).
+
+## 2026-09-26 — Set Location: full-bleed map, compact sheet
+
+- Removed the heading block ("Where should we deliver?" and the campus-spot
+  sentence). The page now opens straight onto the map and the first field;
+  nothing restates what the pin and the fields already say.
+- The map bleeds to the left, right and top edges and runs under the status bar,
+  so the floating glass header ("Set Location" plus the back chevron) sits on top
+  of the map instead of above it — the back control is now a layer over the map,
+  which is what was asked for. `mapWrap` lost its margins and its radius.
+- The form is a white sheet with rounded top corners, tucked 20pt over the map's
+  bottom edge, and it starts lower than before: the map is now a clamped 46% of
+  the window (300–440pt) instead of a fixed 280pt. The map gains real viewing
+  room while the form keeps more than half the screen, and the map stays visible
+  while the form scrolls because only the sheet scrolls.
+- `DeliveryMap` gained `locateBottomInset`, used here so the locate control rides
+  above the sheet rather than hiding behind it.
+- Compacted the form: the "Selected location" card and the separate pin note are
+  replaced by one line of live feedback above the fields (pin state, the label the
+  fields resolve to, and the coordinate); Block/Floor/Room share a single row with
+  short placeholders; the category cells are tighter; spacing and horizontal
+  padding each came down a step.
+- Fixed on device: the form could open part-way down the page, because Android
+  settles the WebView's first frame after mount and the scroll landed mid-form. A
+  mount-time scroll now pins it to the top; verified from a cold start.
+- Note: `app/(requester)/set-location.tsx` was untracked in the working tree when
+  this work began, and `app/(requester)/_layout.tsx` plus
+  `components/location/DeliverToSheet.tsx` carry another session's uncommitted
+  changes. Only the screen and this changelog are committed here.
+
 ## 2026-09-26 — Fix: "The action 'GO_BACK' was not handled by any navigator"
 
 - Cause: expo-router queues imperative actions and flushes that queue from a

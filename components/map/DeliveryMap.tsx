@@ -47,6 +47,12 @@ export interface DeliveryMapProps {
    * position.
    */
   locateControl?: boolean;
+  /**
+   * Raises the locate control by this many points. Screens that tuck a sheet
+   * over the map's bottom edge use it so the control clears the sheet instead of
+   * hiding behind it.
+   */
+  locateBottomInset?: number;
   onEvent?: (event: MapEvent) => void;
   style?: StyleProp<ViewStyle>;
   /** Hide the built-in state overlay when the screen renders its own. */
@@ -76,6 +82,7 @@ function DeliveryMapImpl({
   fitToken = 0,
   pickMode = false,
   locateControl = false,
+  locateBottomInset = 0,
   onEvent,
   style,
   hideInternalState = false,
@@ -299,7 +306,9 @@ function DeliveryMapImpl({
       />
 
       {locateControl ? (
-        <View style={styles.locateLayer} pointerEvents="box-none">
+        <View
+          style={[styles.locateLayer, { bottom: spacing.md + locateBottomInset }]}
+          pointerEvents="box-none">
           {locateCaption ? (
             locate.outcome === 'blocked' ? (
               <Pressable
@@ -380,7 +389,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.md,
     right: spacing.md,
-    bottom: spacing.md,
     alignItems: 'flex-start',
     gap: spacing.sm,
   },

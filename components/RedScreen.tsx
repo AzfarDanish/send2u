@@ -137,7 +137,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    minHeight: 48,
+    // Home's header row geometry: a 4pt top nudge inside a 56pt row. Without
+    // it this title row centres 8pt higher than the wordmark and bell on Home,
+    // which reads as misaligned when moving between the tabs.
+    marginTop: spacing.xs,
+    minHeight: 56,
   },
   leading: { marginLeft: -spacing.sm },
   title: { flexShrink: 1 },

@@ -107,6 +107,11 @@ only. No secrets are ever recorded here.
   `SHEET_OVERLAP`, the old `paddingBottom: spacing.lg` left the title and its
   header icons sitting hard against the white transition; My Orders, Profile and
   Notifications all carry a real red band under the title now.
+- Changed (`RedScreen`): the title row now uses Home's geometry (`marginTop:
+  spacing.xs` inside a `minHeight: 56` row). Measured before: Home's wordmark
+  and bell centre at y=227 while every red header centred its title and icons at
+  y=200, so the header line visibly jumped when moving between tabs. After: 226
+  on My Orders, Profile and Notifications, 227 on Home.
 - Verified (device ELP-NX9, after a full reload): My Orders draws the red header
   with the status bar behind it, bell legible in white, and shows the empty
   state while all three seeded orders are terminal; Profile draws identity,

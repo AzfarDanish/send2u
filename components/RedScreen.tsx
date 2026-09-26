@@ -16,6 +16,12 @@ import { TAB_BAR_CONTENT_CLEARANCE } from '@/lib/layout';
 /** White sheet overlap over the red header; matches Home's sheet geometry. */
 const SHEET_OVERLAP = 20;
 const SHEET_RADIUS = 20;
+/**
+ * Red kept below the last header row before the sheet begins. The sheet rides
+ * up by `SHEET_OVERLAP`, so the band a screen actually shows is this value;
+ * without it the title and its icons sit hard against the white transition.
+ */
+const HEADER_BOTTOM_SPACE = spacing.xxxl;
 
 interface RedScreenProps {
   title: string;
@@ -125,7 +131,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
+    paddingBottom: SHEET_OVERLAP + HEADER_BOTTOM_SPACE,
   },
   titleRow: {
     flexDirection: 'row',

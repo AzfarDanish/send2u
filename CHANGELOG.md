@@ -68,6 +68,11 @@ only. No secrets are ever recorded here.
   `display` default, because a back chevron plus a text action leaves about
   180pt of title room at 360pt and "Notifications" at 28pt would ellipsize
   there. The two tab roots keep the large title.
+- Changed (`RedScreen`): the header now keeps `spacing.xxxl` (32pt) of red below
+  its last row before the sheet begins. Because the sheet rides up by
+  `SHEET_OVERLAP`, the old `paddingBottom: spacing.lg` left the title and its
+  header icons sitting hard against the white transition; My Orders, Profile and
+  Notifications all carry a real red band under the title now.
 - Verified (device ELP-NX9, after a full reload): My Orders draws the red header
   with the status bar behind it, bell legible in white, and shows the empty
   state while all three seeded orders are terminal; Profile draws identity,

@@ -181,6 +181,33 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Orders: saved-location link added to the schema (paste pending)
+
+- Cause of "Could not find a relationship between 'send2u_orders' and
+  'send2u_saved_delivery_locations'": the client's order queries — both
+  `services/orders.ts` ORDER_SELECT and `services/vendor.ts` VENDOR_ORDER_SELECT,
+  uncommitted work from another session — embed the saved location and read
+  `saved_location_id`, `delivery_instruction` and `leave_at_door`. None of those three
+  columns existed and there was no foreign key between the two tables, so PostgREST
+  could not resolve the embed. The client is ahead of the database, not wrong.
+- Checkout was broken by the same gap before anyone hit it: `send2u_place_orders` is
+  called with `p_saved_location_id`, `p_delivery_instruction` and `p_leave_at_door`,
+  which the function does not accept, and PostgREST resolves functions by argument
+  name. Rewriting that function needs its source; one query was handed over for it.
+- Added `supabase/migrations/2026-09-26_orders_saved_location.sql` (local only — the
+  directory is gitignored): the three columns, the missing foreign key with
+  `on delete set null`, an index on it, a drop of the now-wrong NOT NULL on
+  `delivery_location_id` so a saved-location order can omit the shared point, and a
+  PostgREST cache reload. Idempotent. Waiting to be pasted.
+- Agreed but deliberately held: renaming every table to drop the `send2u_` prefix,
+  with `send2u_delivery_locations` → `dropoff_points` and
+  `send2u_saved_delivery_locations` → `saved_locations` (they would otherwise read too
+  alike), plus the 31 RPCs renamed in the same pass. Held because another session has
+  uncommitted work in the same files. The plan is one self-contained block that
+  rewrites the function and policy bodies itself, so no function bodies need to be
+  sent over by hand, and it can also report which functions touch the six dead
+  columns found in the earlier cleanup.
+
 ## 2026-09-26 — Database cleanup (live project, item by item on approval)
 
 - Audited the live project read-only first — 14 tables, 31 RPCs, 15 auth users — and

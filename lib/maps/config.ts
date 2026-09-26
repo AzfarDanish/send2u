@@ -18,11 +18,24 @@
  *   caches them like any other image; we add no cache-busting parameters.
  */
 
-/** Raster tile template. `{z}/{x}/{y}` are substituted by the map library. */
-export const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+/**
+ * Raster tile template. `{z}/{x}/{y}` are substituted by the map library and
+ * `{s}` rotates across the mirror's subdomains (a/b/c) so the browser can open
+ * parallel connections and the load spreads across the OSM-France mirrors.
+ *
+ * HOT (Humanitarian OSM Team) style: higher-contrast rendering that makes campus
+ * buildings, blocks and footpaths easier to distinguish than the default Carto
+ * style — chosen for reading a delivery destination at street level. The mirror
+ * only serves on subdomains (the bare host 404s), hence `{s}`.
+ */
+export const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png';
 
-/** Required attribution text, rendered inside the map by the map library. */
-export const OSM_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+/**
+ * Required attribution text, rendered inside the map by the map library.
+ * The HOT mirror is hosted by OpenStreetMap France, so both it and the OSM
+ * data contributors are credited.
+ */
+export const OSM_ATTRIBUTION = '&copy; OpenStreetMap contributors, tiles &copy; HOT / OSM France';
 
 /** OSM serves nothing useful past z19; asking for more returns grey tiles. */
 export const OSM_MAX_ZOOM = 19;

@@ -10,6 +10,25 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Helper: two-point in-app map replaces Google Maps jumps
+
+- Change: helper job screen no longer opens Google Maps — new
+  `components/map/JobOverviewMap.tsx` (vendor + drop-off pins with the OSRM
+  driving leg and distance/duration, fitted, no GPS/watchers) leads the
+  decision view full-width; pickup/deliver blocks are static info;
+  workspace Navigate chips removed and `HelperDeliveryMap` went full-width.
+  `lib/maps/external.ts` stays for history detail only.
+- Reason: the helper evaluates and runs a two-point job; the points belong
+  on one in-app surface instead of an external app jump.
+- Details: overview route reuses `useDeliveryRoute` (static leg = one
+  provider call); honest captions when pins are missing (no map on
+  double-missing); `docs/design.md` §19 decision shape updated to match.
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 14
+  errors + 1 warning all pre-existing), `npm test` 51/51, `expo export -p
+  web` pass (dynamic job route has no static shell; bundle compiles).
+- Known limitations: needs on-device verification (fit framing, full-bleed
+  edges, OSRM leg); turn-by-turn now lives only in history detail.
+
 ## 2026-09-26 — Review: per-vendor cards + plain summary + declutter
 
 - Change: `app/(requester)/create.tsx` — each vendor now gets its own card
@@ -180,6 +199,26 @@ only. No secrets are ever recorded here.
   retry; the Set Location full form (label/details/type/pin) is still to
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
+
+## 2026-09-26 — Map basemap switched to HOT (Humanitarian OSM) style
+
+- Area: `lib/maps/config.ts`.
+- Change: the map's raster tiles now come from the HOT style
+  (`https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png`) instead of the default
+  OSM Carto (`tile.openstreetmap.org`), with the `{s}` subdomain rotation the
+  OSM-France mirrors require (the bare host returns 404). Attribution now reads
+  "© OpenStreetMap contributors, tiles © HOT / OSM France".
+- Reason: higher-contrast rendering makes campus buildings, blocks and footpaths
+  easier to read at street level when picking/verifying a delivery destination.
+- Details: a one-constant change; `mapHtml.ts` consumes `OSM_TILE_URL` and
+  `OSM_ATTRIBUTION` unchanged, and Leaflet's default `['a','b','c']` subdomains
+  match the mirror. No key, no new dependency. The public HOT mirror (OSM France)
+  is the free source; note it occasionally has outages, so the old Carto URL is a
+  known fallback if the mirror is down.
+- Validation: verified all three subdomains (`a`/`b`/`c`) serve 200 PNG tiles
+  (including a mid-zoom z13 tile). `tsc` and `eslint` clean. On ELP-NX9 the
+  set-location map renders the HOT layer — attribution reads "…tiles © HOT / OSM
+  France", the locate marker works, and `tiles-failed`/`library-failed` never fire.
 
 ## 2026-09-26 — Fixed realtime channel double-subscribe crash ("after subscribe()")
 

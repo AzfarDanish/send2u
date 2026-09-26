@@ -181,6 +181,49 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Checkout fixed: send2u_place_orders replaced (schema-cache error)
+
+- Symptom: "Could not place your request: Could not find the function
+  public.send2u_place_orders(p_delivery_instruction, p_delivery_location_id,
+  p_items, p_leave_at_door, p_payment_method, p_saved_location_id) in the schema
+  cache".
+- Cause: the client sends six arguments; the live function took three
+  (`p_delivery_location_id, p_items, p_payment_method DEFAULT 'cod'`). It also
+  validated the drop-off against `send2u_delivery_locations`, a table that no longer
+  exists, so it could not have placed an order even with the right signature.
+- Migration: `supabase/migrations/2026-09-26_fix_place_orders.sql`, applied through
+  the Supabase MCP as migration `fix_place_orders`.
+- Details:
+  - The 3-argument version is dropped (pre-flight check: no other function in the
+    database calls it) and replaced by the six-argument version the client calls:
+    `p_delivery_location_id, p_items, p_payment_method, p_saved_location_id,
+    p_delivery_instruction, p_leave_at_door`. No defaults on the three new
+    arguments — with both arities callable, Postgres reports the call as ambiguous.
+  - Drop-off resolution: a `p_saved_location_id` belonging to the caller is
+    required. A legacy `p_delivery_location_id` alone now raises "That drop-off
+    point is no longer available. Choose a saved location." rather than ordering to
+    a point that cannot be resolved; neither raises "Choose where to deliver".
+  - The order now stores `saved_location_id`, `delivery_instruction` (trimmed, empty
+    as null) and `leave_at_door`. Prices, the 200-cent delivery fee, the pickup
+    code, the payment row and every key of the returned jsonb are unchanged.
+    `create.tsx` passes `savedLocationId: activeSaved.id`, so the saved-location
+    branch is the one the app takes.
+  - `send2u_notify_order_event`, which a trigger on orders calls, LEFT JOINed the
+    same dropped table: the first order write would have failed inside the trigger
+    as soon as the signature was right. Rewritten from its own definition rather
+    than retyped, with a guard that raises if the expected text is missing and does
+    nothing if already applied, so the ~120 lines of notification copy around the
+    fix cannot drift.
+- Validation: `pg_get_function_arguments` reads back as exactly the six the client
+  sends; the notify function no longer matches the dropped table; replaying the
+  client's own call over PostgREST now returns `28000 Not authenticated` — the
+  function is found and its auth guard runs — instead of PGRST202 "not in the schema
+  cache". End-to-end placement with a signed-in requester is the owner's to confirm.
+- Still outstanding from the same dropped table: `send2u_set_delivery_location_pin`
+  and its client path (`services/locations.ts`, `hooks/useDeliveryLocations.ts`, the
+  Drop-off Locations screen, `dropoff-pin.tsx`). That pin flow has no table left to
+  write to, so it needs retiring rather than repairing.
+
 ## 2026-09-26 — Helper Portal: bottom navigation removed (a stack, not tabs)
 
 - Area: `app/(requester)/helper-portal/_layout.tsx` and the portal screens.

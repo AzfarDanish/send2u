@@ -121,32 +121,30 @@ export function useTransaction(orderId: string, refreshToken = 0): UseTransactio
   // Realtime: any change to this order's row, payment row, or settlement row
   // refreshes the context. Silent failure by design — focus refetch covers it.
   //
-  // The channel name is deterministic (`send2u:txn:<orderId>`), so this effect
-  // must run exactly once per order: Supabase's client keeps a registry keyed
-  // by channel name, and a second `.on()` against an already-subscribed channel
-  // of the same name throws "cannot add postgres_changes callbacks ... after
-  // subscribe()". `session` and `load` are therefore read through refs rather
-  // than listed as deps — `session` identity churns on every auth-state event,
-  // and `load` is already stable on `[orderId]` — so the effect body runs once
-  // for the order's lifetime and tears the channel down once on unmount.
+  // The channel name must be unique per subscription, not deterministic: more
+  // than one component for the same order (RequesterPaymentCard and
+  // TransactionRecord render side by side on the order detail screen) mounts
+  // this hook with the same orderId, and Supabase's client keeps a registry
+  // keyed by channel name — a second `.on()` against a channel whose name is
+  // already subscribed throws "cannot add postgres_changes callbacks ... after
+  // subscribe()". Nothing broadcasts to this channel (realtime arrives from
+  // server postgres_changes), so a unique name is safe. This matches
+  // `useRealtimeReload`, which names its channel with a random suffix for the
+  // same reason. `session` and `load` are read through refs so their identity
+  // churn cannot re-run the effect; `authed` is a stable `!!session` boolean.
   const sessionRef = useRef(session);
   const loadRef = useRef(load);
   useEffect(() => {
     sessionRef.current = session;
     loadRef.current = load;
   }, [session, load]);
-  // Stable auth presence: `!!session` does not churn across auth-state events
-  // that refresh the object while keeping a valid session, but it does flip
-  // false→true if this hook ever mounts before sign-in completes, so the
-  // realtime subscription is (re)created exactly when a session first appears.
-  const authed = !!session;
 
   useEffect(() => {
     const supabase = getSupabaseClient();
-    if (!supabase || !authed) return;
+    if (!supabase || !sessionRef.current) return;
     let cancelled = false;
     const channel = supabase
-      .channel(`send2u:txn:${orderId}`)
+      .channel(`send2u:txn:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'send2u_orders', filter: `id=eq.${orderId}` },
@@ -178,7 +176,7 @@ export function useTransaction(orderId: string, refreshToken = 0): UseTransactio
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [orderId, authed]);
+  }, [orderId]);
 
   const retry = useCallback(() => {
     void load();

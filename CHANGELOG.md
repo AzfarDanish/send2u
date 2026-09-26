@@ -148,6 +148,15 @@ only. No secrets are ever recorded here.
   `create function`, so a second run after a partial paste would stop with "function
   already exists". They are `create or replace` now, keeping the existing drop of
   the old five-argument signatures.
+- Applied and verified the same session. All four functions are in the schema cache
+  (`send2u_create_saved_location`, `update`, `delete`, `set_active`), the table
+  answers, and it is granted to `authenticated` with an owner-scoped select policy,
+  which is the role the app calls as. The decisive check: a create with the client's
+  exact eleven-parameter payload now resolves and is refused by the function's own
+  sign-in guard (`42501 sign-in is required to save a location`) instead of failing
+  to be found — the same call that produced the original error. Nothing was written
+  by that probe, since the guard runs before any insert. The anon key gets a 401 on
+  the table; that is expected, because the app never reads it anonymously.
 
 ## 2026-09-26 — Set Location: the whole sheet drags, the pin centres on the map
 

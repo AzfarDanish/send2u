@@ -120,9 +120,30 @@ export function useTransaction(orderId: string, refreshToken = 0): UseTransactio
 
   // Realtime: any change to this order's row, payment row, or settlement row
   // refreshes the context. Silent failure by design — focus refetch covers it.
+  //
+  // The channel name is deterministic (`send2u:txn:<orderId>`), so this effect
+  // must run exactly once per order: Supabase's client keeps a registry keyed
+  // by channel name, and a second `.on()` against an already-subscribed channel
+  // of the same name throws "cannot add postgres_changes callbacks ... after
+  // subscribe()". `session` and `load` are therefore read through refs rather
+  // than listed as deps — `session` identity churns on every auth-state event,
+  // and `load` is already stable on `[orderId]` — so the effect body runs once
+  // for the order's lifetime and tears the channel down once on unmount.
+  const sessionRef = useRef(session);
+  const loadRef = useRef(load);
+  useEffect(() => {
+    sessionRef.current = session;
+    loadRef.current = load;
+  }, [session, load]);
+  // Stable auth presence: `!!session` does not churn across auth-state events
+  // that refresh the object while keeping a valid session, but it does flip
+  // false→true if this hook ever mounts before sign-in completes, so the
+  // realtime subscription is (re)created exactly when a session first appears.
+  const authed = !!session;
+
   useEffect(() => {
     const supabase = getSupabaseClient();
-    if (!supabase || !session) return;
+    if (!supabase || !authed) return;
     let cancelled = false;
     const channel = supabase
       .channel(`send2u:txn:${orderId}`)
@@ -130,14 +151,14 @@ export function useTransaction(orderId: string, refreshToken = 0): UseTransactio
         'postgres_changes',
         { event: '*', schema: 'public', table: 'send2u_orders', filter: `id=eq.${orderId}` },
         () => {
-          if (!cancelled) void load({ background: true });
+          if (!cancelled) void loadRef.current({ background: true });
         },
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'send2u_payments', filter: `order_id=eq.${orderId}` },
         () => {
-          if (!cancelled) void load({ background: true });
+          if (!cancelled) void loadRef.current({ background: true });
         },
       )
       .on(
@@ -149,7 +170,7 @@ export function useTransaction(orderId: string, refreshToken = 0): UseTransactio
           filter: `order_id=eq.${orderId}`,
         },
         () => {
-          if (!cancelled) void load({ background: true });
+          if (!cancelled) void loadRef.current({ background: true });
         },
       )
       .subscribe();
@@ -157,7 +178,7 @@ export function useTransaction(orderId: string, refreshToken = 0): UseTransactio
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [orderId, session, load]);
+  }, [orderId, authed]);
 
   const retry = useCallback(() => {
     void load();

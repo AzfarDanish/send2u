@@ -181,6 +181,28 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Fixed realtime channel double-subscribe crash ("after subscribe()")
+
+- Symptom: React render error on the transaction/payment screens —
+  "cannot add postgres_changes callbacks for realtime:send2u:txn:<orderId> after
+  subscribe()".
+- Cause: `useTransaction` names its realtime channel deterministically
+  (`send2u:txn:<orderId>`) but listed `session` (and `load`) in the effect deps.
+  `useAuth().session` returns a fresh object identity on every auth-state event
+  even while the session stays valid, so the effect tore down and re-ran, and the
+  new `.on()` hit Supabase's channel registry — which already holds a subscribed
+  channel of that name — throwing on the re-registration. `removeChannel` is async,
+  so the old channel was still tearing down when the new one was created.
+- Fix: the realtime effect now runs exactly once per order. `session` and `load`
+  are read through refs (synced in their own effect) instead of being deps, and
+  auth presence is a stable `!!session` boolean (which does not churn on
+  object-refresh but does flip false→true if the hook ever mounts pre-auth). The
+  effect deps collapse to `[orderId, authed]`, so the deterministic channel is
+  subscribed once and torn down once.
+- Validation: `tsc` clean, `eslint` clean, `npm test` 51/51. On ELP-NX9 the
+  transaction screen renders ("Payment Successful" + full breakdown) with zero
+  `postgres_changes`/`after subscribe` errors in logcat after a fresh reload.
+
 ## 2026-09-26 — Carts: per-vendor cart page + independent checkout (two-step flow)
 
 - Area: `app/(requester)/carts.tsx` (new), `app/(requester)/checkout.tsx` (new),

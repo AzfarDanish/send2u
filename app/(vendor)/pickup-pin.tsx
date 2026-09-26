@@ -125,6 +125,7 @@ export default function PickupPinScreen() {
           route={null}
           fitToken={fitToken}
           pickMode={picking}
+          locateControl
           onEvent={handleMapEvent}
           style={styles.map}
         />

@@ -108,6 +108,7 @@ export default function DropOffPinScreen() {
           route={null}
           fitToken={fitToken}
           pickMode={!readOnly && location !== null}
+          locateControl
           onEvent={handleMapEvent}
           style={styles.map}
         />

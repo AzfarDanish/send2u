@@ -65,3 +65,19 @@ export const FOLLOW_PADDING_PX = 96;
 
 /** Zoom applied when following a single moving point. */
 export const FOLLOW_ZOOM = 16;
+
+/**
+ * Zoom used when the user asks the map to jump to their own position. Closer
+ * than follow zoom on purpose: the point of that action is to see the ground
+ * you are standing on while placing a pin on it.
+ */
+export const LOCATE_ZOOM = 17;
+
+/**
+ * "You are here" marker. Dark slate rather than brand red or route blue, so it
+ * cannot be mistaken for a delivery point or for the drawn route.
+ */
+export const MARKER_LOCATE_COLOR = '#1F2937';
+
+/** How long a one-shot fix may take before the control reports failure. */
+export const LOCATE_TIMEOUT_MS = 20000;

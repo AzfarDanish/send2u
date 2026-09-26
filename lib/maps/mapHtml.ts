@@ -5,6 +5,7 @@ import {
   LEAFLET_JS_URL,
   MARKER_DROPOFF_COLOR,
   MARKER_HELPER_COLOR,
+  MARKER_LOCATE_COLOR,
   MARKER_VENDOR_COLOR,
   OSM_ATTRIBUTION,
   OSM_MAX_ZOOM,
@@ -51,6 +52,14 @@ export function buildMapHtml(): string {
     box-shadow: 0 1px 3px rgba(0,0,0,0.25);
   }
   .s2u-marker-helper { width: 22px; height: 22px; }
+  /* "You are here": a hollow ring with a filled centre, deliberately unlike the
+     filled delivery pins so it can never be read as one. */
+  .s2u-marker-locate { background: #FFFFFF; width: 20px; height: 20px; }
+  .s2u-marker-locate::after {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    width: 8px; height: 8px; margin: -4px 0 0 -4px;
+    border-radius: 50%; background: ${MARKER_LOCATE_COLOR};
+  }
   .s2u-marker-helper::after {
     content: ''; position: absolute; left: 50%; top: 50%;
     width: 6px; height: 6px; margin: -3px 0 0 -3px;
@@ -132,6 +141,7 @@ export function buildMapHtml(): string {
     helper: 'background:${MARKER_HELPER_COLOR};border:3px solid #FFFFFF;',
     vendor: 'background:${MARKER_VENDOR_COLOR};border:3px solid #FFFFFF;',
     dropoff: 'background:${MARKER_DROPOFF_COLOR};border:3px solid #FFFFFF;',
+    locate: 'background:#FFFFFF;border:3px solid ${MARKER_LOCATE_COLOR};',
   };
   var accuracyCircle = null;
   var routeCasing = null;
@@ -209,13 +219,13 @@ export function buildMapHtml(): string {
         '" style="' +
         (MARKER_STYLES[key] || MARKER_STYLES.dropoff) +
         '"></div>',
-      iconSize: key === 'helper' ? [22, 22] : [18, 18],
-      iconAnchor: key === 'helper' ? [11, 11] : [9, 9],
+      iconSize: key === 'helper' ? [22, 22] : key === 'locate' ? [20, 20] : [18, 18],
+      iconAnchor: key === 'helper' ? [11, 11] : key === 'locate' ? [10, 10] : [9, 9],
     });
     var marker = L.marker(latLng(point.coordinate), {
       icon: icon,
       // The live position sits above the fixed points, never hidden by them.
-      zIndexOffset: key === 'helper' ? 1000 : 0,
+      zIndexOffset: key === 'helper' ? 1000 : key === 'locate' ? 600 : 0,
       keyboard: false,
       // A tap on a pin belongs to that pin and never reaches the map under it,
       // so placing a new pin cannot be triggered by inspecting a drawn one.
@@ -231,7 +241,7 @@ export function buildMapHtml(): string {
 
   function moveMarker(marker, point) {
     marker.setLatLng(latLng(point.coordinate));
-    marker.setZIndexOffset(point.key === 'helper' ? 1000 : 0);
+    marker.setZIndexOffset(point.key === 'helper' ? 1000 : point.key === 'locate' ? 600 : 0);
   }
 
   function drawRoute(coordinates) {
@@ -327,6 +337,19 @@ export function buildMapHtml(): string {
         case 'fit':
           fitPoints(command.coordinates, command.paddingPx);
           return;
+        case 'centerOn': {
+          var target = command.coordinate;
+          if (!target || !finite(target.latitude) || !finite(target.longitude)) return;
+          // The user asked for this jump, so it is not a manual pan, and it must
+          // not quietly switch following back on either.
+          map._s2uZoomProgrammatic = true;
+          map.setView(
+            [target.latitude, target.longitude],
+            command.zoom || ${FOLLOW_ZOOM},
+            { animate: false },
+          );
+          return;
+        }
         case 'follow':
           followEnabled = !!command.enabled;
           // Asking to follow is also a reset of manual exploration.

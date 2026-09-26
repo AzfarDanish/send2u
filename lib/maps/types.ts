@@ -12,8 +12,8 @@ export interface LatLng {
   longitude: number;
 }
 
-/** The three logical points a delivery map can show. */
-export type MapPointKind = 'helper' | 'vendor' | 'dropoff';
+/** The logical points a delivery map can show. */
+export type MapPointKind = 'helper' | 'vendor' | 'dropoff' | 'locate';
 
 /**
  * One marker on the map. `key` is stable across updates so the map moves the
@@ -62,6 +62,8 @@ export type MapCommand =
   | { type: 'removePoint'; key: MapPointKind }
   | { type: 'fit'; coordinates: LatLng[]; paddingPx: number }
   | { type: 'follow'; enabled: boolean }
+  /** Jump straight to one point at a given zoom, with no animation. */
+  | { type: 'centerOn'; coordinate: LatLng; zoom: number }
   /** Pin placement mode: a map tap reports the tapped coordinate. */
   | { type: 'pickMode'; enabled: boolean };
 

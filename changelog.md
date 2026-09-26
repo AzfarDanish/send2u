@@ -10,6 +10,33 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Map: "show my location" control
+
+- Added (`components/map/DeliveryMap.tsx`, opt-in via `locateControl`): a
+  bottom-left control that asks for a single fix and jumps the camera straight to
+  it at close zoom (`LOCATE_ZOOM`, 17), drawing a "you are here" ring marker in
+  dark slate so it can never be mistaken for a red delivery pin or the blue
+  route. Bottom-left on purpose: the map's attribution owns the bottom-right
+  corner and must stay uncovered.
+- Added (`hooks/useLocateMe.ts`): a one-shot locate, never a watcher, because a
+  pin is placed once. A cached fix is painted first so the map moves immediately,
+  the fresh reading replaces it, and if the fresh reading times out the cached
+  one stays while the caption says so rather than passing an old fix off as
+  current. Nothing is published, and no marker is drawn until a real fix exists.
+- Off by default. Only the two pin screens turn it on, because those are the
+  screens where the user is standing on the spot they are marking; the
+  requester's tracking view never shows it, so watching a helper still requires
+  no location permission from the watcher.
+- Verified on device (ELP-NX9): denying the OS prompt leaves the map usable and
+  shows "Location permission denied, so your position cannot be shown."; allowing
+  it jumps immediately to street level on the device's real position (campus
+  buildings and street names visible, carrier and country consistent with the
+  owner), with the ring marker drawn and the caption "You are here, accurate to
+  about 100 m." taken from the device's own reported accuracy.
+- Consequence worth noting: the pin screens no longer have to open at the world
+  view, because one tap now lands the user on their own ground. The configured
+  campus-centre idea is therefore optional rather than necessary.
+
 ## 2026-09-26 — Live delivery map and tracking (OpenStreetMap + OSRM)
 
 - Built (shared, `lib/maps/`): one map module for both roles, with the provider

@@ -1,11 +1,21 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { MAP_HTML } from '@/lib/maps/mapHtml';
-import { MAP_USER_AGENT, FOLLOW_PADDING_PX } from '@/lib/maps/config';
+import { MAP_USER_AGENT, FOLLOW_PADDING_PX, LOCATE_ZOOM } from '@/lib/maps/config';
+import { useLocateMe } from '@/hooks/useLocateMe';
 import type { LatLng, MapCommand, MapEvent, MapPoint, RouteResult } from '@/lib/maps/types';
 
 export interface DeliveryMapProps {
@@ -29,6 +39,14 @@ export interface DeliveryMapProps {
    * the length of one placement task.
    */
   pickMode?: boolean;
+  /**
+   * Shows a "show my location" control that jumps the map to the device's own
+   * position at close zoom. Only screens where the user is standing at the spot
+   * they are marking turn it on: the requester's tracking view deliberately
+   * never does, because watching a helper must not require sharing your own
+   * position.
+   */
+  locateControl?: boolean;
   onEvent?: (event: MapEvent) => void;
   style?: StyleProp<ViewStyle>;
   /** Hide the built-in state overlay when the screen renders its own. */
@@ -57,6 +75,7 @@ function DeliveryMapImpl({
   camera = 'none',
   fitToken = 0,
   pickMode = false,
+  locateControl = false,
   onEvent,
   style,
   hideInternalState = false,
@@ -116,11 +135,49 @@ function DeliveryMapImpl({
     [onEvent],
   );
 
+  // "Show my location": one fix, asked for by the user, drawn as its own marker
+  // and centred immediately. It publishes nothing and starts no watcher, so a
+  // screen that never shows this control never touches the location permission.
+  const locate = useLocateMe();
+
+  const handleLocate = useCallback(() => {
+    void locate.locate();
+  }, [locate]);
+
+  // Derived, never stored: the marker is a pure function of the fix the hook
+  // holds, so no second copy of the coordinate can drift out of date.
+  const locatePoint = useMemo<MapPoint | null>(() => {
+    if (!locate.coordinate) return null;
+    return {
+      kind: 'locate',
+      key: 'locate',
+      coordinate: locate.coordinate,
+      label: 'Your location',
+      accuracyMeters: locate.accuracyMeters,
+    };
+  }, [locate.coordinate, locate.accuracyMeters]);
+
+  // The jump is a command rather than state: the camera lands on the user the
+  // moment a fix exists. Clearing the manual-pan flag here is deliberate, since
+  // this is the user's own request rather than the map fighting their drag.
+  useEffect(() => {
+    if (!locate.coordinate) return;
+    userTookCamera.current = false;
+    send({ type: 'centerOn', coordinate: locate.coordinate, zoom: LOCATE_ZOOM });
+  }, [locate.coordinate, send]);
+
+  // The user's own position rides with the screen's points: to the map layer it
+  // is a marker like any other, and it disappears when the control is unused.
+  const allPoints = useMemo(
+    () => (locatePoint ? [...points, locatePoint] : points),
+    [points, locatePoint],
+  );
+
   // Markers: create what is missing, move what moved, drop what is gone.
   useEffect(() => {
     if (!ready) return;
     const present = new Set<string>();
-    for (const point of points) {
+    for (const point of allPoints) {
       present.add(point.key);
       const signature = `${point.coordinate.latitude.toFixed(6)},${point.coordinate.longitude.toFixed(6)},${point.accuracyMeters ?? ''}`;
       if (sentPoints.current.get(point.key) === signature) continue;
@@ -136,7 +193,7 @@ function DeliveryMapImpl({
       sentPoints.current.delete(key);
       send({ type: 'removePoint', key: key as MapPoint['key'] });
     }
-  }, [points, ready, camera, send]);
+  }, [allPoints, ready, camera, send]);
 
   // Route: only redraw when the geometry instance changes.
   useEffect(() => {
@@ -196,6 +253,29 @@ function DeliveryMapImpl({
     return true;
   }, []);
 
+  // One honest sentence per locate outcome, so the control never implies it is
+  // showing a position it does not have.
+  const locateCaption = (() => {
+    if (!locateControl) return null;
+    switch (locate.outcome) {
+      case 'denied':
+        return 'Location permission denied, so your position cannot be shown.';
+      case 'blocked':
+        return 'Location is blocked for Send2U. Tap to open settings.';
+      case 'services-off':
+        return 'Location services are off on this device.';
+      case 'unavailable':
+        return 'Your location is unavailable right now.';
+      case 'ok':
+        if (locate.fromCache) return 'Showing your last known position.';
+        return locate.accuracyMeters
+          ? `You are here, accurate to about ${Math.round(locate.accuracyMeters)} m.`
+          : 'You are here.';
+      default:
+        return null;
+    }
+  })();
+
   const unavailable = failed !== null;
 
   return (
@@ -217,6 +297,43 @@ function DeliveryMapImpl({
         setSupportMultipleWindows={false}
         style={styles.web}
       />
+
+      {locateControl ? (
+        <View style={styles.locateLayer} pointerEvents="box-none">
+          {locateCaption ? (
+            locate.outcome === 'blocked' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open settings to allow location"
+                onPress={() => void locate.openSettings()}
+                style={({ pressed }) => [styles.locateCaption, pressed && styles.locatePressed]}>
+                <Text variant="caption" color="secondary">
+                  {locateCaption}
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={styles.locateCaption}>
+                <Text variant="caption" color="secondary">
+                  {locateCaption}
+                </Text>
+              </View>
+            )
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Show my location"
+            accessibilityState={{ busy: locate.locating }}
+            disabled={locate.locating}
+            onPress={handleLocate}
+            style={({ pressed }) => [styles.locateButton, pressed && styles.locatePressed]}>
+            {locate.locating ? (
+              <ActivityIndicator color={colors.text} size="small" />
+            ) : (
+              <MaterialIcons name="my-location" size={22} color={colors.text} />
+            )}
+          </Pressable>
+        </View>
+      ) : null}
 
       {!ready && !unavailable && !hideInternalState ? (
         <View style={styles.overlay} pointerEvents="none">
@@ -257,6 +374,34 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
   },
   web: { flex: 1, backgroundColor: colors.surfaceSecondary },
+  // The locate control sits bottom-left, away from the map's own attribution in
+  // the bottom-right corner, and its layer lets every other tap reach the map.
+  locateLayer: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  locateCaption: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    maxWidth: '100%',
+  },
+  locateButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locatePressed: { opacity: 0.7 },
   overlay: {
     position: 'absolute',
     top: 0,

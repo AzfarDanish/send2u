@@ -181,6 +181,40 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Helper Portal: bottom navigation removed (a stack, not tabs)
+
+- Area: `app/(requester)/helper-portal/_layout.tsx` and the portal screens.
+- Change: the portal's own Tabs navigator is gone. It is a Stack whose root is
+  Available Jobs; Profile is pushed from the header avatar, and Deliveries,
+  Earnings & Payouts and About Helper are pushed from the Profile rows. Nothing
+  in the portal has a bottom bar, and the requester tab bar remains hidden for the
+  whole subtree (`app/(requester)/_layout.tsx`).
+- Reason: the island covers the active delivery, so the Deliveries tab had nothing
+  left to hold, and history belongs to the Profile.
+- Details:
+  - `index.tsx`: `underTabs` dropped (there is no bar to clear). The island is now
+    one entry per active delivery, stacked, so a helper holding two or three jobs
+    can still reach each of them now that no tab lists them. `footerClearance` is
+    computed from the count — a new optional `RedScreen` prop, default unchanged —
+    so the last job row never hides behind them.
+  - `profile.tsx`: pushed from the avatar, so it gains a back chevron (HeaderBack
+    to the portal root) and drops `underTabs`. Centred title and settings gear stay.
+  - `deliveries.tsx`: no longer a tab root, so it drops `hideBack` and `underTabs`,
+    and its back control falls back to the Profile. It still lists active
+    deliveries above history on purpose: those rows carry the cash-collection
+    amount, which the island does not show.
+  - `jobs/[id].tsx` unchanged (already a pushed detail screen).
+  - The comment on the outer `(requester)/_layout.tsx` entry was corrected in the
+    working tree but left uncommitted: that file carries another session's
+    in-flight work.
+- Validation: `tsc` clean, `eslint` clean, `npm test` 51/51. On ELP-NX9: the portal
+  root shows no bar and the sheet runs to the bottom edge; the avatar opens Profile
+  with a back chevron, centred title and settings gear; the Delivery History row
+  opens the deliveries screen with a working back control. No tab-bar labels
+  anywhere in the portal.
+- Known limitation: the stacked islands are not visually verified — they render
+  only when a delivery is active, and `send2u_orders` holds 0 rows.
+
 ## 2026-09-26 — Helper Portal: Jobs and Profile rebuilt on the red-header shell
 
 - Area: `app/(requester)/helper-portal`, `components/`, `hooks/`, `lib/`, `services/ratings.ts`.

@@ -88,10 +88,9 @@ export default function PortalDeliveriesScreen() {
 
   return (
     <HelperPortalGuard title="Deliveries">
-      <GlassHeader title="Deliveries" hideBack />
+      <GlassHeader title="Deliveries" fallbackHref="/(requester)/helper-portal/profile" />
       <Screen
         beneathHeader
-        underTabs
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
         }>

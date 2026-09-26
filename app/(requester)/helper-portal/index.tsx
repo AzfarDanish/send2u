@@ -47,6 +47,17 @@ function distanceLabel(job: OrderWithDetails): string | null {
   return formatted ? `${formatted} to drop-off` : null;
 }
 
+/**
+ * Scroll clearance the stacked islands need, so the last job row is never
+ * hidden behind them. One island's height plus the gap between them, plus a
+ * row's worth of breathing room.
+ */
+const ISLAND_HEIGHT = 60;
+function islandClearance(count: number): number {
+  if (count <= 0) return 0;
+  return count * ISLAND_HEIGHT + (count - 1) * spacing.sm + spacing.xxxl;
+}
+
 interface JobRowProps {
   job: OrderWithDetails;
   /** Last row in its list: no divider underneath. */
@@ -170,7 +181,6 @@ export default function HelperJobsScreen() {
 
   const activeDeliveries = active.status === 'ready' ? active.deliveries : [];
   const atCapacity = activeDeliveries.length >= MAX_ACTIVE_JOBS_PER_HELPER;
-  const currentDelivery = activeDeliveries[0] ?? null;
 
   const handleAccept = useCallback(
     async (jobId: string) => {
@@ -200,9 +210,6 @@ export default function HelperJobsScreen() {
     profile?.displayName?.trim() ||
     user?.email?.split('@')[0] ||
     'Helper';
-  const currentPickup = currentDelivery
-    ? currentDelivery.vendor.locationHint ?? currentDelivery.vendor.name
-    : null;
 
   return (
     <HelperPortalGuard title="Available Jobs">
@@ -288,31 +295,43 @@ export default function HelperJobsScreen() {
             </View>
           ) : null
         }
-        underTabs
         footer={
-          currentDelivery && currentPickup ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Active delivery. Pickup at ${currentPickup}. Opens the delivery.`}
-              onPress={() => openJob(currentDelivery.id)}
-              style={({ pressed }) => [styles.island, pressed && styles.pressed]}>
-              <View style={styles.islandIcon}>
-                <MaterialIcons name="delivery-dining" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.islandText}>
-                <Text variant="status" color="onPrimary">
-                  Active Delivery
-                </Text>
-                <Text variant="caption" color="onPrimary" numberOfLines={1} style={styles.islandSub}>
-                  {currentPickup}
-                </Text>
-              </View>
-              <View style={styles.islandArrow}>
-                <MaterialIcons name="arrow-forward" size={20} color={colors.primary} />
-              </View>
-            </Pressable>
-          ) : null
+          activeDeliveries.length === 0 ? null : (
+            <View style={styles.islandStack}>
+              {activeDeliveries.map((delivery) => {
+                const pickup = delivery.vendor.locationHint ?? delivery.vendor.name;
+                return (
+                  <Pressable
+                    key={delivery.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Active delivery. Pickup at ${pickup}. Opens the delivery.`}
+                    onPress={() => openJob(delivery.id)}
+                    style={({ pressed }) => [styles.island, pressed && styles.pressed]}>
+                    <View style={styles.islandIcon}>
+                      <MaterialIcons name="delivery-dining" size={20} color={colors.primary} />
+                    </View>
+                    <View style={styles.islandText}>
+                      <Text variant="status" color="onPrimary">
+                        Active Delivery
+                      </Text>
+                      <Text
+                        variant="caption"
+                        color="onPrimary"
+                        numberOfLines={1}
+                        style={styles.islandSub}>
+                        {pickup}
+                      </Text>
+                    </View>
+                    <View style={styles.islandArrow}>
+                      <MaterialIcons name="arrow-forward" size={20} color={colors.primary} />
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )
         }
+        footerClearance={islandClearance(activeDeliveries.length)}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -447,6 +466,7 @@ const styles = StyleSheet.create({
   acceptDisabled: { backgroundColor: colors.disabled },
   pressed: { opacity: 0.7 },
 
+  islandStack: { gap: spacing.sm },
   island: {
     flexDirection: 'row',
     alignItems: 'center',

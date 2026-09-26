@@ -54,6 +54,11 @@ interface RedScreenProps {
    */
   footer?: ReactNode;
   /**
+   * Scroll clearance the pinned footer needs. Defaults to one island's height;
+   * pass a larger value when the footer stacks several.
+   */
+  footerClearance?: number;
+  /**
    * `display` (28pt) is the default large tab title. A narrow header that also
    * carries a back control and a text action passes `title` (22pt): at 360pt,
    * "Notifications" plus both slots cannot hold 28pt without truncating.
@@ -94,6 +99,7 @@ export function RedScreen({
   subtitle,
   below,
   footer,
+  footerClearance: footerClearanceProp,
   titleSize = 'display',
   children,
   refreshControl,
@@ -103,7 +109,7 @@ export function RedScreen({
 }: RedScreenProps) {
   const insets = useSafeAreaInsets();
   const bottomPad = underTabs ? TAB_BAR_CONTENT_CLEARANCE : spacing.xxxl;
-  const footerClearance = footer ? FOOTER_CLEARANCE : 0;
+  const footerClearance = footer ? (footerClearanceProp ?? FOOTER_CLEARANCE) : 0;
   // The portal's tab bar floats, so a pinned footer rides above it rather than
   // behind it. Same inset math the portal layout uses for the bar itself.
   const footerBottom = underTabs

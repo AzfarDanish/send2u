@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Avatar } from '@/components/Avatar';
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
+import { HeaderBack } from '@/components/HeaderBack';
 import { HeaderSettings } from '@/components/HeaderSettings';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { RedScreen } from '@/components/RedScreen';
@@ -86,8 +87,10 @@ export default function HelperPortalProfileScreen() {
       <RedScreen
         title="Profile"
         centerTitle
+        leading={
+          <HeaderBack fallbackHref="/(requester)/helper-portal" color={colors.onPrimary} />
+        }
         right={<HeaderSettings href="/(requester)/settings" color={colors.onPrimary} />}
-        underTabs
         contentStyle={styles.content}>
         {isLoading && !profile ? (
           <SkeletonProfile rows={5} label="Loading your helper profile" />

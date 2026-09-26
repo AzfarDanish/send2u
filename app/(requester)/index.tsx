@@ -237,7 +237,10 @@ export default function RequesterHomeScreen() {
               // zero is ignored rather than stored — storing one is what used
               // to leave the header permanently hidden.
               const measured = event.nativeEvent.layout.height;
-              if (measured > 0) collapseHeight.value = measured;
+              // `.set()` rather than the `.value` setter: the compiler-aware
+              // lint rules treat an assignment to a hook result as mutating an
+              // immutable value.
+              if (measured > 0) collapseHeight.set(measured);
             }}>
             <View style={styles.topRow}>
               <Image

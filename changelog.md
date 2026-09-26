@@ -10,6 +10,40 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Home scroll: roughness traced to the collapse compensation (not fixed)
+
+- Investigated (`app/(requester)/index.tsx`): the reported "rough and heavy"
+  Home scroll versus the static-header screens. Measurements were taken rather
+  than guessed: `uiautomator dump` bounds give exact on-screen pixels, which
+  downscaled screenshots cannot.
+- Measured (baseline, `dumpsys gfxinfo`, three swipe pairs): 16/344 janky frames
+  (4.65%), 90th percentile 13ms, 99th 18ms, 12 missed vsync.
+- Tried: rebuilding the collapse to move everything with transforms instead of
+  the per-frame `marginBottom` that re-laid-out the header and resized the scroll
+  view's frame on every frame of a drag (block, search bar and sheet each
+  translating by the same amount, plus a one-off `marginBottom` over-extension so
+  the risen sheet still covers the screen bottom).
+- Result: 15/328 janky (4.57%), inside the noise of the baseline. **Reverted**
+  rather than kept: it bought nothing measurable, and one full-collapse frame
+  showed the search bar gone where the transform maths puts it just under the
+  status bar.
+- Found, and this is the real defect (still open): during the collapse phase the
+  list moves at exactly TWICE the header. With the search pill as the reference,
+  one slow 150px drag moves the pill up 60px and the list up 121px; a second drag
+  gives 121px and 241px. `contentShiftStyle` exists to cancel that (`ride`
+  translates the list by the scroll offset) and on these measurements it
+  contributes nothing — the list advances at scroll + collapse while the header
+  advances at collapse alone.
+- Kept from the investigation: `collapseHeight.set(measured)` instead of the
+  `.value` setter, which clears the `react-hooks/immutability` error and is what
+  Reanimated 4 wants.
+- Validation: `npx tsc --noEmit` clean, `npx eslint` clean on the file,
+  `npm test` 43/43.
+- Known limitation: Home still scrolls with the doubling above. Next step is to
+  make the `ride` compensation actually reach the list (log the sheet body's
+  animated transform on the UI thread, confirm it arrives, then re-measure jank
+  with the same gfxinfo method).
+
 ## 2026-09-26 — Red-header redesign: My Orders, Profile, Notifications
 
 - Built (shared, `components/RedScreen.tsx`): one red-header shell for the

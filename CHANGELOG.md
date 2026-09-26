@@ -131,6 +131,24 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Saved locations: the backend was never applied to the database
+
+- The save failure ("Could not find the function public.send2u_create_saved_location…")
+  is not a client bug. The live schema exposes 27 RPCs and none of them are the
+  saved-location ones, and `send2u_saved_delivery_locations` — the table the client
+  reads and writes — returns 404. The delivery-tracking migration *is* applied
+  (`send2u_delivery_positions` exists, and the pin RPCs are live), so only the
+  saved-location pair is outstanding.
+- The client and the migration agree exactly: the RPC takes the same eleven
+  parameters the client sends (`p_label, p_sub_details, p_location_type, p_lat,
+  p_lng, p_building, p_block, p_floor_level, p_room_unit, p_instructions,
+  p_custom_label`), and the table name matches. Applying the two files in order is
+  the whole fix — no code change was needed.
+- Made `2026-09-26_saved_location_details.sql` re-runnable: its two functions were
+  `create function`, so a second run after a partial paste would stop with "function
+  already exists". They are `create or replace` now, keeping the existing drop of
+  the old five-argument signatures.
+
 ## 2026-09-26 — Set Location: the whole sheet drags, the pin centres on the map
 
 - The drag surface is the whole sheet now, not just the grabber. The handle, the

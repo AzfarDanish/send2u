@@ -60,7 +60,7 @@ drop function if exists public.send2u_update_saved_location(uuid, text, text, te
 -- fields. Label/sub-details still carry the display composition (the sheet
 -- reads those two columns); the structured columns are what the edit flow
 -- reads back. The caller's first location becomes the active one.
-create function public.send2u_create_saved_location(
+create or replace function public.send2u_create_saved_location(
   p_label text,
   p_sub_details text default null,
   p_location_type text default 'other',
@@ -151,7 +151,7 @@ grant execute on function public.send2u_create_saved_location(text, text, text, 
 
 -- Edits one owned location, structured fields included. Selection never
 -- changes here; the setter owns it.
-create function public.send2u_update_saved_location(
+create or replace function public.send2u_update_saved_location(
   p_id uuid,
   p_label text,
   p_sub_details text default null,

@@ -131,6 +131,31 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Set Location: the whole sheet drags, the pin centres on the map
+
+- The drag surface is the whole sheet now, not just the grabber. The handle, the
+  search field and the pin readout sit under one always-live pan, and the form
+  below joins in whenever it has nothing left to scroll, so a drag that starts on
+  the fields moves the sheet instead of doing nothing. Verified by dragging from
+  the form's peek area, well below the grabber: the sheet expanded.
+- The form's scroll is arbitrated, not blocked: the ScrollView is declared to
+  gesture-handler as a `Gesture.Native()` and runs simultaneously with the sheet's
+  pan, while a `formScrolled` flag decides per frame which one applies. A drag
+  inside a scrolled form therefore stays a scroll (verified: the content moved
+  while the sheet's top edge held still) and the form's own drag stays live while
+  it is at the top. Collapsing also clears the form's offset, since a stale offset
+  would keep that gesture switched off.
+- The centre pin is centred on the MAP, not on the screen: the map's box now ends
+  where the sheet's peek begins instead of at the window's bottom edge. That also
+  makes the settled centre the map reports identical to the point the pin marks,
+  which is the entire purpose of a centre pin. The locate control needs no bottom
+  inset any more, and the OSM attribution now sits just above the sheet's edge —
+  visible rather than covered.
+- Device-verified (ELP-NX9): at rest the pin sits halfway between the map's top and
+  the sheet's top with the attribution clear; a drag starting inside the form
+  expands the sheet; a swipe inside the expanded form scrolls the fields while the
+  sheet holds still.
+
 ## 2026-09-26 — Set Location: the sheet peeks, the centre pin returns, the bottom is reachable
 
 - Root cause of both the disappearing sheet and the unreachable bottom: the sheet

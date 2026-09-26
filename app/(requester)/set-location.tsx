@@ -149,6 +149,8 @@ export default function SetLocationScreen() {
   const snapOpen = useSharedValue(0);
   const snapPeek = useSharedValue(peekOffset);
   const expandedRef = useRef(expanded);
+  /** 1 once the form itself has been scrolled away from its top. */
+  const formScrolled = useSharedValue(0);
 
   // Snap bounds follow the measured geometry only. The sheet's own position is
   // owned by the gesture and its spring, so flipping the expanded state never
@@ -175,11 +177,15 @@ export default function SetLocationScreen() {
 
   const collapseSheet = useCallback(() => {
     Keyboard.dismiss();
+    // A collapsed form has nothing to scroll, so its offset goes with it: a stale
+    // offset would otherwise keep the form's own drag gesture switched off.
+    formScrollRef.current?.scrollTo({ y: 0, animated: false });
+    formScrolled.set(0);
     // Reanimated shared-value write (UI-thread spring input) — intended API.
     // eslint-disable-next-line react-hooks/immutability
     ty.value = withSpring(snapPeek.value, SHEET_SPRING);
     setExpanded(false);
-  }, [ty, snapPeek]);
+  }, [ty, snapPeek, formScrolled]);
 
   // Keyboard dismissal has to cross the worklet boundary as a function defined
   // in this scope. A worklet that names `Keyboard` itself tries to copy the
@@ -187,42 +193,89 @@ export default function SetLocationScreen() {
   // render, taking the whole screen down with it.
   const dismissKeyboard = useCallback(() => Keyboard.dismiss(), []);
 
+  // Drag helpers are worklets: they run on the UI thread, with the gesture.
+  const beginDrag = useCallback(() => {
+    'worklet';
+    // eslint-disable-next-line react-hooks/immutability
+    panStart.value = ty.value;
+  }, [panStart, ty]);
+
+  const dragSheetBy = useCallback(
+    (translationY: number) => {
+      'worklet';
+      const next = panStart.value + translationY;
+      // Clamped to the two snaps: never past expanded, never below the peek.
+      // eslint-disable-next-line react-hooks/immutability
+      ty.value = Math.min(snapPeek.value, Math.max(0, next));
+    },
+    [panStart, snapPeek, ty],
+  );
+
+  const settleSheet = useCallback(
+    (velocityY: number) => {
+      'worklet';
+      const open = snapOpen.value;
+      const peek = snapPeek.value;
+      const middle = (open + peek) / 2;
+      let target = ty.value <= middle ? open : peek;
+      if (velocityY < -FLING_VELOCITY) target = open;
+      else if (velocityY > FLING_VELOCITY) target = peek;
+      // The fling's own velocity hands off to the spring, so a fast flick carries
+      // through instead of restarting from a dead stop.
+      // eslint-disable-next-line react-hooks/immutability
+      ty.value = withSpring(target, { ...SHEET_SPRING, velocity: velocityY });
+      runOnJS(setExpanded)(target === open);
+      // Leaving the expanded snap puts the keyboard away with it, so the peek is
+      // never half-covered by a keyboard.
+      if (target !== open) runOnJS(dismissKeyboard)();
+    },
+    [ty, snapOpen, snapPeek, dismissKeyboard],
+  );
+
+  // Chrome drag: the handle, the search field and the pin line. Always live, so
+  // the sheet answers anywhere the finger lands on it.
   const dragGesture = useMemo(
     () =>
       Gesture.Pan()
         .activeOffsetY([-8, 8])
         .failOffsetX([-12, 12])
-        .onBegin(() => {
-          // Reanimated shared-value write (UI-thread gesture input) — intended API.
-          // eslint-disable-next-line react-hooks/immutability
-          panStart.value = ty.value;
-        })
+        .onBegin(beginDrag)
+        .onUpdate((event) => dragSheetBy(event.translationY))
+        .onEnd((event) => settleSheet(event.velocityY)),
+    [beginDrag, dragSheetBy, settleSheet],
+  );
+
+  // Form drag: the same movement, but only while the form has nothing left to
+  // scroll. It runs simultaneously with the ScrollView so a drag inside a scrolled
+  // form stays a scroll rather than yanking the sheet out from under the fields.
+  const formDragGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-8, 8])
+        .failOffsetX([-12, 12])
+        .onBegin(beginDrag)
         .onUpdate((event) => {
-          const next = panStart.value + event.translationY;
-          // Clamped to the two snaps: never past expanded, never below the peek.
-          const clamped = Math.min(snapPeek.value, Math.max(0, next));
-          // Reanimated shared-value write (UI-thread gesture input) — intended API.
-          // eslint-disable-next-line react-hooks/immutability
-          ty.value = clamped;
+          if (formScrolled.value === 1) return;
+          dragSheetBy(event.translationY);
         })
         .onEnd((event) => {
-          const open = snapOpen.value;
-          const peek = snapPeek.value;
-          const middle = (open + peek) / 2;
-          let target = ty.value <= middle ? open : peek;
-          if (event.velocityY < -FLING_VELOCITY) target = open;
-          else if (event.velocityY > FLING_VELOCITY) target = peek;
-          // The fling's own velocity hands off to the spring, so a fast flick
-          // carries through instead of restarting from a dead stop.
-          // Reanimated shared-value write (UI-thread gesture input) — intended API.
-          // eslint-disable-next-line react-hooks/immutability
-          ty.value = withSpring(target, { ...SHEET_SPRING, velocity: event.velocityY });
-          runOnJS(setExpanded)(target === open);
-          // Leaving the expanded snap puts the keyboard away with it, so the peek
-          // is never half-covered by a keyboard.
-          if (target !== open) runOnJS(dismissKeyboard)();
+          if (formScrolled.value === 1) return;
+          settleSheet(event.velocityY);
         }),
-    [ty, panStart, snapOpen, snapPeek, dismissKeyboard],
+    [beginDrag, dragSheetBy, settleSheet, formScrolled],
+  );
+
+  const scrollNativeGesture = useMemo(() => Gesture.Native(), []);
+
+  /**
+   * The form's scroll and its drag run together, and the `formScrolled` flag
+   * decides which one applies on each frame. Declaring the ScrollView as a
+   * `Gesture.Native()` is what lets the two negotiate at all: without it, a pan on
+   * an ancestor swallows the scroll and the form stops scrolling.
+   */
+  const formScrollGesture = useMemo(
+    () => Gesture.Simultaneous(formDragGesture, scrollNativeGesture),
+    [formDragGesture, scrollNativeGesture],
   );
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }));
 
@@ -428,13 +481,16 @@ export default function SetLocationScreen() {
   return (
     <View style={styles.root}>
       {/* Full-bleed map: the sheet floats over its bottom edge. */}
-      <View style={[styles.mapArea, { top: contentTop, bottom: insets.bottom }]}>
+      {/* The map's box ends where the sheet's peek begins rather than at the
+          window's bottom edge. That is what puts the centre pin in the middle of
+          the MAP instead of the middle of the screen, and it keeps the settled
+          centre the map reports identical to the point the pin marks. */}
+      <View style={[styles.mapArea, { top: contentTop, bottom: COLLAPSED_VISIBLE }]}>
         <DeliveryMap
           points={mapPoints}
           route={null}
           fitToken={fitToken}
           locateControl
-          locateBottomInset={COLLAPSED_VISIBLE}
           onEvent={handleMapEvent}
           style={styles.map}
         />
@@ -453,24 +509,27 @@ export default function SetLocationScreen() {
 
       {/* Slideable sheet: two snaps, never off-screen, never fullscreen. */}
       <Animated.View style={[styles.sheet, { height: sheetHeight }, sheetStyle]}>
+        {/* The whole sheet answers the drag, not just the pill: this detector
+            covers the handle, the search field and the pin readout, and the form
+            below joins in whenever it has nothing left to scroll. */}
         <GestureDetector gesture={dragGesture}>
-          <View
-            style={styles.dragZone}
-            accessibilityRole="adjustable"
-            accessibilityLabel="Location form sheet. Drag up to expand, drag down to collapse."
-            accessibilityActions={[
-              { name: 'expand', label: 'Expand' },
-              { name: 'collapse', label: 'Collapse' },
-            ]}
-            onAccessibilityAction={(event) => {
-              if (event.nativeEvent.actionName === 'expand') expandSheet();
-              else collapseSheet();
-            }}>
-            <View style={styles.handle} />
-          </View>
-        </GestureDetector>
+          <View>
+            <View
+              style={styles.dragZone}
+              accessibilityRole="adjustable"
+              accessibilityLabel="Location form sheet. Drag up to expand, drag down to collapse."
+              accessibilityActions={[
+                { name: 'expand', label: 'Expand' },
+                { name: 'collapse', label: 'Collapse' },
+              ]}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'expand') expandSheet();
+                else collapseSheet();
+              }}>
+              <View style={styles.handle} />
+            </View>
 
-        <View style={styles.searchWrap}>
+            <View style={styles.searchWrap}>
           <View style={[styles.searchRow, searchFocused && styles.searchFocused]}>
             <MaterialIcons name="search" size={22} color={colors.secondary} />
             <TextInput
@@ -550,6 +609,8 @@ export default function SetLocationScreen() {
               : 'Pan the map to place your pin'}
           </Text>
         </View>
+          </View>
+        </GestureDetector>
 
         <KeyboardAvoidingView
           style={styles.sheetBody}
@@ -579,13 +640,20 @@ export default function SetLocationScreen() {
               ) : null}
             </ScrollView>
           ) : (
-            <ScrollView
-              ref={formScrollRef}
-              style={styles.formScroll}
-              contentContainerStyle={styles.formContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              scrollEnabled={expanded}>
+            <GestureDetector gesture={formScrollGesture}>
+              <ScrollView
+                ref={formScrollRef}
+                style={styles.formScroll}
+                contentContainerStyle={styles.formContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                // The sheet's form drag reads this flag: while the form can still
+                // scroll, a vertical drag belongs to the form, not to the sheet.
+                onScroll={(event) => {
+                  formScrolled.set(event.nativeEvent.contentOffset.y > 0.5 ? 1 : 0);
+                }}
+                scrollEventThrottle={16}
+                scrollEnabled={expanded}>
               <View>
                 <Input
                   label="Building / Facility"
@@ -786,6 +854,7 @@ export default function SetLocationScreen() {
                 </Text>
               </View>
             </ScrollView>
+            </GestureDetector>
           )}
 
           {/* Docked Save: sheet chrome, button only — minimal and compact.

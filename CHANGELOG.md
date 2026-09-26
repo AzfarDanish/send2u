@@ -181,6 +181,37 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Orders embeds point at a table that no longer exists (fixed)
+
+- Second orders failure, same screen: "Could not find a relationship between
+  'send2u_orders' and 'send2u_delivery_locations'". Cause: the legacy shared
+  campus drop-off table `send2u_delivery_locations` has been dropped (the public
+  schema is down to 13 tables), while both order selects still embedded it.
+  PostgREST cannot join what is gone.
+- The client stopped embedding it. `ORDER_SELECT` and `VENDOR_ORDER_SELECT` now
+  embed only `saved_location`; the `delivery_location` row types are gone from both
+  mappers; and the requester mapper's fallback no longer reads the dropped table.
+- Mapper semantics: `order.location` stays non-null because ~18 screens read
+  `order.location.name`. It is derived from the saved row alone. When there is no
+  saved row the requester's own `delivery_instruction` carries the drop-off text,
+  the description says plainly that the saved location is removed, and the pin stays
+  null rather than becoming a stand-in coordinate. Verified there is no legacy data
+  to strand: `send2u_orders` currently holds 0 rows.
+- Verified: the exact embed the app sends now returns 200 (service role) and 200 on
+  device, with zero `schema cache` or `Could not load your orders` lines in logcat,
+  and My Orders renders its empty state instead of an error. `tsc` and `eslint`
+  clean on both files.
+- Still broken, same dropped table, all server-side (plpgsql resolves these at call
+  time, so nothing fails until the function runs):
+  - `send2u_notify_order_event` — LEFT JOINs the dropped table and **has a trigger
+    attached**, so every order event it fires on will abort its transaction;
+  - `send2u_place_orders` — SELECTs from the dropped table to build the order;
+  - `send2u_set_delivery_location_pin` — existence check plus UPDATE, both gone.
+  Also client-side: `services/locations.ts` reads the dropped table and is used by
+  the Drop-off Locations screen, set-location, dropoff-pin and Home's name fallback.
+- Not committed: `services/orders.ts` and `services/vendor.ts` still carry the other
+  session's uncommitted saved-location work, so these edits ride in their commit.
+
 ## 2026-09-26 — Supabase MCP connected; the schema work is now mine to run
 
 - Why it was blocked before: the service-role key is a REST key. PostgREST exposes

@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@/lib/supabase';
+import type { LatLng } from '@/lib/maps/types';
 import type { MenuItem, OrderStatus, OrderWithDetails, Vendor } from '@/types/domain';
 
 /**
@@ -9,6 +10,11 @@ import type { MenuItem, OrderStatus, OrderWithDetails, Vendor } from '@/types/do
  * ids it shouldn't choose. There are no client write policies/grants on
  * vendors or menu items. Reads of the own stall use the owner SELECT
  * policies. Vendors never touch orders, payments, or other stalls.
+ *
+ * `send2u_set_vendor_pickup_pin` is the one write whose payload is a
+ * coordinate rather than text: a stall's pickup point is a real device
+ * coordinate the vendor taps on the map, and the function resolves the stall
+ * from the caller, so the client still never names an id it does not own.
  * Errors are thrown explicitly; nothing is swallowed.
  */
 
@@ -27,6 +33,8 @@ interface VendorRow {
   name: string;
   description: string | null;
   location_hint: string | null;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
   operating_hours: string | null;
   image_url: string | null;
   is_active: boolean;
@@ -55,6 +63,8 @@ function toVendor(row: VendorRow): Vendor {
     name: row.name,
     description: row.description,
     locationHint: row.location_hint,
+    pickupLat: row.pickup_lat,
+    pickupLng: row.pickup_lng,
     operatingHours: row.operating_hours,
     imageUrl: row.image_url,
     isActive: row.is_active,
@@ -111,7 +121,7 @@ export async function getMyVendor(): Promise<Vendor> {
   const { data, error } = await supabase
     .from('send2u_vendors')
     .select(
-      'id, name, description, location_hint, operating_hours, image_url, is_active, is_open, sort_order, created_at, updated_at',
+      'id, name, description, location_hint, pickup_lat, pickup_lng, operating_hours, image_url, is_active, is_open, sort_order, created_at, updated_at',
     )
     .eq('id', vendorId)
     .maybeSingle();
@@ -141,6 +151,40 @@ export async function updateVendorProfile(input: VendorProfileInput): Promise<Ve
     p_is_open: input.isOpen,
   });
   if (error) throw new Error(error.message ? `Could not save your stall: ${error.message}` : 'Could not save your stall.');
+  return getMyVendor();
+}
+
+/**
+ * Sets the pickup pin the vendor's own device tapped on the map.
+ *
+ * The stall is permanent but its pickup point is not: a stall moves between
+ * semesters and the free-text `locationHint` cannot carry a route, so this is
+ * the one coordinate the vendor controls and it may be corrected by placing it
+ * again. The function resolves the stall from the caller, so nothing here can
+ * address another vendor's row.
+ */
+export async function setMyPickupPin(coordinate: LatLng): Promise<Vendor> {
+  const supabase = requireClient();
+  const { data, error } = await supabase.rpc('send2u_set_vendor_pickup_pin', {
+    p_lat: coordinate.latitude,
+    p_lng: coordinate.longitude,
+  });
+  if (error) {
+    const message = error.message ?? '';
+    if (/only a vendor account/i.test(message))
+      throw new Error('Only a vendor account can set a pickup pin.');
+    if (/coordinates are invalid/i.test(message))
+      throw new Error('That pin is not a usable coordinate. Tap the map again.');
+    if (/no vendor row/i.test(message))
+      throw new Error('Your linked stall is no longer available. Ask your administrator.');
+    throw new Error(message ? `Could not save the pickup pin: ${message}` : 'Could not save the pickup pin.');
+  }
+  // The function echoes the stored coordinate; a write that reported success
+  // but stored nothing else is not success, so the shape is checked before the
+  // stall is re-read and handed to the screen.
+  if (!isRecord(data) || typeof data.pickup_lat !== 'number' || typeof data.pickup_lng !== 'number') {
+    throw new Error('Saving the pickup pin came back in an unexpected shape.');
+  }
   return getMyVendor();
 }
 
@@ -247,14 +291,14 @@ interface VendorOrderRow {
   accepted_at: string | null;
   created_at: string;
   updated_at: string;
-  delivery_location: { id: string; name: string; description: string | null } | null;
+  delivery_location: { id: string; name: string; description: string | null; lat: number | null; lng: number | null } | null;
   send2u_order_items: VendorOrderItemRow[] | null;
 }
 
 const VENDOR_ORDER_SELECT =
   'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents,' +
   ' payment_method, payment_status, settlement_status, helper_id, accepted_at, created_at, updated_at,' +
-  ' delivery_location:send2u_delivery_locations!inner(id, name, description),' +
+  ' delivery_location:send2u_delivery_locations!inner(id, name, description, lat, lng),' +
   ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at)';
 
 function toVendorOrderWithDetails(row: VendorOrderRow): OrderWithDetails {
@@ -300,11 +344,16 @@ function toVendorOrderWithDetails(row: VendorOrderRow): OrderWithDetails {
     resolution: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    vendor: { id: row.vendor_id, name: '', locationHint: null },
+    // The stall's own row is not joined on this query: the vendor already reads
+    // it (with its pickup pin) from `getMyVendor`, and joining it here would
+    // make every order disappear if the stall were ever hidden from requesters.
+    vendor: { id: row.vendor_id, name: '', locationHint: null, pickupLat: null, pickupLng: null },
     location: {
       id: row.delivery_location.id,
       name: row.delivery_location.name,
       description: row.delivery_location.description,
+      lat: row.delivery_location.lat,
+      lng: row.delivery_location.lng,
     },
     items: (row.send2u_order_items ?? []).map((item) => ({
       id: item.id,

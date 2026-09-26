@@ -24,6 +24,8 @@ interface VendorRow {
   name: string;
   description: string | null;
   location_hint: string | null;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
   operating_hours: string | null;
   image_url: string | null;
   is_active: boolean;
@@ -56,6 +58,8 @@ function toVendor(row: VendorRow): Vendor {
     name: row.name,
     description: row.description,
     locationHint: row.location_hint,
+    pickupLat: row.pickup_lat,
+    pickupLng: row.pickup_lng,
     operatingHours: row.operating_hours,
     imageUrl: row.image_url,
     isActive: row.is_active,

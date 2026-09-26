@@ -303,6 +303,18 @@ export default function RequesterLayout() {
           headerShown: false,
         }}
       />
+      {/* Pin placement for the chosen drop-off point: a full-screen map with
+          its own in-screen chrome, so it hides both the tab bar and the native
+          header exactly like the other pushed screens. */}
+      <Tabs.Screen
+        name="dropoff-pin"
+        options={{
+          href: null,
+          title: 'Drop-off Pin',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
       {/* Helper Portal (verified helpers only; guarded per-screen) owns its
         own Jobs/Deliveries/Profile bottom navigation inside this hidden
         slot, entered from Profile — never a main-app tab. */}

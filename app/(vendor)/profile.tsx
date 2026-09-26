@@ -1,9 +1,11 @@
+import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { DevProfileSwitcher } from '@/components/DevProfileSwitcher';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ListRow } from '@/components/ui/ListRow';
 import { SkeletonHero } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -14,6 +16,10 @@ import { useMyVendor } from '@/hooks/useMyVendor';
 export default function VendorProfileScreen() {
   const { user, signOut, isLoading } = useAuth();
   const { vendor, status } = useMyVendor();
+  // The pin is the stall's own coordinate, absent until the vendor places it, so
+  // the row states which of those two facts is true rather than implying one.
+  const hasPin =
+    typeof vendor?.pickupLat === 'number' && typeof vendor?.pickupLng === 'number';
 
   return (
     <Screen underTabs>
@@ -34,6 +40,24 @@ export default function VendorProfileScreen() {
           )}
         </View>
       )}
+
+      <Card style={styles.section}>
+        <ListRow
+          icon="my-location"
+          title={hasPin ? 'Pickup pin' : 'Set your pickup pin'}
+          subtitle={
+            hasPin
+              ? 'Helpers are routed to this point. You can move it if the stall moves.'
+              : 'Not set yet — until it is, helpers cannot be routed to your stall.'
+          }
+          accessibilityLabel={
+            hasPin
+              ? 'Pickup pin, set. Opens the map to move it.'
+              : 'Pickup pin not set. Opens the map to place it.'
+          }
+          onPress={() => router.push('/(vendor)/pickup-pin')}
+        />
+      </Card>
 
       <Card style={styles.section}>
         <Text variant="caption" color="muted">

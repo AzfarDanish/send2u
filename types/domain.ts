@@ -83,7 +83,14 @@ export interface Vendor {
   id: string;
   name: string;
   description: string | null;
+  /** Free-text hint; still what the external maps handoff searches for. */
   locationHint: string | null;
+  /**
+   * Pickup pin placed by the vendor on their own device. Null until then, and
+   * no code may substitute a guess while it is missing.
+   */
+  pickupLat: number | null;
+  pickupLng: number | null;
   /** Free-text operating hours (e.g. "Mon–Fri 9am–5pm"). Display only. */
   operatingHours: string | null;
   /** Storage path/URL for a future vendor image. Unused in MVP. */
@@ -132,6 +139,12 @@ export interface DeliveryLocation {
   id: string;
   name: string;
   description: string | null;
+  /**
+   * Drop-off pin, placed once by the requester who chooses this spot. Null
+   * until then, and no code may substitute a guess while it is missing.
+   */
+  lat: number | null;
+  lng: number | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -246,8 +259,8 @@ export interface OrderItem {
 
 /** Order with its vendor, location, and item snapshots for requester UI. */
 export interface OrderWithDetails extends Order {
-  vendor: Pick<Vendor, 'id' | 'name' | 'locationHint'>;
-  location: Pick<DeliveryLocation, 'id' | 'name' | 'description'>;
+  vendor: Pick<Vendor, 'id' | 'name' | 'locationHint' | 'pickupLat' | 'pickupLng'>;
+  location: Pick<DeliveryLocation, 'id' | 'name' | 'description' | 'lat' | 'lng'>;
   items: OrderItem[];
   /** Latest payment row when visible to the caller; null when unpaid/hidden. */
   payment: Payment | null;

@@ -110,8 +110,8 @@ interface OrderRow {
   resolution: string | null;
   created_at: string;
   updated_at: string;
-  vendor: { id: string; name: string; location_hint: string | null } | null;
-  delivery_location: { id: string; name: string; description: string | null } | null;
+  vendor: { id: string; name: string; location_hint: string | null; pickup_lat: number | null; pickup_lng: number | null } | null;
+  delivery_location: { id: string; name: string; description: string | null; lat: number | null; lng: number | null } | null;
   send2u_order_items: OrderItemRow[] | null;
   // To-one (UNIQUE order_id) embeds decode as a single object, not an array.
   send2u_payments: PaymentRow | PaymentRow[] | null;
@@ -208,8 +208,19 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
       id: row.vendor.id,
       name: row.vendor.name,
       locationHint: row.vendor.location_hint,
+      // Both pins ride along on every order read: without them a tracking map
+      // has nothing real to draw, and a missing pin stays null rather than
+      // becoming a stand-in coordinate.
+      pickupLat: row.vendor.pickup_lat,
+      pickupLng: row.vendor.pickup_lng,
     },
-    location: { id: row.delivery_location.id, name: row.delivery_location.name, description: row.delivery_location.description },
+    location: {
+      id: row.delivery_location.id,
+      name: row.delivery_location.name,
+      description: row.delivery_location.description,
+      lat: row.delivery_location.lat,
+      lng: row.delivery_location.lng,
+    },
     items: (row.send2u_order_items ?? []).map(toOrderItem),
     payment: normalizePayments(row.send2u_payments).slice(0, 1).map((p) => toPayment(row.id, p))[0] ?? null,
   };
@@ -258,8 +269,8 @@ const ORDER_SELECT =
   ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, picked_up_at, out_for_delivery_at, delivered_at, confirmed_at,' +
   ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, dispute_details, dispute_note, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
-  ' vendor:send2u_vendors!inner(id, name, location_hint),' +
-  ' delivery_location:send2u_delivery_locations!inner(id, name, description),' +
+  ' vendor:send2u_vendors!inner(id, name, location_hint, pickup_lat, pickup_lng),' +
+  ' delivery_location:send2u_delivery_locations!inner(id, name, description, lat, lng),' +
   ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at),' +
   ' send2u_payments(order_id, amount_cents, evidence_path, status, method, provider_ref, attempt_count, last_error, submitted_at, paid_at, verified_at)';
 

@@ -200,6 +200,33 @@ export default function CreateRequestScreen() {
               </View>
               <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
             </Pressable>
+            {/* The drop-off pin is what routes a helper to the exact spot. It does
+                not exist until someone sets it, and the map has nothing honest to
+                draw without it, so the gap is named here next to the way to fix
+                it rather than discovered later on a map with no route. */}
+            {selectedLocation && selectedLocation.lat === null ? (
+              <View style={styles.pinRow}>
+                <Text variant="caption" color="secondary" style={styles.pinHint}>
+                  This drop-off point has no pin yet, so helpers cannot be routed to the exact
+                  spot.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Set the pin for ${selectedLocation.name} on the map`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(requester)/dropoff-pin',
+                      params: { locationId: selectedLocation.id },
+                    })
+                  }
+                  style={({ pressed }) => [styles.pinAction, pressed && styles.pressed]}>
+                  <MaterialIcons name="add-location-alt" size={20} color={colors.primary} />
+                  <Text variant="caption" style={styles.pinActionLabel}>
+                    Set pin on map
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
             {/* Mirrors the drop-off summary row above: leading icon chip,
                 point name, and its hint line. */}
             {locations.status === 'loading' ? (
@@ -351,6 +378,19 @@ function PaymentMethodOption({
 }
 
 const styles = StyleSheet.create({
+  // The missing-pin notice: a quiet caption plus one text action, matching the
+  // weight of the row it sits under rather than competing with the primary
+  // action at the bottom of the screen.
+  pinRow: { gap: spacing.sm, marginTop: -spacing.sm },
+  pinHint: { lineHeight: 18 },
+  pinAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'flex-start',
+    minHeight: 32,
+  },
+  pinActionLabel: { color: colors.primary, fontWeight: '600' },
   pressed: { opacity: 0.7 },
   group: { gap: spacing.md },
   sectionLabel: { marginTop: spacing.sm },

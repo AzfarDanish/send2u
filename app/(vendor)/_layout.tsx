@@ -76,6 +76,17 @@ export default function VendorLayout() {
         name="menu"
         options={{ title: 'Menu', tabBarIcon: tabIcon('restaurant-menu') }}
       />
+      {/* Pickup pin placement: a full-screen map with its own in-screen chrome,
+          registered as a pushed screen so it never appears in the tab bar. */}
+      <Tabs.Screen
+        name="pickup-pin"
+        options={{
+          href: null,
+          title: 'Pickup Pin',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
       <Tabs.Screen
         name="profile"
         options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}

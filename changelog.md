@@ -10,6 +10,70 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Live delivery map and tracking (OpenStreetMap + OSRM)
+
+- Built (shared, `lib/maps/`): one map module for both roles, with the provider
+  isolated in `config.ts` (OSM raster tiles, OSRM routing, Leaflet pin, route and
+  marker colours, `MAP_USER_AGENT` so tile requests identify the app). `types.ts`
+  holds the vocabulary, `geo.ts` the distance maths, `osrm.ts` the route lookup
+  (GeoJSON geometry, distance, duration, typed failure reasons), `mapHtml.ts` the
+  map document, `orderPoints.ts` the phase-to-destination derivation, and
+  `index.ts` the barrel. `lib/maps.ts` moved to `lib/maps/external.ts` and is
+  re-exported, so the pre-existing external handoff and the in-app map are one
+  module rather than two.
+- Built (`components/map/DeliveryMap.tsx`): the single map surface. Static HTML
+  source (never remounts), markers move rather than being recreated, a marker
+  command is sent only when that coordinate changed, `fit` runs only on a new
+  `fitToken`, a user drag flips following off, and tile/library failures surface
+  as real states instead of a blank map.
+- Built (`services/deliveryPositions.ts` + four hooks): one upserted row per
+  order, no GPS history; `useHelperLocation` (real permission states, single
+  watcher, no duplicates), `useHelperPositionPublisher` (throttled to 5s/20m,
+  deletes on terminal), `useDeliveryPosition` (fetch + realtime + age check so a
+  silent socket cannot pass for live, and a re-fetch on reconnect), and
+  `useDeliveryRoute` (recalculates only on a destination/phase change, a 250m
+  drift, or an ageing route after real movement, with a 20s floor; keeps the last
+  good route on failure).
+- Backend (`supabase/migrations/2026-09-26_delivery_tracking.sql`, applied):
+  coordinate columns with range checks, two `SECURITY DEFINER` pin setters, and
+  `send2u_delivery_positions` (order-keyed, participants-only reads, realtime).
+  The first draft of this file added two UPDATE policies; reading the live
+  policies showed this project keeps tables SELECT-only and writes through RPCs,
+  so those became `send2u_set_vendor_pickup_pin` (authorizing through the
+  existing `send2u_caller_vendor_id()`) and `send2u_set_delivery_location_pin`
+  (first-writer-wins in the WHERE clause). Verified after applying: columns
+  present and null, table present and empty, both functions enforced their role
+  checks (403 for a caller with no profile), `anon` reads zero rows and cannot
+  call either function, and all existing rows were untouched.
+- Fixed (foundation): `DeliveryMap` never sent the `follow` command, so the page
+  never panned with the moving helper even though the helper screen asked for it.
+  Follow is now sent as a camera fact, ordered after the fit so a Recentre hands
+  the camera back.
+- Added (entry points): the drop-off pin screen is reachable from the review
+  screen's drop-off row, which also states when a point has no pin ("helpers
+  cannot be routed to the exact spot"); the vendor pickup pin is reachable from
+  the vendor profile, whose row says whether it is set.
+- Verified on device (ELP-NX9, dev build rebuilt with `expo-location` and
+  `react-native-webview`): the map renders real OSM raster tiles, the attribution
+  "© OpenStreetMap contributors" is visible and not covered; tapping the map
+  draws a draft marker at the tapped coordinate, refits the camera to street
+  level, and enables Save; Save wrote real coordinates through the RPC into
+  `send2u_delivery_locations` and the screen confirmed "Pin saved for Block A."
+  with a Done action. The test pin was then cleared so the real one can be
+  placed.
+- Not yet verified (needs an active delivery, which does not exist in the data):
+  the helper's navigation map and the requester's tracking map with a live
+  marker and a drawn route, follow behaviour during movement, tracking stopping
+  on completion and cancellation, and cross-account isolation of a position row.
+  No claim is made about those.
+- Found (pin aiming): with nothing pinned the map opens at the world view, so the
+  first pin is placed by eye. My own aim was off by a continent. A campus centre
+  belongs in `lib/maps/config.ts` as a camera anchor (no marker, so nothing is
+  invented); its real coordinates have to come from the owner.
+- Known limitation: the drop-off pin is first-writer-wins, so a wrong one needs
+  an admin fix; the three new hooks trip the same `react-hooks/set-state-in-effect`
+  rule as the nine pre-existing hook files (repo-wide pattern, not fixed here).
+
 ## 2026-09-26 — Home scroll: roughness traced to the collapse compensation (not fixed)
 
 - Investigated (`app/(requester)/index.tsx`): the reported "rough and heavy"

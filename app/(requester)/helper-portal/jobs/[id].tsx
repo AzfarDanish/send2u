@@ -9,6 +9,7 @@ import { HelperHistoryDetail } from '@/components/HelperHistoryDetail';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { VendorMark } from '@/components/VendorMark';
+import { HelperDeliveryMap } from '@/components/map/HelperDeliveryMap';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -325,7 +326,9 @@ function CompletionResult({ job, staysForCash }: { job: OrderWithDetails; staysF
  * → completed, plus release/abandon/report branches); the hierarchy is
  * task-first: state + next step lead, the action follows immediately,
  * location emphasis tracks the state, and the order breakdown is
- * progressively disclosed. External-maps handoff only — no embedded map.
+ * progressively disclosed. The live map leads the four navigational stages
+ * (go, collect, deliver, confirm) and the external-maps handoff stays
+ * available beside it for turn-by-turn.
  */
 export default function PortalJobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -599,6 +602,14 @@ export default function PortalJobDetailScreen() {
       <HelperPortalGuard title="Delivery record">
         <GlassHeader title="Delivery record" fallbackHref="/(requester)" right={<HeaderBell />} />
         <Screen beneathHeader>
+          {/*
+            The tracking surface stays mounted here for exactly one reason: a
+            terminal order must leave nothing to track, and the cleanup is the
+            publisher's own delete. It draws nothing on this screen — a terminal
+            status is in no tracking phase, so the helper's location is neither
+            watched nor shared.
+          */}
+          <HelperDeliveryMap order={job} />
           <HelperHistoryDetail job={job} refreshToken={paymentTick} />
         </Screen>
       </HelperPortalGuard>
@@ -716,6 +727,12 @@ export default function PortalJobDetailScreen() {
 
   const stage = stageFor(job.status);
   const foodCents = job.foodCostCents ?? job.subtotalCents;
+  // The map leads the four navigational stages and stays put while the stage
+  // details scroll beneath it. The completion presentation (delivered,
+  // confirmed) and the closed-job fallback keep the screen they already had —
+  // there is nothing left to navigate on them.
+  const showMap =
+    stage === 'go' || stage === 'collect' || stage === 'deliver' || stage === 'confirm';
   // Exception paths mirror exactly what the backend permits per state.
   // There is deliberately no release path on the collect screen.
   const canReportUnavailable = job.status === 'at_vendor' || job.status === 'food_available';
@@ -1037,6 +1054,7 @@ export default function PortalJobDetailScreen() {
         }
       />
       <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
+        {showMap ? <HelperDeliveryMap order={job} /> : null}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
           {body}
         </ScrollView>

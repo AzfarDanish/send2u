@@ -9,6 +9,7 @@ import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { OrderRatingSection } from '@/components/OrderRatingSection';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { RequestProgress } from '@/components/RequestProgress';
+import { RequesterTrackingMap } from '@/components/map/RequesterTrackingMap';
 import type { StatusCardTone } from '@/components/RequestStatusCard';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { TransactionRecord } from '@/components/TransactionRecord';
@@ -23,6 +24,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
+import { isTrackingPhase } from '@/lib/maps/orderPoints';
 import { emitOrderChanged } from '@/lib/orderEvents';
 import {
   formatOrderDate,
@@ -472,6 +474,9 @@ export default function OrderDetailScreen() {
   }
 
   const terminal = isTerminalOrderStatus(order.status);
+  // Live tracking belongs to the states where someone is actually travelling
+  // for this order; terminal records keep their existing presentation only.
+  const tracking = isTrackingPhase(order.status);
   const card = statusCardFor(order);
 
   // One payment line for the Order Summary. Terminal orders are history —
@@ -590,6 +595,10 @@ export default function OrderDetailScreen() {
           </Text>
           <Text color="secondary">{card.description}</Text>
         </View>
+
+        {/* The map sits with the status it explains, ahead of the order's
+            static detail: what is happening, then where it is happening. */}
+        {tracking ? <RequesterTrackingMap order={order} /> : null}
 
         <Card style={styles.card}>
           <Text variant="subtitle">Order Summary</Text>

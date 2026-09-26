@@ -10,6 +10,37 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Fix: "The action 'GO_BACK' was not handled by any navigator"
+
+- Cause: expo-router queues imperative actions and flushes that queue from a
+  passive effect, so a bare `router.back()` on a screen that has become the app's
+  first route (a deep link, a notification tap, a dev reload straight into a
+  route) is dispatched to the root navigator with nothing to pop. The console
+  error was the visible half; the other half was a control that silently did
+  nothing when tapped.
+- Added (`lib/navigation.ts`): `goBackOr(fallback)` — go back when there is
+  history, otherwise replace with the screen that owns the current one. This is
+  the shape `HeaderBack` already used for header chevrons, now shared instead of
+  duplicated.
+- Fixed all 12 unguarded back calls: both pin screens (`Done`, and the vendor's
+  "no stall linked"), `pay-online`, `rate` and `confirm` (where "Back to
+  Request" now resolves to that request when an id is present and to My Orders
+  when it is not), the help article's "Back to Help Center", and the vendor
+  order's "Back to orders". Every back affordance now names a destination, so
+  none of them can dead-end.
+- Verified on device (ELP-NX9): opening the help article as the app's root via
+  deep link (`send2u:///(requester)/help/<unknown-id>`) and tapping its back
+  action produces zero GO_BACK lines in logcat and navigates instead of doing
+  nothing. The remaining eleven sites share the same helper and are covered by
+  `tsc` and `eslint` only, not individually exercised on device.
+- Honest limit: from a cold deep link expo-router synthesises a parent route, so
+  `canGoBack()` is true and the tap pops to Home rather than the Help Center the
+  label names. Correct in the normal pushed flow, approximate only on that entry.
+- Note: the 14 repo-wide eslint errors are all pre-existing `hooks/` debt (the
+  `set-state-in-effect` and `refs` patterns). Three live in the tracking hooks
+  written for the live map earlier; fixing those is its own change, deliberately
+  not bundled into this one.
+
 ## 2026-09-26 — Map: "show my location" control
 
 - Added (`components/map/DeliveryMap.tsx`, opt-in via `locateControl`): a

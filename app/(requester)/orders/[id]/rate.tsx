@@ -1,4 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { goBackOr } from '@/lib/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { HelperIdentity } from '@/components/HelperIdentity';
@@ -148,7 +149,13 @@ export default function OrderRateScreen() {
             title="Rating not available"
             message="Rating opens once the request is completed and paid."
             actionTitle="Back to request"
-            onAction={() => router.back()}
+            onAction={() =>
+              goBackOr(
+                orderId
+                  ? { pathname: '/(requester)/orders/[id]', params: { id: orderId } }
+                  : '/(requester)/orders',
+              )
+            }
           />
         ) : (
           <>
@@ -163,7 +170,17 @@ export default function OrderRateScreen() {
               />
             </Card>
             <OrderRatingSection order={order} refreshToken={refreshToken} requesterForm="inline" />
-            <Button title="Back to Request" variant="secondary" onPress={() => router.back()} />
+            <Button
+              title="Back to Request"
+              variant="secondary"
+              onPress={() =>
+                goBackOr(
+                  orderId
+                    ? { pathname: '/(requester)/orders/[id]', params: { id: orderId } }
+                    : '/(requester)/orders',
+                )
+              }
+            />
           </>
         )}
       </Screen>

@@ -1,5 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { goBackOr } from '@/lib/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
@@ -214,7 +215,17 @@ export default function OrderConfirmScreen() {
                 }
               />
             ) : null}
-            <Button title="Back to Request" variant="secondary" onPress={() => router.back()} />
+            <Button
+              title="Back to Request"
+              variant="secondary"
+              onPress={() =>
+                goBackOr(
+                  orderId
+                    ? { pathname: '/(requester)/orders/[id]', params: { id: orderId } }
+                    : '/(requester)/orders',
+                )
+              }
+            />
           </>
         ) : order.status !== 'delivered' ? (
           <EmptyState
@@ -222,7 +233,13 @@ export default function OrderConfirmScreen() {
             title="Not ready to confirm"
             message="Confirmation opens once the helper marks your food delivered."
             actionTitle="Back to request"
-            onAction={() => router.back()}
+            onAction={() =>
+              goBackOr(
+                orderId
+                  ? { pathname: '/(requester)/orders/[id]', params: { id: orderId } }
+                  : '/(requester)/orders',
+              )
+            }
           />
         ) : (
           <>
@@ -312,7 +329,13 @@ export default function OrderConfirmScreen() {
               title="Not Yet, Still Waiting"
               variant="secondary"
               disabled={confirming}
-              onPress={() => router.back()}
+              onPress={() =>
+                goBackOr(
+                  orderId
+                    ? { pathname: '/(requester)/orders/[id]', params: { id: orderId } }
+                    : '/(requester)/orders',
+                )
+              }
             />
           </>
         )}

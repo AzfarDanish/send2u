@@ -1,3 +1,4 @@
+import { goBackOr } from '@/lib/navigation';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -149,7 +150,7 @@ export default function DropOffPinScreen() {
           {location && savedPin ? (
             <>
               <Text variant="secondary">Pin saved for {location.name}.</Text>
-              <Button title="Done" onPress={() => router.back()} />
+              <Button title="Done" onPress={() => goBackOr('/(requester)/create')} />
             </>
           ) : null}
 

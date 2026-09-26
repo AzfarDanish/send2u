@@ -1,4 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOr } from '@/lib/navigation';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -110,7 +111,7 @@ export default function VendorOrderDetailScreen() {
             title="Order not found"
             message="This order isn't part of your stall."
             retryTitle="Back to orders"
-            onRetry={() => router.back()}
+            onRetry={() => goBackOr('/(vendor)/orders')}
           />
         )}
       </Screen>

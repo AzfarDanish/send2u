@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { goBackOr } from '@/lib/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -141,7 +141,7 @@ export default function PickupPinScreen() {
               title="No stall linked"
               message="This account is not linked to a stall yet. Ask your administrator to link one."
               actionTitle="Back to your stall"
-              onAction={() => router.back()}
+              onAction={() => goBackOr('/(vendor)/profile')}
             />
           ) : null}
 
@@ -157,7 +157,7 @@ export default function PickupPinScreen() {
           {vendor && savedPin ? (
             <>
               <Text variant="secondary">Pickup pin saved for {vendor.name}.</Text>
-              <Button title="Done" onPress={() => router.back()} />
+              <Button title="Done" onPress={() => goBackOr('/(vendor)/profile')} />
             </>
           ) : null}
 

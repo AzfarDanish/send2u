@@ -1,3 +1,4 @@
+import { goBackOr } from '@/lib/navigation';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { GlassHeader } from '@/components/GlassHeader';
@@ -23,7 +24,7 @@ export default function HelpArticleScreen() {
             title="Article not found"
             message="This help topic doesn't exist."
             actionTitle="Back to Help Center"
-            onAction={() => router.back()}
+            onAction={() => goBackOr('/(requester)/help')}
           />
         </Screen>
       </>

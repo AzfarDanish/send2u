@@ -1,5 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOr } from '@/lib/navigation';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { GlassHeader } from '@/components/GlassHeader';
@@ -82,7 +83,12 @@ export default function PayOnlineScreen() {
                 arrives. Nothing is due now.
               </Text>
             </Card>
-            <Button title="Back to Request" onPress={() => router.back()} />
+            <Button
+              title="Back to Request"
+              onPress={() =>
+                goBackOr({ pathname: '/(requester)/orders/[id]', params: { id: orderId } })
+              }
+            />
           </>
         ) : context.orderStatus === 'cancelled' || context.orderStatus === 'disputed' ? (
           <EmptyState
@@ -90,7 +96,9 @@ export default function PayOnlineScreen() {
             title="Payment not available"
             message="This request is no longer payable."
             actionTitle="Back to request"
-            onAction={() => router.back()}
+            onAction={() =>
+              goBackOr({ pathname: '/(requester)/orders/[id]', params: { id: orderId } })
+            }
           />
         ) : paid || payPhase === 'success' ? (
           <>

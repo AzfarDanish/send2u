@@ -131,6 +131,25 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Deliver-to sheet: the backdrop fades in place instead of sliding
+
+- The sheet's modal used `animationType="slide"`, which animates the entire modal —
+  the full-screen dim layer included — so the dark backdrop travelled up from the
+  bottom edge as a rectangle with a hard visible top edge. That travelling edge is
+  the "shape" visible on open. The modal is `animationType="fade"` now, so the dim
+  cross-fades in place in both directions and no edge ever moves.
+- The sheet still rises on its own, on top of that fade: a new `riseY` shared value
+  springs from `SHEET_ENTER_RISE` (80pt) to 0 using the app's `springDefault` token,
+  adding to the existing drag offset. Drag-to-dismiss is untouched, because while a
+  drag is in play the rise is already back at zero. Under reduced motion the rise is
+  skipped and the modal's own fade is the entire transition, which is what
+  `fadeDurationMs` is documented for in the motion tokens.
+- The rise is re-armed on the next open rather than on close, since resetting it as
+  the modal faded out would have jumped the sheet down during its exit.
+- Not device-verified, deliberately: the phone was on the Edit Location sheet with an
+  unsaved form filled in, and reaching the deliver-to sheet means navigating away from
+  it, which would discard that input. Left for the next time the sheet is opened.
+
 ## 2026-09-26 — Saved locations: the backend was never applied to the database
 
 - The save failure ("Could not find the function public.send2u_create_saved_location…")

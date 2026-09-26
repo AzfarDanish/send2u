@@ -23,7 +23,9 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
+import { springDefault } from '@/constants/motion';
 import { colors, radii, spacing, touchTargets } from '@/constants/theme';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import {
   useSavedDeliveryLocations,
   type SavedLocationsStatus,
@@ -32,6 +34,8 @@ import type { SavedDeliveryLocation, SavedLocationType } from '@/types/domain';
 
 /** Sheet corner radius; matches the home white sheet. */
 const SHEET_RADIUS = 20;
+/** Entrance offset the sheet springs up from; the backdrop itself only fades. */
+const SHEET_ENTER_RISE = 80;
 /** Downward drag that dismisses the sheet on release. */
 const DISMISS_DISTANCE = 120;
 /** Downward fling velocity that dismisses the sheet regardless of distance. */
@@ -128,9 +132,33 @@ export function DeliverToSheet({
   // runs on the UI thread; `.set()` rather than the `.value` setter, which
   // is what the compiler-aware lint rules want.
   const dragY = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
+  /** Entrance offset for the sheet; the backdrop itself only fades. */
+  const riseY = useSharedValue(SHEET_ENTER_RISE);
+
   useEffect(() => {
     if (visible) dragY.set(0);
   }, [visible, dragY]);
+
+  /**
+   * Entrance. The modal fades the whole surface in and the sheet adds a short
+   * upward spring on top of that fade. The fade is the point: when the modal owns
+   * a slide animation, the dim layer travels up with it as a dark rectangle and
+   * its hard top edge is visible the whole way.
+   */
+  useEffect(() => {
+    // Nothing on close: the modal is fading out and moving the sheet now would
+    // make it jump. The rise is re-armed on the next open instead.
+    if (!visible) return;
+    if (reducedMotion) {
+      riseY.set(0);
+      return;
+    }
+    // Start below and let the spring carry it up. Note the reset only happens
+    // here, for the reason above.
+    riseY.set(SHEET_ENTER_RISE);
+    riseY.value = withSpring(0, springDefault);
+  }, [visible, reducedMotion, riseY]);
 
   const dismissGesture = useMemo(
     () =>
@@ -154,14 +182,17 @@ export function DeliverToSheet({
     [dragY, onClose],
   );
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: Math.max(0, dragY.value) }],
+    // Drag and entrance add up; during a drag the rise is already back at zero.
+    transform: [{ translateY: Math.max(0, dragY.value) + riseY.value }],
   }));
 
   return (
+    // Fade, not slide: a sliding modal carries its dim layer up with it, so the
+    // dark backdrop reads as a shape rising from the bottom edge.
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       statusBarTranslucent
       onRequestClose={onClose}>
       <View style={styles.backdropWrap}>

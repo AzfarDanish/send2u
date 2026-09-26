@@ -10,6 +10,24 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Locations: sheet footer cutoff + minimal footer
+
+- Change: `app/(requester)/set-location.tsx` — the sheet is now exactly as
+  tall as the expanded visible area (was full-window height), so the footer
+  lands on the window bottom at the expanded snap instead of below the fold;
+  the footer is button-only (blocker caption removed; only a failed save
+  adds one transient line so failures are never silent). Form inputs stay
+  stacked full-width; nothing went side by side.
+- Reason: the full-height sheet pushed Save off-screen in every state, and
+  the footer carried duplicate helper text the pin readout and field errors
+  already show.
+- Details: `sheetHeight = windowHeight - expandedTop`; snap range and
+  collapsed peek unchanged. Validation: `tsc` clean, `eslint` clean on the
+  file (repo-wide 14 errors + 1 warning all pre-existing), `npm test`
+  50/50, `expo export -p web` pass + headless-Chrome bundle check.
+- Known limitations: needs on-device verification that Save is reachable at
+  the expanded snap on small screens.
+
 ## 2026-09-26 — Locations: slideable Set Location sheet + campus search
 
 - Change: `app/(requester)/set-location.tsx` rebuilt around a full-bleed map
@@ -112,6 +130,38 @@ only. No secrets are ever recorded here.
   retry; the Set Location full form (label/details/type/pin) is still to
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
+
+## 2026-09-26 — Set Location: the sheet peeks, the centre pin returns, the bottom is reachable
+
+- Root cause of both the disappearing sheet and the unreachable bottom: the sheet
+  is exactly as tall as the expanded area, but `ty` held absolute window tops and
+  was applied as `translateY`. At the collapsed snap that pushed the sheet 464pt
+  past the bottom edge, so the peek and the form's last fields went off-screen
+  together — one bug, two symptoms. Snaps are now offsets from the sheet's natural
+  position: 0 is expanded, `peekOffset` is the peek.
+- Expand and collapse are smooth now: the geometry effect no longer re-seats the
+  sheet with `ty.set` every time the expanded state flips (that instant re-seat
+  was what made each transition jump), the spring softened to damping 28 /
+  stiffness 260 / mass 0.9, and a fling hands its own velocity to the spring so a
+  fast flick carries through instead of restarting from a dead stop.
+- Dragging below the peek dismisses the keyboard, so the peek is never
+  half-covered by one.
+- The centre pin is back: a disc-backed place glyph fixed to the centre of the
+  map, with the map panned underneath it and the settled centre as the selected
+  point. It is hidden only while the sheet is fully expanded, where it would sit
+  behind the sheet rather than at the visible centre.
+- Removed the heading block again ("Where should we deliver?" and the sentence
+  under it). The search field, the pin readout and the centre pin already say what
+  to do, and it was removed for the same reason in an earlier pass.
+- Bug found and fixed during this work, and it was mine: `runOnJS(Keyboard.dismiss)()`
+  inside the pan worklet made the worklet copy the native module and throw
+  "[Worklets] Cannot copy value of type 'KeyboardImpl'" at render, which took the
+  whole screen down to a black frame. Keyboard dismissal now crosses the worklet
+  boundary as a component-scope callback.
+- Device-verified (ELP-NX9): at rest the sheet shows its peek — handle, search
+  field, pin readout and the first field — with the centre pin over the map; after
+  dragging up, the form scrolls to its very end, with the label grid, the pin note
+  and the Save footer all reachable.
 
 ## 2026-09-26 — Set Location: full-bleed map, compact sheet
 

@@ -69,7 +69,7 @@ const DRAG_ZONE_HEIGHT = 36;
 const SEARCH_SUGGESTION_COUNT = 5;
 /** Reverse lookup waits for the camera to settle before asking the OS. */
 const GEOCODE_DEBOUNCE_MS = 800;
-const SHEET_SPRING = { damping: 30, stiffness: 300 };
+const SHEET_SPRING = { damping: 28, stiffness: 260, mass: 0.9 };
 const FLING_VELOCITY = 500;
 
 /**
@@ -124,40 +124,68 @@ export default function SetLocationScreen() {
   const geoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geoRequest = useRef(0);
 
-  // Snap geometry in window coordinates. The sheet is a full-height view
-  // translated vertically: `collapsedTop` leaves only the peek visible,
-  // `expandedTop` stops below the glass with a clear map strip between.
+  // Snap geometry in window coordinates. The sheet is exactly as tall as the
+  // expanded visible area, so at the expanded snap its top sits on `expandedTop`
+  // and its footer lands on the window bottom.
   const contentTop = insets.top + GLASS_HEADER_ROW + spacing.md;
   const expandedTop = contentTop + MAP_PEEK;
   const collapsedTop = windowHeight - COLLAPSED_VISIBLE;
+  const sheetHeight = windowHeight - expandedTop;
+  /**
+   * How far the sheet slides down from its natural position to reach the peek.
+   * This is an offset, never an absolute top: the sheet already starts at
+   * `expandedTop`, so translating it by an absolute window coordinate pushed its
+   * bottom 480pt past the screen edge — the peek vanished and the form's last
+   * fields became unreachable.
+   */
+  const peekOffset = Math.max(0, collapsedTop - expandedTop);
 
   // Drag state lives in shared values so the gesture runs on the UI thread.
   // Snaps ride in shared values too, so rotation never leaves the worklet
-  // holding stale geometry.
-  const ty = useSharedValue(collapsedTop);
-  const panStart = useSharedValue(collapsedTop);
-  const snapTop = useSharedValue(expandedTop);
-  const snapBottom = useSharedValue(collapsedTop);
+  // holding stale geometry. `ty` is a distance from the natural position:
+  // 0 is expanded, `peekOffset` is the peek.
+  const ty = useSharedValue(peekOffset);
+  const panStart = useSharedValue(peekOffset);
+  const snapOpen = useSharedValue(0);
+  const snapPeek = useSharedValue(peekOffset);
+  const expandedRef = useRef(expanded);
+
+  // Snap bounds follow the measured geometry only. The sheet's own position is
+  // owned by the gesture and its spring, so flipping the expanded state never
+  // re-seats it — that instant re-seat was what made expand and collapse jump
+  // instead of glide.
+  useEffect(() => {
+    snapOpen.set(0);
+    snapPeek.set(peekOffset);
+    // A geometry change (rotation, insets arriving after the first frame)
+    // re-seats the sheet on the snap it is already in, without animating.
+    ty.set(expandedRef.current ? 0 : peekOffset);
+  }, [peekOffset, snapOpen, snapPeek, ty]);
 
   useEffect(() => {
-    snapTop.set(expandedTop);
-    snapBottom.set(collapsedTop);
-    ty.set(expanded ? expandedTop : collapsedTop);
-  }, [expandedTop, collapsedTop, expanded, ty, snapTop, snapBottom]);
+    expandedRef.current = expanded;
+  }, [expanded]);
 
   const expandSheet = useCallback(() => {
     // Reanimated shared-value write (UI-thread spring input) — intended API.
     // eslint-disable-next-line react-hooks/immutability
-    ty.value = withSpring(snapTop.value, SHEET_SPRING);
+    ty.value = withSpring(snapOpen.value, SHEET_SPRING);
     setExpanded(true);
-  }, [ty, snapTop]);
+  }, [ty, snapOpen]);
 
   const collapseSheet = useCallback(() => {
+    Keyboard.dismiss();
     // Reanimated shared-value write (UI-thread spring input) — intended API.
     // eslint-disable-next-line react-hooks/immutability
-    ty.value = withSpring(snapBottom.value, SHEET_SPRING);
+    ty.value = withSpring(snapPeek.value, SHEET_SPRING);
     setExpanded(false);
-  }, [ty, snapBottom]);
+  }, [ty, snapPeek]);
+
+  // Keyboard dismissal has to cross the worklet boundary as a function defined
+  // in this scope. A worklet that names `Keyboard` itself tries to copy the
+  // native module and throws "Cannot copy value of type 'KeyboardImpl'" at
+  // render, taking the whole screen down with it.
+  const dismissKeyboard = useCallback(() => Keyboard.dismiss(), []);
 
   const dragGesture = useMemo(
     () =>
@@ -171,25 +199,30 @@ export default function SetLocationScreen() {
         })
         .onUpdate((event) => {
           const next = panStart.value + event.translationY;
-          // Clamped at both ends: never off-screen, never fullscreen.
-          const clamped = Math.min(snapBottom.value, Math.max(snapTop.value, next));
+          // Clamped to the two snaps: never past expanded, never below the peek.
+          const clamped = Math.min(snapPeek.value, Math.max(0, next));
           // Reanimated shared-value write (UI-thread gesture input) — intended API.
           // eslint-disable-next-line react-hooks/immutability
           ty.value = clamped;
         })
         .onEnd((event) => {
-          const top = snapTop.value;
-          const bottom = snapBottom.value;
-          const middle = (top + bottom) / 2;
-          let target = ty.value <= middle ? top : bottom;
-          if (event.velocityY < -FLING_VELOCITY) target = top;
-          else if (event.velocityY > FLING_VELOCITY) target = bottom;
-          // Reanimated shared-value write (UI-thread spring input) — intended API.
+          const open = snapOpen.value;
+          const peek = snapPeek.value;
+          const middle = (open + peek) / 2;
+          let target = ty.value <= middle ? open : peek;
+          if (event.velocityY < -FLING_VELOCITY) target = open;
+          else if (event.velocityY > FLING_VELOCITY) target = peek;
+          // The fling's own velocity hands off to the spring, so a fast flick
+          // carries through instead of restarting from a dead stop.
+          // Reanimated shared-value write (UI-thread gesture input) — intended API.
           // eslint-disable-next-line react-hooks/immutability
-          ty.value = withSpring(target, SHEET_SPRING);
-          runOnJS(setExpanded)(target === top);
+          ty.value = withSpring(target, { ...SHEET_SPRING, velocity: event.velocityY });
+          runOnJS(setExpanded)(target === open);
+          // Leaving the expanded snap puts the keyboard away with it, so the peek
+          // is never half-covered by a keyboard.
+          if (target !== open) runOnJS(dismissKeyboard)();
         }),
-    [ty, panStart, snapTop, snapBottom],
+    [ty, panStart, snapOpen, snapPeek, dismissKeyboard],
   );
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }));
 
@@ -351,9 +384,6 @@ export default function SetLocationScreen() {
   const editReady = editingId === null || editStatus === 'ready';
   const canSave = editReady && isSetLocationValid(errors) && !saving;
 
-  const blocker =
-    errors.pin ?? errors.building ?? errors.category ?? errors.customLabel ?? errors.instructions ?? null;
-
   const resolvedText = resolveLocationText({
     building,
     block,
@@ -408,10 +438,21 @@ export default function SetLocationScreen() {
           onEvent={handleMapEvent}
           style={styles.map}
         />
+        {/* Centre pin: the map is panned underneath it and the settled centre is
+            the selected point, so the aim is visible before the marker is
+            dropped. Hidden while the sheet is expanded, where it would sit behind
+            the sheet rather than at the visible centre. */}
+        {!expanded ? (
+          <View style={styles.centerPin} pointerEvents="none">
+            <View style={styles.centerPinDisc}>
+              <MaterialIcons name="place" size={30} color={colors.primary} />
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {/* Slideable sheet: two snaps, never off-screen, never fullscreen. */}
-      <Animated.View style={[styles.sheet, { height: windowHeight }, sheetStyle]}>
+      <Animated.View style={[styles.sheet, { height: sheetHeight }, sheetStyle]}>
         <GestureDetector gesture={dragGesture}>
           <View
             style={styles.dragZone}
@@ -545,14 +586,6 @@ export default function SetLocationScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               scrollEnabled={expanded}>
-              <View style={styles.headingBlock}>
-                <Text variant="title">Where should we deliver?</Text>
-                <Text color="secondary">
-                  Pan the map — the pin drops at the centre when you release — then
-                  describe the spot so your helper finds the exact door.
-                </Text>
-              </View>
-
               <View>
                 <Input
                   label="Building / Facility"
@@ -755,17 +788,15 @@ export default function SetLocationScreen() {
             </ScrollView>
           )}
 
-          {/* Docked Save: sheet chrome, so it stays reachable while the form
-              scrolls and rides above the keyboard. */}
+          {/* Docked Save: sheet chrome, button only — minimal and compact.
+              Field-level errors live on their inputs and the pin state on the
+              pin readout above, so the footer carries no helper text. Only a
+              failed save adds one transient line, so a failure is never
+              silent. */}
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
             {saveError ? (
               <Text variant="caption" color="error" accessibilityRole="alert">
                 {saveError}
-              </Text>
-            ) : null}
-            {!canSave && !saveError && editReady && blocker ? (
-              <Text variant="caption" color="muted">
-                {blocker}
               </Text>
             ) : null}
             <Button
@@ -787,9 +818,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   mapArea: { position: 'absolute', left: 0, right: 0 },
   map: { flex: 1, borderRadius: 0 },
-  // The sheet is a full-height view translated vertically: only the window
-  // between the two snaps is ever visible, so it can neither leave the
-  // screen nor cover the map's top strip.
+  // The sheet is exactly as tall as the expanded visible area, translated
+  // vertically: only the window between the two snaps is ever on-screen, so
+  // it can neither leave the screen nor cover the map's top strip.
   sheet: {
     position: 'absolute',
     left: 0,
@@ -875,7 +906,24 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.lg,
   },
-  headingBlock: { gap: spacing.xs },
+  // Centre pin chrome over the map: a disc so the glyph stays legible on tiles.
+  centerPin: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerPinDisc: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   suggestionCard: { marginTop: spacing.sm, gap: 0, paddingVertical: spacing.xs },
   geoRow: {
     flexDirection: 'row',

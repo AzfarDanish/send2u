@@ -10,6 +10,56 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Review: per-vendor cards + plain summary + declutter
+
+- Change: `app/(requester)/create.tsx` — each vendor now gets its own card
+  (name heading outside, that vendor's items inside); the Order Summary
+  below Payment Method lists every line plus subtotal/fee/total as plain
+  text-only rows (no card, no images); redundant captions removed (fee
+  caption shortened to one line, chooser hints and prices caption dropped
+  as the cards already name what's missing). Location and payment stay
+  card UI; inputs stay stacked.
+- Reason: the page mixed vendors, buried the summary, and repeated itself.
+- Validation: `tsc` clean, `eslint` clean on the file (repo-wide 14 errors
+  + 1 warning all pre-existing), `npm test` 51/51, `expo export -p web`
+  pass.
+- Known limitations: needs on-device verification.
+
+## 2026-09-26 — Checkout: saved-location review + payment brands + fixed sheet
+
+- Change: Review Request rebuilt — location is a card (saved spot via the
+  Deliver-to sheet, editable delivery instruction, Leave-at-the-door toggle
+  last row), payment is a row into a new `payment-method` page (Cash, Visa,
+  Debit/Credit, Touch 'n Go, FPX, DuitNow QR), summary stays plain rows, and
+  Place sits on a fixed bottom sheet. Old `location.tsx` picker deleted (the
+  shared table and its data stay for history); new shared
+  `DockedActionBar` (fixed, non-draggable) also docks pay-online,
+  dropoff-pin, set-location, and confirm-delivery actions.
+- Reason: checkout must run on the address book, offer real-world brands,
+  and keep its primary action reachable; headings stay outside cards per the
+  design rule.
+- Details: brands are labels on the two rails (Cash→cod, rest→online) in
+  `lib/orders.ts` (`PAYMENT_BRANDS`, tested) with icons in
+  `components/payment/brandIcons.ts`; brand choice rides `CartContext`
+  (ephemeral, resets with the cart). Migration
+  `supabase/migrations/2026-09-26_checkout_fields.sql` adds
+  `saved_location_id`/`delivery_instruction`/`leave_at_door`, relaxes the
+  old FK to nullable, guards saved-location deletion against order history,
+  and replaces `send2u_place_orders` (same name, new optional params).
+  Mappers synthesize `location` from the saved row with shared-point
+  fallback, so old orders and every downstream view render unchanged.
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 14
+  errors + 1 warning all pre-existing), `npm test` 51/51, `expo-doctor`
+  18/21 (3 pre-existing env), `expo export -p web` pass (old `location`
+  route gone, `payment-method` emitted) + headless-Chrome bundle check.
+- Known limitations: THREE migrations now await the SQL editor in file
+  order — checkout is broken until applied, and the reconstructed
+  `place_orders` MUST pass the in-file smoke test first (original body is
+  not in the repo; assumptions marked ASSUMPTION inline); `locations.tsx`
+  browser and profile's Saved-locations row untouched (follow-up); brand
+  persists through checkout only, post-submit views keep Online/COD; needs
+  on-device verification.
+
 ## 2026-09-26 — Locations: sheet footer cutoff + minimal footer
 
 - Change: `app/(requester)/set-location.tsx` — the sheet is now exactly as
@@ -130,6 +180,25 @@ only. No secrets are ever recorded here.
   retry; the Set Location full form (label/details/type/pin) is still to
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
+
+## 2026-09-26 — Database cleanup (live project, item by item on approval)
+
+- Audited the live project read-only first — 14 tables, 31 RPCs, 15 auth users — and
+  listed every row so the owner could choose. Only what he approved was deleted.
+- Deleted the test order history: 3 orders, 3 order items, 3 payments, 2 settlements
+  and 6 notifications, children before parents, with the returned rows as proof. My
+  Orders and Past Orders are now empty by decision, not by accident.
+- Deleted the 6 abandoned accounts with no email (created 9-11 Sept, one sign-in each
+  at creation) plus the stale push token they left. None of them owned a profile — that
+  was checked before deleting, so nothing was orphaned. Auth users: 15 → 9.
+- Stripped the "Demo: " prefix from the 6 delivery-location descriptions. Names, pins
+  and every reference are untouched; Block A keeps its real pin.
+- Untouched on the owner's instruction: 6 vendors, 28 menu items, all 9 profiles
+  (including the 6 `dev.vendor*@send2u.test` accounts behind the Dev Profile Switcher),
+  the saved location, and app config (commission 0 bps, delivery fee RM 2.00).
+- Access note for later: the service key in `.env` carries DELETE/PATCH/POST on all 14
+  tables and the auth admin API removes users, so row-level cleanup needs no MCP. The
+  Supabase MCP is not configured and would only add DDL.
 
 ## 2026-09-26 — Deliver-to sheet: the backdrop fades in place instead of sliding
 

@@ -26,6 +26,7 @@ import { DeliveryMap } from '@/components/map/DeliveryMap';
 import { matchesSearch } from '@/components/SearchBar';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { DockedActionBar } from '@/components/ui/DockedActionBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
@@ -33,7 +34,6 @@ import { SkeletonForm } from '@/components/ui/LoadingBlocks';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
-import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
 import { useMenu } from '@/hooks/useMenu';
 import {
   INSTRUCTIONS_MAX_LENGTH,
@@ -371,18 +371,14 @@ export default function SetLocationScreen() {
     }, GEOCODE_DEBOUNCE_MS);
   }, []);
 
-  // Campus search pool: drop-off points plus vendor names — the dataset that
-  // already exists, filtered locally. No network, no generic web search.
-  const { locations: dropPoints } = useDeliveryLocations();
+  // Campus search pool: vendor names — the dataset that already exists,
+  // filtered locally. No network, no generic web search.
   const { sections } = useMenu();
   const campusPool = useMemo(() => {
-    const pool: { title: string; subtitle?: string }[] = [
-      ...dropPoints.map((point) => ({ title: point.name, subtitle: point.description ?? undefined })),
-      ...sections.map((section) => ({
-        title: section.vendor.name,
-        subtitle: section.vendor.locationHint ?? undefined,
-      })),
-    ];
+    const pool: { title: string; subtitle?: string }[] = sections.map((section) => ({
+      title: section.vendor.name,
+      subtitle: section.vendor.locationHint ?? undefined,
+    }));
     const seen = new Set<string>();
     return pool.filter((entry) => {
       const key = entry.title.toLowerCase();
@@ -390,7 +386,7 @@ export default function SetLocationScreen() {
       seen.add(key);
       return true;
     });
-  }, [dropPoints, sections]);
+  }, [sections]);
 
   const searchResults = useMemo(() => {
     if (query.trim().length < 2) return [];
@@ -857,12 +853,12 @@ export default function SetLocationScreen() {
             </GestureDetector>
           )}
 
-          {/* Docked Save: sheet chrome, button only — minimal and compact.
-              Field-level errors live on their inputs and the pin state on the
-              pin readout above, so the footer carries no helper text. Only a
-              failed save adds one transient line, so a failure is never
-              silent. */}
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          {/* Docked Save: the shared fixed sheet chrome — button only,
+              minimal and compact. Field-level errors live on their inputs
+              and the pin state on the pin readout above, so the footer
+              carries no helper text. Only a failed save adds one transient
+              line, so a failure is never silent. */}
+          <DockedActionBar>
             {saveError ? (
               <Text variant="caption" color="error" accessibilityRole="alert">
                 {saveError}
@@ -874,7 +870,7 @@ export default function SetLocationScreen() {
               disabled={!canSave}
               loading={saving}
             />
-          </View>
+          </DockedActionBar>
         </KeyboardAvoidingView>
       </Animated.View>
 
@@ -1035,12 +1031,4 @@ const styles = StyleSheet.create({
   summaryEditLabel: { fontWeight: '600', color: colors.primary },
   noteRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   noteText: { flex: 1 },
-  footer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    gap: spacing.xs,
-    backgroundColor: colors.background,
-  },
 });

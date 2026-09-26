@@ -10,6 +10,50 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Helper job: headerless full-bleed map + in-map controls
+
+- Change: helper job decision/workspace stages go headerless with the map
+  edge to edge (width and top); a floating 44pt back disc sits over the
+  map (decision only — stages never had back); vendor hero title removed;
+  decision scroll freezes while a finger is on the map (scroll starts
+  outside it); zoom in/out + recenter live inside the map (new bridge
+  commands, shared `controls` opt-in on `DeliveryMap`), replacing both
+  below-map Recentre rows.
+- Reason: the map is the helper's primary surface; chrome, text, and
+  off-map controls competed with it, and outer scroll stole map gestures.
+- Details: `zoomIn`/`zoomOut` flag programmatic zoom so pinches still read
+  as manual pans; controls default off (other screens unchanged);
+  done/closed/terminal/loading keep their existing headers.
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 14
+  errors + 1 warning all pre-existing), `npm test` 51/51, `expo export -p
+  web` pass + headless bundle check, inline map JS `node --check` clean.
+- Known limitations: needs on-device verification (bleed under status bar,
+  touch-freeze feel, control reachability).
+
+## 2026-09-26 — Maps: MapTiler Streets basemap with OSM fallback
+
+- Change: in-app map renders MapTiler Streets v4 (building detail baked in)
+  when `EXPO_PUBLIC_MAPTILER_KEY` is set, else the current OSM raster;
+  MapTiler tile failures fall back to OSM inside the map document, and the
+  failure overlay copy is provider-neutral. Dual attribution (MapTiler +
+  OSM contributors, exact vendor wording) follows the visible layer.
+- Reason: campus building footprints, names, and entrances for everyday
+  delivery context, without leaving Leaflet or adding dependencies.
+- Details: key plumbing in `config/env.ts` (`isMapTilerConfigured`) +
+  `.env.example` + README row; provider constants in `lib/maps/config.ts`;
+  `buildMapHtml(key)` builds the MapTiler primary with OSM standby (empty
+  key builds OSM-only); new `base-fallback` map event, `tiles-failed` now
+  means both layers failed so no host change was needed. Static-source and
+  provider-isolation rules hold.
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 14
+  errors + 1 warning all pre-existing), `npm test` 51/51, `expo export -p
+  web` pass + headless bundle check, inline map JS `node --check` clean,
+  and 9 behavioral asserts against real `buildMapHtml` output (layer
+  selection, key interpolation, dual attribution, fallback sender, zooms).
+- Known limitations: key not provisioned — you add it to `.env` and push to
+  EAS env (URL-restrict it); building detail + fallback need on-device
+  verification with a real key.
+
 ## 2026-09-26 — Helper: two-point in-app map replaces Google Maps jumps
 
 - Change: helper job screen no longer opens Google Maps — new
@@ -199,6 +243,34 @@ only. No secrets are ever recorded here.
   retry; the Set Location full form (label/details/type/pin) is still to
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
+
+## 2026-09-27 — Removed the dead drop-off-locations feature
+
+- Area: `app/(requester)/locations.tsx`, `app/(requester)/dropoff-pin.tsx`,
+  `hooks/useDeliveryLocations.ts`, `services/locations.ts` (deleted);
+  `app/(requester)/_layout.tsx`, `app/(requester)/index.tsx`,
+  `app/(requester)/profile.tsx`, `app/(requester)/set-location.tsx` (edited).
+- Change: the legacy shared campus "drop-off points" feature is gone. Its backing
+  table (`send2u_delivery_locations`) was already dropped, so the page, the pin
+  placement screen, and their service/hook hit a table that no longer exists.
+- Details:
+  - Deleted the read-only Drop-off Locations page, the drop-off pin placement
+    screen, `useDeliveryLocations` and `services/locations.ts`
+    (`listDeliveryLocations` + `setDeliveryLocationPin`).
+  - Removed both `_layout.tsx` route entries (`locations`, `dropoff-pin`).
+  - Home's delivery-area label now falls back to the saved location, then
+    "Campus"; the legacy drop-off-point lookup is removed.
+  - Set Location's campus search pool is now vendor names only (the drop-off
+    points source is removed).
+  - Profile's "Saved locations" row now points at `/(requester)/set-location`
+    (the live address-book manager) instead of the deleted `/locations`.
+  - Kept: the saved-location address book (`send2u_saved_delivery_locations`,
+    `useSavedDeliveryLocations`, `services/savedLocations.ts`, `set-location.tsx`,
+    `DeliverToSheet`) and the `DeliveryLocation` type (still types
+    `OrderWithDetails.location`).
+- Validation: `tsc` clean, `eslint` clean on touched files, `npm test` 51/51,
+  `expo export -p web` exit 0 with `/locations` and `/dropoff-pin` no longer
+  bundled and `/set-location` present.
 
 ## 2026-09-26 — Map basemap switched to HOT (Humanitarian OSM) style
 

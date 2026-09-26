@@ -25,7 +25,7 @@ import { useAuth } from '@/hooks/useAuth';
 const MENU_ROWS = [
   { icon: 'person-outline', title: 'Personal information', href: '/(requester)/edit-profile' },
   { icon: 'history', title: 'Past orders', href: '/(requester)/orders/past' },
-  { icon: 'place', title: 'Saved locations', href: '/(requester)/locations' },
+  { icon: 'place', title: 'Saved locations', href: '/(requester)/set-location' },
   { icon: 'notifications-none', title: 'Notifications', href: '/(requester)/notifications' },
   { icon: 'help-outline', title: 'Help & Support', href: '/(requester)/help' },
   { icon: 'description', title: 'Terms & Privacy', href: '/(requester)/terms' },

@@ -216,15 +216,6 @@ export default function RequesterLayout() {
         }}
       />
       <Tabs.Screen
-        name="locations"
-        options={{
-          href: null,
-          title: 'Drop-off Locations',
-          tabBarStyle: { display: 'none' },
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
         name="help"
         options={{
           href: null,
@@ -309,18 +300,6 @@ export default function RequesterLayout() {
         options={{
           href: null,
           title: 'Payment Method',
-          tabBarStyle: { display: 'none' },
-          headerShown: false,
-        }}
-      />
-      {/* Pin placement for the chosen drop-off point: a full-screen map with
-          its own in-screen chrome, so it hides both the tab bar and the native
-          header exactly like the other pushed screens. */}
-      <Tabs.Screen
-        name="dropoff-pin"
-        options={{
-          href: null,
-          title: 'Drop-off Pin',
           tabBarStyle: { display: 'none' },
           headerShown: false,
         }}

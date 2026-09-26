@@ -23,7 +23,6 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing, touchTargets } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
-import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
 import { useSavedDeliveryLocations } from '@/hooks/useSavedDeliveryLocations';
 import { useMenu } from '@/hooks/useMenu';
 import { formatMYR } from '@/lib/money';
@@ -89,9 +88,8 @@ export default function RequesterHomeScreen() {
     COLLAPSE_DISTANCE + touchTargets.tabBar + Math.max(insets.bottom, 8) + spacing.xl;
   const { sections, status, error, refreshing, retry, refresh } = useMenu();
   const { profile, user } = useAuth();
-  const { locations } = useDeliveryLocations();
   const saved = useSavedDeliveryLocations();
-  const { locationId, addItem } = useCart();
+  const { addItem } = useCart();
   const unreadCount = useSharedUnreadCount();
   const [query, setQuery] = useState('');
   const [showAllVendors, setShowAllVendors] = useState(false);
@@ -183,10 +181,7 @@ export default function RequesterHomeScreen() {
     : greetingForHour(new Date().getHours());
 
   const campusLabel =
-    saved.locations.find((location) => location.id === saved.activeLocationId)?.label ??
-    locations.find((location) => location.id === locationId)?.name ??
-    locations[0]?.name ??
-    'Campus';
+    saved.locations.find((location) => location.id === saved.activeLocationId)?.label ?? 'Campus';
 
   // One pick per vendor (available preferred): the popular shelf always
   // represents dishes from across the platform, never one stall twice.

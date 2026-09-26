@@ -28,13 +28,12 @@ function requireClient() {
 }
 
 const PROFILE_SELECT =
-  'id, role, vendor_id, payment_qr_path, is_available, availability_updated_at, is_dev_account, is_verified_helper, display_name, full_name, student_id, phone_number, avatar_path, created_at, updated_at';
+  'id, role, vendor_id, is_available, availability_updated_at, is_dev_account, is_verified_helper, display_name, full_name, student_id, phone_number, avatar_path, created_at, updated_at';
 
 function toProfile(row: {
   id: string;
   role: string;
   vendor_id: string | null;
-  payment_qr_path: string | null;
   is_available: boolean | null;
   availability_updated_at: string | null;
   is_dev_account: boolean | null;
@@ -51,7 +50,9 @@ function toProfile(row: {
     id: row.id,
     role: row.role as ProfileRole,
     vendorId: row.vendor_id,
-    paymentQrPath: row.payment_qr_path,
+    /** The helper QR screen that owned this was removed; the profile shape keeps
+   *  the field so the domain type stays stable, with nothing behind it. */
+  paymentQrPath: null,
     isAvailable: row.is_available ?? false,
     availabilityUpdatedAt: row.availability_updated_at ?? null,
     isDevAccount: row.is_dev_account ?? false,

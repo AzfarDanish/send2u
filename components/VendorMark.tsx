@@ -13,19 +13,32 @@ function initialsFor(name: string): string {
 interface VendorMarkProps {
   name: string;
   size?: number;
+  /**
+   * `circle` is the requester-side row mark. `square` fills the slot a food
+   * photo would occupy (Helper Portal job rows). Vendors still carry no
+   * imagery, so the initials remain the real content either way.
+   */
+  shape?: 'circle' | 'square';
 }
 
 /**
- * Circular vendor identifier for job rows. Vendors carry no imagery in
+ * Vendor identifier for job rows. Vendors carry no imagery in
  * this product, so the mark derives initials from the real vendor name —
  * never invented artwork. Fixed geometry keeps every row the same height.
  */
-export function VendorMark({ name, size = 56 }: VendorMarkProps) {
+export function VendorMark({ name, size = 56, shape = 'circle' }: VendorMarkProps) {
   return (
     <View
       accessibilityRole="image"
       accessibilityLabel={name}
-      style={[styles.circle, { width: size, height: size, borderRadius: radii.full }]}>
+      style={[
+        styles.circle,
+        {
+          width: size,
+          height: size,
+          borderRadius: shape === 'square' ? radii.md : radii.full,
+        },
+      ]}>
       <Text style={[styles.initials, { fontSize: size * 0.34 }]}>{initialsFor(name)}</Text>
     </View>
   );

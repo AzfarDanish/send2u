@@ -59,6 +59,19 @@ export async function listOrderRatings(orderId: string): Promise<Rating[]> {
   return (data as unknown as RatingRow[]).map(toRating);
 }
 
+/** Ratings addressed to one user. RLS scopes this to orders the caller is a
+ *  party of, so a helper reads only what was left on their own jobs. */
+export async function listReceivedRatings(userId: string): Promise<Rating[]> {
+  const supabase = requireClient();
+  const { data, error } = await supabase
+    .from('send2u_ratings')
+    .select('id, order_id, from_user_id, to_user_id, score, comment, created_at')
+    .eq('to_user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Could not load ratings: ${error.message}`);
+  return (data as unknown as RatingRow[]).map(toRating);
+}
+
 /**
  * Submits the caller's rating for a completed order. One per party per
  * order — resubmission is rejected server-side (the row is immutable once

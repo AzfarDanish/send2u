@@ -66,6 +66,24 @@ export default function HelperPortalLayout() {
             tabBarStyle: { display: 'none' },
           }}
         />
-    </Tabs>
+        {/* Pushed from the Profile tab; route-only, never a destination of their
+            own, so they carry no tab button. */}
+        <Tabs.Screen
+          name="earnings"
+          options={{
+            href: null,
+            title: 'Earnings & Payouts',
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="about"
+          options={{
+            href: null,
+            title: 'About Helper',
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+      </Tabs>
   );
 }

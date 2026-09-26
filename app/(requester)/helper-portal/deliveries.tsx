@@ -13,6 +13,7 @@ import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { useMyDeliveries } from '@/hooks/useMyDeliveries';
 import { useMyDeliveryHistory } from '@/hooks/useMyDeliveryHistory';
+import { settledEarningsCents } from '@/lib/helperStats';
 import { formatMYR } from '@/lib/money';
 import { formatOrderDate, orderStatusLabel, orderTotalCents } from '@/lib/orders';
 import type { OrderWithDetails } from '@/types/domain';
@@ -79,13 +80,11 @@ export default function PortalDeliveriesScreen() {
     await Promise.all([active.refresh(), history.refresh()]);
   }, [active, history]);
 
-  // Settled earnings: delivery fees on completed + settled orders only.
+  // Settled earnings: one shared definition (lib/orders), the same one the
+  // Helper Portal profile stats and the Earnings screen use, so the figures
+  // shown in three places can never drift apart.
   const settledEarnings =
-    history.status === 'ready'
-      ? history.deliveries
-          .filter((d) => d.status === 'completed' && d.settlementStatus === 'settled')
-          .reduce((sum, d) => sum + d.deliveryFeeCents, 0)
-      : 0;
+    history.status === 'ready' ? settledEarningsCents(history.deliveries) : 0;
 
   return (
     <HelperPortalGuard title="Deliveries">

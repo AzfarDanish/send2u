@@ -181,6 +181,59 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Helper Portal: Jobs and Profile rebuilt on the red-header shell
+
+- Area: `app/(requester)/helper-portal`, `components/`, `hooks/`, `lib/`, `services/ratings.ts`.
+- Change: the Jobs and Profile tabs now use `RedScreen` (red header behind the
+  status bar, white rounded sheet) like the requester tabs, instead of
+  `GlassHeader` + `Screen`. Jobs gained a control row above the title (Leave,
+  availability pill, avatar), claim-on-the-row, and a pinned active-delivery
+  island. Profile gained a three-figure stats band, an online band, five menu
+  rows and a collapsible dev section.
+- Reason: the portal read as a separate app next to the requester tabs, and the
+  owner specified this layout for both screens.
+- Details:
+  - `components/RedScreen.tsx` gained three optional props used by this work:
+    `top` (control row above the title), `centerTitle`, and `footer` (pinned
+    above the tab bar with matching scroll clearance). All three default to
+    absent, so the existing screens are unchanged.
+  - Accept on the row calls the same `send2u_accept_order` RPC as Job Detail, so
+    both paths end in one server-side winner. It is disabled at the 3-job
+    capacity and while offline, and a refusal resyncs the list.
+  - Distance is the straight-line metres between the order's own pickup and
+    drop-off pins (`lib/maps/geo` + `formatRouteDistance`). **No ETA is shown**:
+    nothing in the backend estimates walking time, and OSRM routes exist only for
+    deliveries already accepted. A missing pin drops the line rather than
+    printing 0 m.
+  - New `lib/helperStats.ts`: `settledEarningsCents`, `completedDeliveryCount`,
+    `helperRatingSummary` — pure reductions shared by the Jobs tab, the Earnings
+    screen, the Deliveries tab and the profile stats, so the same figure cannot be
+    computed two ways. Deliberately not in `lib/orders.ts`, which carries another
+    session's uncommitted payment-brand work.
+  - New `hooks/useHelperStats.ts` and `services/ratings.ts#listReceivedRatings`.
+    The rating is intersected with the helper's own delivery ids, so a score this
+    account received as a requester cannot inflate it. An unrated helper reads a
+    dash, never a stand-in 5.0.
+  - New routes `helper-portal/earnings.tsx` and `helper-portal/about.tsx`,
+    registered `href: null` in the portal `_layout` so neither becomes a tab.
+    "About Helper" reuses the existing "how you earn" copy rather than inventing
+    policy, and describes no payout schedule because the backend tracks per-order
+    settlements, not transfers.
+  - `components/VendorMark.tsx` gained an optional `shape` (`circle` default,
+    `square` for job rows). Vendors carry no imagery in this product, so the
+    initials remain the real content — no invented food photos.
+  - The old "Active jobs" section on Jobs is gone; active deliveries are reached
+    through the island, which opens the most recent one.
+- Validation: `tsc` clean, `eslint` clean on every touched file, `npm test` 51/51,
+  `npx expo export -p web` exit 0 with `/helper-portal/earnings` bundled. On
+  ELP-NX9: header row, availability panel (opens, switch present), Leave (lands on
+  the requester Home), both pushed screens, and the whole Profile verified by
+  screenshot; no app-level errors in logcat.
+- Known limitation: the job row and its Accept button are **not** device-verified.
+  `send2u_orders` holds 0 rows, so no open job exists to render. The claim path is
+  the same RPC Job Detail already uses, but it is unexercised here. Nothing was
+  inserted into the database to force the case.
+
 ## 2026-09-26 — Orders embeds point at a table that no longer exists (fixed)
 
 - Second orders failure, same screen: "Could not find a relationship between

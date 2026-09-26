@@ -48,9 +48,9 @@ export interface DeliveryMapProps {
    */
   locateControl?: boolean;
   /**
-   * Raises the locate control by this many points. Screens that tuck a sheet
-   * over the map's bottom edge use it so the control clears the sheet instead of
-   * hiding behind it.
+   * Lifts the locate control above an overlay sheet (e.g. the Set Location
+   * form) so recenter stays tappable while the sheet is collapsed. Defaults
+   * to 0, which leaves every existing screen exactly where it is.
    */
   locateBottomInset?: number;
   onEvent?: (event: MapEvent) => void;

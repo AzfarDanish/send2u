@@ -148,6 +148,9 @@ export function buildMapHtml(): string {
   var routeLine = null;
   var userControlsCamera = false;
   var followEnabled = false;
+  // Centre reporting for fixed-pin screens: the next settled camera position
+  // is an answer (the host asked for this jump), not exploration.
+  var reportCenterOnMoveEnd = false;
   // Pin placement: while this is on, a plain map tap is a coordinate answer
   // rather than camera interaction, and it is reported to the host.
   var pickModeEnabled = false;
@@ -171,6 +174,21 @@ export function buildMapHtml(): string {
     if (map._s2uZoomProgrammatic) { map._s2uZoomProgrammatic = false; return; }
     userControlsCamera = true;
     send({ type: 'manual-pan' });
+  });
+
+  // A settled camera is a coordinate answer when the user moved it
+  // themselves, or when the host asked for the jump: fixed-pin screens read
+  // the container centre as the selected point. Fits, the initial world view
+  // and follow pans never report, so the host only hears real placements.
+  map.on('moveend', function () {
+    if (!userControlsCamera && !reportCenterOnMoveEnd) return;
+    reportCenterOnMoveEnd = false;
+    var center = map.getCenter();
+    if (!center || !finite(center.lat) || !finite(center.lng)) return;
+    send({
+      type: 'center-changed',
+      coordinate: { latitude: center.lat, longitude: center.lng },
+    });
   });
 
   // Pick mode consumes plain map taps only. Leaflet's own click event carries
@@ -341,8 +359,10 @@ export function buildMapHtml(): string {
           var target = command.coordinate;
           if (!target || !finite(target.latitude) || !finite(target.longitude)) return;
           // The user asked for this jump, so it is not a manual pan, and it must
-          // not quietly switch following back on either.
+          // not quietly switch following back on either. The settled position
+          // reports back as the selected centre for fixed-pin screens.
           map._s2uZoomProgrammatic = true;
+          reportCenterOnMoveEnd = true;
           map.setView(
             [target.latitude, target.longitude],
             command.zoom || ${FOLLOW_ZOOM},

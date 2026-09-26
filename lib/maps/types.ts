@@ -76,6 +76,13 @@ export type MapEvent =
   | { type: 'point-tap'; key: string; label: string }
   /** In pick mode: the user tapped the map, with the real coordinate. */
   | { type: 'map-tap'; coordinate: LatLng }
+  /**
+   * The camera settled with the centre over a new coordinate: either the user
+   * dragged/pinched the map, or the host asked for a jump (`centerOn`). The
+   * initial world view never reports. Screens with a fixed centre pin treat
+   * this as the selected point.
+   */
+  | { type: 'center-changed'; coordinate: LatLng }
   /** The user dragged or pinched: the camera must stop being driven for them. */
   | { type: 'manual-pan' };
 

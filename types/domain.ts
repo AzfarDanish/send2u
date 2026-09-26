@@ -128,6 +128,48 @@ export interface VendorMenuSection {
   items: MenuItemWithVendor[];
 }
 
+/**
+ * Saved-location icon category for the Deliver-to sheet and the Set Location
+ * selector. `library` covers library buildings, `class` covers
+ * class/academic blocks, `hostel` covers residential colleges, `cafeteria`
+ * covers cafeteria/dining halls, `office` covers office/faculty blocks,
+ * `other` covers custom entries with their own name.
+ */
+export type SavedLocationType =
+  | 'home'
+  | 'library'
+  | 'class'
+  | 'hostel'
+  | 'cafeteria'
+  | 'office'
+  | 'other';
+
+/** One row of the requester's personal address book. Owned by its creator. */
+export interface SavedDeliveryLocation {
+  id: string;
+  /** Primary label shown in the sheet (e.g. "Home", "KK Block C"). */
+  label: string;
+  /** Secondary line (e.g. block, level, room). Null when the user gave none. */
+  subDetails: string | null;
+  locationType: SavedLocationType;
+  /** The single-select active delivery location. At most one per user. */
+  isSelected: boolean;
+  /** Optional pin from the Set Location flow. Null until placed. */
+  lat: number | null;
+  lng: number | null;
+  /** Structured Set Location fields; null when the row predates them. */
+  building: string | null;
+  block: string | null;
+  floorLevel: string | null;
+  roomUnit: string | null;
+  /** Free-text delivery instructions (≤500 chars). */
+  instructions: string | null;
+  /** Custom name for `other` rows. */
+  customLabel: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Local in-memory cart line. Submitted to Supabase via `placeOrders`; never persisted. */
 export interface CartLine {
   item: MenuItemWithVendor;

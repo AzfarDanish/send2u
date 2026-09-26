@@ -315,6 +315,17 @@ export default function RequesterLayout() {
           headerShown: false,
         }}
       />
+      {/* Set Location flow: the Deliver-to sheet's add/edit destination for
+          the requester's personal address book. */}
+      <Tabs.Screen
+        name="set-location"
+        options={{
+          href: null,
+          title: 'Set Location',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
       {/* Helper Portal (verified helpers only; guarded per-screen) owns its
         own Jobs/Deliveries/Profile bottom navigation inside this hidden
         slot, entered from Profile — never a main-app tab. */}

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { SearchBar, matchesSearch } from '@/components/SearchBar';
 import { CartFab } from '@/components/CartFab';
+import { DeliverToSheet } from '@/components/location/DeliverToSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
@@ -23,6 +24,7 @@ import { colors, radii, spacing, touchTargets } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useDeliveryLocations } from '@/hooks/useDeliveryLocations';
+import { useSavedDeliveryLocations } from '@/hooks/useSavedDeliveryLocations';
 import { useMenu } from '@/hooks/useMenu';
 import { formatMYR } from '@/lib/money';
 import { useSharedUnreadCount } from '@/lib/unread';
@@ -88,10 +90,12 @@ export default function RequesterHomeScreen() {
   const { sections, status, error, refreshing, retry, refresh } = useMenu();
   const { profile, user } = useAuth();
   const { locations } = useDeliveryLocations();
+  const saved = useSavedDeliveryLocations();
   const { locationId, addItem } = useCart();
   const unreadCount = useSharedUnreadCount();
   const [query, setQuery] = useState('');
   const [showAllVendors, setShowAllVendors] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const deferredQuery = useDeferredValue(query);
   const isSearching = deferredQuery.trim().length > 0;
 
@@ -179,6 +183,7 @@ export default function RequesterHomeScreen() {
     : greetingForHour(new Date().getHours());
 
   const campusLabel =
+    saved.locations.find((location) => location.id === saved.activeLocationId)?.label ??
     locations.find((location) => location.id === locationId)?.name ??
     locations[0]?.name ??
     'Campus';
@@ -270,8 +275,8 @@ export default function RequesterHomeScreen() {
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Delivery area: ${campusLabel}. Change drop-off location.`}
-              onPress={() => router.push('/(requester)/locations')}
+              accessibilityLabel={`Delivery area: ${campusLabel}. Change delivery location.`}
+              onPress={() => setSheetOpen(true)}
               style={({ pressed }) => [styles.locationRow, pressed && styles.pressed]}
               hitSlop={8}>
               <MaterialIcons name="place" size={14} color={colors.onPrimary} />
@@ -445,6 +450,16 @@ export default function RequesterHomeScreen() {
         </Animated.View>
       </Animated.ScrollView>
       <CartFab aboveTabs />
+      <DeliverToSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        locations={saved.locations}
+        activeLocationId={saved.activeLocationId}
+        onSelect={(id) => void saved.selectLocation(id)}
+        status={saved.status}
+        error={saved.error}
+        onRetry={saved.retry}
+      />
     </View>
   );
 }

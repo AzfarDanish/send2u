@@ -10,6 +10,34 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-26 — Locations: slideable Set Location sheet + campus search
+
+- Change: `app/(requester)/set-location.tsx` rebuilt around a full-bleed map
+  with a two-snap bottom sheet: grey pill grabber on a 36pt drag zone,
+  collapsed peek (216pt: grabber + search + pin readout + form sliver),
+  expanded stop 120pt below the glass so map stays visible, drag/fling
+  snapping with both ends clamped (never off-screen, never fullscreen),
+  screen-reader expand/collapse actions, form scrolls only when expanded and
+  any field focus expands. New campus search bar under the grabber (drop-off
+  points + vendors, no-result state, tap fills Building and expands). Save
+  footer rides inside the sheet above the keyboard.
+- Reason: the fixed 280pt map + stacked form buried the map and starved the
+  form; the sheet keeps the map dominant with the form one drag away, and
+  location search was missing entirely.
+- Details: snap geometry in Reanimated shared values (rotation-safe), pan
+  clamped to [expanded, collapsed] with spring snaps; `DeliveryMap` gains
+  `locateBottomInset` (0 by default; set-location passes the peek height so
+  recenter clears the sheet). Deliberate adaptation: the RN centre-pin
+  overlay is gone — the pin is the `dropoff` map marker at the selected
+  coordinate, which stays truthful while the sheet moves (an overlay pin
+  would drift off the selection once the sheet covers the map centre).
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 14
+  errors + 1 warning all pre-existing), `npm test` 50/50, `expo export -p
+  web` pass + headless-Chrome bundle check (auth redirect, no crash).
+- Known limitations: needs on-device verification (drag feel, snap points on
+  small screens, keyboard/footer interplay); migrations still unapplied so
+  save/edit still hits the error path.
+
 ## 2026-09-26 — Locations: Set Location single page + structured backend
 
 - Change: `app/(requester)/set-location.tsx` is now the full single page

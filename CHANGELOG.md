@@ -181,6 +181,45 @@ only. No secrets are ever recorded here.
   build; the saved active selection is not yet bridged into the order draft
   (`CartContext.locationId` still drives checkout).
 
+## 2026-09-26 — Carts: per-vendor cart page + independent checkout (two-step flow)
+
+- Area: `app/(requester)/carts.tsx` (new), `app/(requester)/checkout.tsx` (new),
+  `contexts/CartContext.tsx`, `components/CartFab.tsx`, `app/(requester)/_layout.tsx`,
+  `payment-method.tsx`, `menu/[id].tsx`, `dropoff-pin.tsx`. `create.tsx` retired.
+- Change: the combined Review Request is split into a Carts overview plus a
+  per-vendor checkout. Carts lists each vendor's unsubmitted cart as a separate
+  section (vendor name, items, per-vendor subtotal, "Add more" → that vendor's
+  menu, "Continue" → that vendor's checkout). Checkout shows only that vendor's
+  lines and submits only them; a successful order clears just that vendor's lines.
+- Reason: multi-vendor carts must stay independent checkout contexts and must
+  never merge; the old single combined checkout submitted every vendor at once.
+- Details:
+  - `CartContext` gained `clearVendor(vendorId)` so one vendor's checkout clears
+    only its own lines; `clear()` and the location/payment reset stay whole-cart.
+  - Checkout calls the unchanged `send2u_place_orders` with only one vendor's lines
+    (the backend still splits internally; no backend change, no order-lifecycle
+    change, no new cart store). Prices/quantities are the exact in-memory
+    `MenuItemWithVendor` values already in the cart.
+  - The saved-location card, delivery instruction, leave-at-door and payment-brand
+    chooser moved intact from `create.tsx` into `checkout.tsx`. Payment method
+    stays the single global draft choice (owner's decision).
+  - Cart is still in-memory and per-device (owner's decision: no cart table).
+    Active/ongoing orders are never shown here — orders remain My Orders only.
+  - Navigation: `CartFab`, `menu/[id]` "Add", and `dropoff-pin` "Done" now route to
+    `/carts`; `payment-method` falls back to `/carts`. `create.tsx` and its route
+    entry are removed (its saved-location + payment-brand logic lives on in
+    `checkout.tsx`).
+- Validation: `tsc` clean, `eslint` clean on touched files, `npm test` 51/51,
+  `expo export -p web` exit 0 with `/carts` and `/checkout` bundled. Device-verified
+  on ELP-NX9: two vendor carts listed separately with correct items/subtotals;
+  "Continue" opens a checkout scoped to exactly that vendor (the other vendor's
+  items are absent), and back returns to both carts intact.
+- Known limitation: the "Place Request" success path (per-vendor clear + order
+  creation) is not e2e-verified on device — it needs a saved location plus payment
+  method selected, and the live DB holds 0 orders, so no submitted order was
+  produced during verification. The order-placement path itself (`placeOrders`) is
+  the same already-fixed function.
+
 ## 2026-09-26 — Checkout fixed: send2u_place_orders replaced (schema-cache error)
 
 - Symptom: "Could not place your request: Could not find the function

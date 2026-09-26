@@ -135,7 +135,7 @@ export default function MenuItemDetailScreen() {
       const addon = byId.get(addonId);
       if (addon) addItem(addon, 1);
     }
-    router.push('/(requester)/create');
+    router.push('/(requester)/carts');
   }, [item, quantity, addons, selectedAddons, addItem]);
 
   if (status === 'loading' || !item) {

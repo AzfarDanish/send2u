@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { GlassHeader } from '@/components/GlassHeader';
 import { DeliveryMap } from '@/components/map/DeliveryMap';
 import { Button } from '@/components/ui/Button';
+import { DockedActionBar } from '@/components/ui/DockedActionBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
@@ -102,7 +103,7 @@ export default function DropOffPinScreen() {
 
   return (
     <>
-      <GlassHeader title="Drop-off pin" fallbackHref="/(requester)/location" />
+      <GlassHeader title="Drop-off pin" fallbackHref="/(requester)" />
       <Screen beneathHeader scrollable={false} contentStyle={styles.content}>
         <DeliveryMap
           points={points}
@@ -114,13 +115,14 @@ export default function DropOffPinScreen() {
           style={styles.map}
         />
 
-        <View style={styles.footer}>
+        {/* States and guidance stay inline; only actions dock. */}
+        <View style={styles.statusZone}>
           {!pointId ? (
             <ErrorState
               title="No drop-off point"
               message="Open a drop-off point from the request to place its pin."
               retryTitle="Choose a point"
-              onRetry={() => router.replace('/(requester)/location')}
+              onRetry={() => router.replace('/(requester)')}
             />
           ) : null}
 
@@ -143,15 +145,12 @@ export default function DropOffPinScreen() {
               title="Drop-off point unavailable"
               message="This point is no longer offered. Pick another one for your request."
               actionTitle="Choose a point"
-              onAction={() => router.replace('/(requester)/location')}
+              onAction={() => router.replace('/(requester)')}
             />
           ) : null}
 
           {location && savedPin ? (
-            <>
-              <Text variant="secondary">Pin saved for {location.name}.</Text>
-              <Button title="Done" onPress={() => goBackOr('/(requester)/create')} />
-            </>
+            <Text variant="secondary">Pin saved for {location.name}.</Text>
           ) : null}
 
           {location && !savedPin && existingPin ? (
@@ -181,24 +180,34 @@ export default function DropOffPinScreen() {
                   onRetry={() => void handleSave()}
                 />
               ) : null}
+            </>
+          ) : null}
+        </View>
+        {/* Fixed bottom sheet: Done / Save never scrolls away. */}
+        {location && (savedPin || !readOnly) ? (
+          <DockedActionBar>
+            {savedPin ? (
+              <Button title="Done" onPress={() => goBackOr('/(requester)/carts')} />
+            ) : (
               <Button
                 title="Save drop-off pin"
                 onPress={() => void handleSave()}
                 disabled={!draft || saving}
                 loading={saving}
               />
-            </>
-          ) : null}
-        </View>
+            )}
+          </DockedActionBar>
+        ) : null}
       </Screen>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  // The map is the screen: it runs edge to edge, with only the action row
-  // inset, so nothing competes with the pin being placed.
-  content: { paddingHorizontal: 0, paddingBottom: spacing.lg, gap: spacing.md },
+  // The map is the screen: it runs edge to edge, with only the status row
+  // inset, so nothing competes with the pin being placed. Actions dock in
+  // the shared bar below, which owns the bottom edge.
+  content: { paddingHorizontal: 0, paddingBottom: 0, gap: spacing.md },
   map: { flex: 1, borderRadius: 0 },
-  footer: { paddingHorizontal: spacing.xl, gap: spacing.sm },
+  statusZone: { paddingHorizontal: spacing.xl, gap: spacing.sm },
 });

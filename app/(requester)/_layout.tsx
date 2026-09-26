@@ -92,10 +92,19 @@ export default function RequesterLayout() {
         menu page (per the requester hierarchy). All other pushed routes
         hide it so content owns the full screen. */}
       <Tabs.Screen
-        name="create"
+        name="carts"
         options={{
           href: null,
-          title: 'Review Request',
+          title: 'Your Carts',
+          tabBarStyle: { display: 'none' },
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="checkout"
+        options={{
+          href: null,
+          title: 'Checkout',
           tabBarStyle: { display: 'none' },
           headerShown: false,
         }}
@@ -294,11 +303,12 @@ export default function RequesterLayout() {
           headerShown: false,
         }}
       />
+      {/* Checkout payment-brand picker for the request draft. */}
       <Tabs.Screen
-        name="location"
+        name="payment-method"
         options={{
           href: null,
-          title: 'Drop-off Location',
+          title: 'Payment Method',
           tabBarStyle: { display: 'none' },
           headerShown: false,
         }}
@@ -326,9 +336,10 @@ export default function RequesterLayout() {
           headerShown: false,
         }}
       />
-      {/* Helper Portal (verified helpers only; guarded per-screen) owns its
-        own Jobs/Deliveries/Profile bottom navigation inside this hidden
-        slot, entered from Profile — never a main-app tab. */}
+      {/* Helper Portal (verified helpers only; guarded per-screen). It is a
+          stack with no bottom navigation of its own: the island on the Jobs
+          root covers active deliveries and the Profile carries history.
+          Entered from Profile — never a main-app tab. */}
       <Tabs.Screen
         name="helper-portal"
         options={{

@@ -82,7 +82,7 @@ export function CartFab({ aboveTabs = false }: CartFabProps) {
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={`Open cart, ${count} items`}
-        onPress={() => router.push('/(requester)/create')}
+        onPress={() => router.push('/(requester)/carts')}
         haptic="selection"
         style={styles.fab}>
         <MaterialIcons name="shopping-cart" size={26} color={colors.onPrimary} />

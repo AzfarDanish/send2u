@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, useState, type ReactNode } from 'react';
 
-import type { CartLine, MenuItemWithVendor } from '@/types/domain';
+import type { CartLine, MenuItemWithVendor, PaymentMethod } from '@/types/domain';
+import type { PaymentBrandId } from '@/lib/orders';
 
 const MAX_QUANTITY = 99;
 
@@ -8,6 +9,7 @@ type CartAction =
   | { type: 'add'; item: MenuItemWithVendor; quantity: number }
   | { type: 'setQty'; itemId: string; quantity: number }
   | { type: 'remove'; itemId: string }
+  | { type: 'clearVendor'; vendorId: string }
   | { type: 'clear' };
 
 interface CartState {
@@ -44,6 +46,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
     case 'remove':
       return { lines: state.lines.filter((line) => line.item.id !== action.itemId) };
+    case 'clearVendor':
+      return { lines: state.lines.filter((line) => line.item.vendorId !== action.vendorId) };
     case 'clear':
       return { lines: [] };
   }
@@ -58,10 +62,24 @@ interface CartContextValue {
   addItem: (item: MenuItemWithVendor, quantity: number) => void;
   setQuantity: (itemId: string, quantity: number) => void;
   removeItem: (itemId: string) => void;
+  /**
+   * Removes one vendor's lines only (after that vendor's checkout succeeds),
+   * leaving any other vendor's still-pending cart intact. The location and
+   * payment reset is NOT tied to this — those stay until `clear`.
+   */
+  clearVendor: (vendorId: string) => void;
   clear: () => void;
   /** Selected drop-off point for the current draft request. In-memory only. */
   locationId: string | null;
   setLocationId: (locationId: string | null) => void;
+  /**
+   * Checkout payment brand for the current draft (null until the requester
+   * picks one on the payment page). The brand's rail (`online`/`cod`) is
+   * what gets submitted; the brand id itself is checkout-scoped display.
+   */
+  paymentBrandId: PaymentBrandId | null;
+  paymentMethod: PaymentMethod | null;
+  setPayment: (brandId: PaymentBrandId, method: PaymentMethod) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -77,10 +95,19 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { lines: [] });
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [paymentBrandId, setPaymentBrandId] = useState<PaymentBrandId | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+
+  const setPayment = useCallback((brandId: PaymentBrandId, method: PaymentMethod) => {
+    setPaymentBrandId(brandId);
+    setPaymentMethod(method);
+  }, []);
 
   const clear = useCallback(() => {
     dispatch({ type: 'clear' });
     setLocationId(null);
+    setPaymentBrandId(null);
+    setPaymentMethod(null);
   }, []);
 
   const value = useMemo<CartContextValue>(() => {
@@ -96,11 +123,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem: (item, quantity) => dispatch({ type: 'add', item, quantity }),
       setQuantity: (itemId, quantity) => dispatch({ type: 'setQty', itemId, quantity }),
       removeItem: (itemId) => dispatch({ type: 'remove', itemId }),
+      clearVendor: (vendorId) => dispatch({ type: 'clearVendor', vendorId }),
       clear,
       locationId,
       setLocationId,
+      paymentBrandId,
+      paymentMethod,
+      setPayment,
     };
-  }, [state, locationId, clear]);
+  }, [state, locationId, paymentBrandId, paymentMethod, clear, setPayment]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

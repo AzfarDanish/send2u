@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -78,6 +78,14 @@ export interface DeliverToSheetProps {
   status?: SavedLocationsStatus;
   error?: string | null;
   onRetry?: () => void;
+  /**
+   * Fires on the closed→open transition only (a modal open fires no screen
+   * focus event, so the parent's focus refetch can't cover it). Callers
+   * pass their address-book `refresh` so the sheet never opens on rows that
+   * went stale while it was closed. Must be referentially stable — an
+   * inline closure would refire on every parent render.
+   */
+  onOpenRefresh?: () => void;
 }
 
 /**
@@ -102,6 +110,7 @@ export function DeliverToSheet({
   status: controlledStatus,
   error: controlledError,
   onRetry: controlledRetry,
+  onOpenRefresh,
 }: DeliverToSheetProps) {
   const insets = useSafeAreaInsets();
   const managed = useSavedDeliveryLocations();
@@ -139,6 +148,21 @@ export function DeliverToSheet({
   useEffect(() => {
     if (visible) dragY.set(0);
   }, [visible, dragY]);
+
+  // Opening the modal fires no screen focus event, so a sheet reopened
+  // after an out-of-band change (background edit, second device) would show
+  // stale rows. Refresh once per closed→open transition — the preserving
+  // silent kind, so visible rows never flash.
+  const wasVisible = useRef(visible);
+  const onOpenRefreshRef = useRef(onOpenRefresh);
+  useEffect(() => {
+    onOpenRefreshRef.current = onOpenRefresh;
+  }, [onOpenRefresh]);
+  useEffect(() => {
+    const opened = visible && !wasVisible.current;
+    wasVisible.current = visible;
+    if (opened) onOpenRefreshRef.current?.();
+  }, [visible]);
 
   /**
    * Entrance. The modal fades the whole surface in and the sheet adds a short

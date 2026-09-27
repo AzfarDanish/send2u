@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { applyOrderChange, subscribeOrderChanges } from '@/lib/orderEvents';
@@ -24,6 +25,8 @@ interface UseMyOrderHistoryResult {
  * Pass `enabled={false}` while the history UI is hidden (e.g. the Active
  * tab is showing) to skip the mount fetch; the query runs on the first
  * flip to `true`. Defaults to `true` to preserve the plain mount-load.
+ * Screen focus refetches silently once anything loaded, so returning from
+ * a detail never shows a stale record.
  */
 export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
@@ -74,6 +77,18 @@ export function useMyOrderHistory(enabled = true): UseMyOrderHistoryResult {
     if (hasLoaded.current) void silentReload();
     else void load(false);
   }, [enabled, load, silentReload]);
+
+  // Screen revisits (back from a detail, tab return) refetch silently once
+  // something loaded before. Kept alongside the enabled effect above, which
+  // covers hidden-tab flips that fire no focus event; the service dedupes
+  // concurrent loads to a single request.
+  useFocusEffect(
+    useCallback(() => {
+      if (!enabled) return;
+      if (hasLoaded.current) void silentReload();
+      else void load(false);
+    }, [enabled, load, silentReload]),
+  );
 
   // Latest list + enabled flag for the emitter callback (synced in an
   // effect — refs must not be written during render).

@@ -10,6 +10,70 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-27 — Docs: README rewritten for the 2026-09-25–27 architecture
+
+- Change: `README.md` rewritten against the last 3 days of changelog
+  entries and verified against the tree (routes, hooks, services,
+  migrations all checked). No code changed.
+- Reason: the old README described a superseded product — shared
+  drop-off points (table dropped), Review Request (split into Carts +
+  per-vendor checkout), 6-stage tracker (now 5, auto-complete on
+  delivery), portal tabs (now a stack), "no test suite" (51 tests exist),
+  and maps/GPS as out of scope (now core).
+- Details: new sections for the freshness system (realtime + focus +
+  emitters), the saved-location address book + payment brands, in-app
+  maps/tracking, `send2u-web`, and EAS preview APKs; backend table list
+  corrected (`saved_delivery_locations`, `delivery_positions` in,
+  `delivery_locations` out); project structure matches the repo;
+  validation loop gains `npm test`, doctor corrected to 18/21.
+- Validation: every route/component/table named was checked against the
+  working tree; `npx tsc --noEmit` clean after the edit (docs-only change).
+- Known limitation: none — prose only.
+
+## 2026-09-27 — Freshness: saved locations notify on save + focus refetch
+
+- Change: new `lib/locationEvents.ts` emitter (mirrors `orderEvents`);
+  `useSavedDeliveryLocations` refetches silently on screen focus and on the
+  emitter, and `set-location` + active-selection switches emit at the
+  mutation site — a new location shows on home/checkout with no manual
+  reload. `DeliverToSheet` takes stable `onOpenRefresh` (fired once per
+  closed→open transition; modal opens fire no focus event), wired to the
+  parent's refresh in home and checkout. `useMyOrders`/`useMyOrderHistory`
+  refetch on focus (history keeps its enabled-flip load; the service
+  dedupes concurrent fetches). `useMyVendor` watches the own stall row live
+  (RLS-scoped, unfiltered) plus focus refetch — one fix covering stall,
+  profile, and pickup-pin screens.
+- Reason: saved locations, order lists, and stall data went stale across
+  screens with pull-to-refresh as the only recovery (the checkout sheet had
+  not even that).
+- Details: focus + invalidation only for locations (deterministic,
+  offline-safe; no new realtime subscription per approval); realtime added
+  only for the single vendor stall row (admin hide / second-device edits).
+  No new routes, no schema/RPC changes.
+- Validation: `tsc` clean, `eslint` clean on touched files, `npm test`
+  51/51, `expo export -p web` pass.
+- Known limitations: needs on-device verification (save→back visibility,
+  admin-hide propagation, tab revisits with realtime down); vendors/[id]
+  pull, menu/[id] focus, and earnings copy fixes deferred.
+
+## 2026-09-27 — Build: Android preview APK rebuild with MapTiler key
+
+- Change: cloud build `b7c01017-8bed-4541-8ffe-511b91399837` FINISHED —
+  `send2u-preview.apk` (105 MB), `com.azfardanish.send2u` v1.0.0 (code 1).
+  No repo code changed; build only.
+- Reason: the previous preview APK was built before `EXPO_PUBLIC_MAPTILER_KEY`
+  existed in the `preview` EAS environment, so maps fell back to OSM raster.
+- Details: `eas build -p android --profile preview --non-interactive`;
+  preview env now holds the MapTiler key (Streets basemap with building
+  detail active); applicationId verified on the artifact with
+  `aapt2 dump badging`.
+- Validation: EAS status FINISHED; artifact downloads and badges correctly.
+- Known limitation: not installed/run on the ELP_NX9 device yet. Preview env
+  also carries `EXPO_PUBLIC_SEND2U_DEV_AUTH=1` (dev entry enabled in this
+  test APK — remove before any store-bound build) and `SUPABASE_SERVICE_ROLE_KEY`
+  (not `EXPO_PUBLIC_`-prefixed, so not inlined in the bundle).
+  Install: https://expo.dev/accounts/azfardns/projects/send2u/builds/b7c01017-8bed-4541-8ffe-511b91399837
+
 ## 2026-09-27 — Build: Android preview APK via EAS (`preview` profile)
 
 - Change: cloud build `04a6fd00-65db-4a60-be01-72d0d03a4331` FINISHED —

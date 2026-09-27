@@ -454,6 +454,7 @@ export default function RequesterHomeScreen() {
         status={saved.status}
         error={saved.error}
         onRetry={saved.retry}
+        onOpenRefresh={saved.refresh}
       />
     </View>
   );

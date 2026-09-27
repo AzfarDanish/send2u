@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 
+import { useRealtimeReload } from '@/hooks/useRealtimeReload';
 import { getMyVendor, updateVendorProfile, type VendorProfileInput } from '@/services/vendor';
 import type { Vendor } from '@/types/domain';
 
@@ -23,8 +25,10 @@ interface UseMyVendorResult {
 }
 
 /**
- * The signed-in vendor's own stall. Loads once on mount; `save` writes
- * through the profile RPC and reloads. Unlinked accounts surface the
+ * The signed-in vendor's own stall. `save` writes through the profile RPC
+ * and reloads; tab revisits refetch silently and the own stall row is
+ * watched live (an administrator hiding the stall, or an edit from another
+ * device, arrives without a manual reload). Unlinked accounts surface the
  * service's "no stall linked" error as their empty state.
  */
 export function useMyVendor(): UseMyVendorResult {
@@ -33,6 +37,9 @@ export function useMyVendor(): UseMyVendorResult {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // True once any load succeeded: focus returns then refresh silently
+  // instead of flashing the skeleton over visible stall data.
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) {
@@ -44,6 +51,7 @@ export function useMyVendor(): UseMyVendorResult {
     try {
       setVendor(await getMyVendor());
       setStatus('ready');
+      hasLoaded.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load your stall.');
       setStatus('error');
@@ -52,9 +60,34 @@ export function useMyVendor(): UseMyVendorResult {
     }
   }, []);
 
-  useEffect(() => {
-    void load(false);
-  }, [load]);
+  // Preserving background refetch for focus returns and realtime events.
+  // Never blanks; failures keep stale rows.
+  const silentReload = useCallback(async () => {
+    try {
+      setVendor(await getMyVendor());
+      setError(null);
+      setStatus('ready');
+      hasLoaded.current = true;
+    } catch {
+      // Keep stale data.
+    }
+  }, []);
+
+  // Tab revisits would otherwise show a stale stall (or miss an admin
+  // hide). Replaces the mount fetch — focus fires on mount too.
+  useFocusEffect(
+    useCallback(() => {
+      if (hasLoaded.current) void silentReload();
+      else void load(false);
+    }, [load, silentReload]),
+  );
+
+  // Own stall row only, RLS-scoped server-side: the vendor SELECT policies
+  // expose exactly the linked stall, so an unfiltered subscription is safe
+  // and no other stall's rows can ever arrive.
+  useRealtimeReload([{ table: 'send2u_vendors', event: '*' }], () => {
+    void silentReload();
+  });
 
   const save = useCallback(async (input: VendorProfileInput) => {
     setSaving(true);

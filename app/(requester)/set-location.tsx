@@ -48,6 +48,7 @@ import {
 import { reverseGeocodePoint, type ReverseGeocodeResult } from '@/lib/maps/geocode';
 import type { LatLng, MapEvent, MapPoint } from '@/lib/maps/types';
 import { goBackOr } from '@/lib/navigation';
+import { emitLocationsChanged } from '@/lib/locationEvents';
 import {
   createSavedDeliveryLocation,
   listSavedDeliveryLocations,
@@ -462,6 +463,10 @@ export default function SetLocationScreen() {
       };
       if (editingId) await updateSavedDeliveryLocation(editingId, input);
       else await createSavedDeliveryLocation(input);
+      // The address book is read mount/focus-cached on home and checkout —
+      // notify every mounted consumer now so the new row shows without a
+      // manual reload on return.
+      emitLocationsChanged();
       goBackOr('/(requester)');
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save the location.');

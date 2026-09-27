@@ -396,6 +396,7 @@ export default function CheckoutScreen() {
           status={saved.status}
           error={saved.error}
           onRetry={saved.retry}
+          onOpenRefresh={saved.refresh}
         />
       </Screen>
     </>

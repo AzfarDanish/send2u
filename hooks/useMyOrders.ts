@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
@@ -18,14 +19,18 @@ interface UseMyOrdersResult {
 }
 
 /**
- * Requester's own orders, newest first. Loads once on mount; refresh is
- * explicit (pull-to-refresh / retry) so re-renders never refetch.
+ * Requester's own orders, newest first. Refetches on screen focus so
+ * returning from a detail never shows a stale list; manual refresh stays
+ * available. Realtime and the local emitter cover open-screen changes.
  */
 export function useMyOrders(): UseMyOrdersResult {
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [status, setStatus] = useState<MyOrdersStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // True once any load succeeded: focus returns then refresh silently
+  // instead of flashing the skeleton over visible rows.
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) {
@@ -38,6 +43,7 @@ export function useMyOrders(): UseMyOrdersResult {
       const next = await listMyOrders();
       setOrders(next);
       setStatus(next.length === 0 ? 'empty' : 'ready');
+      hasLoaded.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load your orders.');
       setStatus('error');
@@ -45,10 +51,6 @@ export function useMyOrders(): UseMyOrdersResult {
       setRefreshing(false);
     }
   }, []);
-
-  useEffect(() => {
-    void load(false);
-  }, [load]);
 
   // Live updates (helper accepts, fulfilment advances, payment reviews…).
   // RLS-scoped server-side: only own rows ever arrive. Silent failures keep
@@ -58,10 +60,21 @@ export function useMyOrders(): UseMyOrdersResult {
       const next = await listMyOrders();
       setOrders(next);
       setStatus(next.length === 0 ? 'empty' : 'ready');
+      hasLoaded.current = true;
     } catch {
       // Keep stale data.
     }
   }, []);
+
+  // Tab revisits with realtime down would otherwise show stale rows.
+  // Preserve the visible list on return; skeleton only when nothing ever
+  // loaded. Replaces the mount fetch — focus fires on mount too.
+  useFocusEffect(
+    useCallback(() => {
+      if (hasLoaded.current) void silentReload();
+      else void load(false);
+    }, [load, silentReload]),
+  );
 
   useRealtimeReload([{ table: 'send2u_orders', event: '*' }], () => {
     void silentReload();

@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -86,72 +86,100 @@ export function SlideToConfirm({
   const crossed = useSharedValue(false);
   const confirmed = useSharedValue(false);
 
+  // The gesture must survive parent re-renders mid-drag (realtime ticks,
+  // badge counts): it is memoized on its true inputs only, and the confirm
+  // callback rides a ref so a fresh parent closure never recreates it. A
+  // recreated gesture cancels the active drag without `onEnd`, which is
+  // exactly the "thumb reaches the end, nothing happens" failure.
+  const onConfirmRef = useRef(onConfirm);
+  useEffect(() => {
+    onConfirmRef.current = onConfirm;
+  });
+
   const fireConfirm = useCallback(() => {
     succeed();
-    onConfirm();
+    onConfirmRef.current();
     // Reset for the next use after the caller clears `busy`.
     // Reanimated shared-value writes — intended API.
     // eslint-disable-next-line react-hooks/immutability
     x.value = withSpring(0, { ...springDefault });
     // eslint-disable-next-line react-hooks/immutability
     confirmed.value = false;
-  }, [confirmed, onConfirm, x]);
+  }, [confirmed, x]);
 
-  const pan = Gesture.Pan()
-    .enabled(!locked)
-    .activeOffsetX([-8, 8])
-    .failOffsetY([-12, 12])
-    .onStart(() => {
-      // Reanimated worklet writes — intended API.
-      crossed.value = false;
-      // eslint-disable-next-line react-hooks/immutability
-      confirmed.value = false;
-    })
-    .onUpdate((event) => {
-      const raw = event.translationX;
-      if (raw <= maxDx) {
-        // eslint-disable-next-line react-hooks/immutability
-        x.value = Math.max(raw, 0);
-      } else {
-        // Rubber-band past the end instead of a hard stop (Apple §9).
-        x.value = maxDx + rubberband(raw - maxDx, maxDx);
-      }
-      const past = x.value >= maxDx * COMPLETE_FRACTION;
-      if (past && !crossed.value) {
-        crossed.value = true;
-        runOnJS(tick)();
-      } else if (!past && crossed.value) {
-        crossed.value = false;
-      }
-    })
-    .onEnd((event) => {
-      if (confirmed.value) return;
-      const velocity = event.velocityX ?? 0;
-      // Momentum projection (Apple §6): land where the gesture is going,
-      // then commit when the projected point clears the threshold — a
-      // fling commits early, a slow drag must travel the distance.
-      const projected = x.value + project(velocity);
-      const fling = velocity > FLING_VELOCITY && x.value > maxDx * 0.3;
-      const commit = x.value >= maxDx * COMPLETE_FRACTION || projected >= maxDx * COMPLETE_FRACTION || fling;
-      if (commit) {
-        // eslint-disable-next-line react-hooks/immutability
-        confirmed.value = true;
-        // eslint-disable-next-line react-hooks/immutability
-        x.value = reduced
-          ? withTiming(maxDx, { duration: pressDurationMs }, (finished) => {
-              if (finished) runOnJS(fireConfirm)();
-            })
-          : withSpring(maxDx, { ...springFlick, velocity }, (finished) => {
-              if (finished) runOnJS(fireConfirm)();
-            });
-      } else {
-        // Velocity handoff (Apple §5): continue at the finger's exact
-        // velocity so there is no seam between drag and spring.
-        x.value = reduced
-          ? withTiming(0, { duration: pressDurationMs })
-          : withSpring(0, { ...springDefault, velocity });
-      }
-    });
+  // Identity is the bug fix here, so the dependency list is intentionally
+  // minimal AND stable: `locked`/`maxDx`/`reduced` change only when behavior
+  // must change, `fireConfirm` is stable, and `x`/`crossed`/`confirmed` never
+  // change identity — including them would be harmless but the writes below
+  // would then trip `immutability`, so they stay out on purpose.
+  // The `refs` rule is a false positive inside this block: gesture worklets
+  // never run during render (UI thread, deferred), which the compiler cannot
+  // see — reads and writes of shared values here are Reanimated's intended
+  // API, same as the per-line disables already in this file.
+  /* eslint-disable react-hooks/refs, react-hooks/exhaustive-deps */
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!locked)
+        .activeOffsetX([-8, 8])
+        .failOffsetY([-12, 12])
+        .onStart(() => {
+          // Reanimated worklet writes — intended API.
+          crossed.value = false;
+          // eslint-disable-next-line react-hooks/immutability
+          confirmed.value = false;
+        })
+        .onUpdate((event) => {
+          const raw = event.translationX;
+          if (raw <= maxDx) {
+            // eslint-disable-next-line react-hooks/immutability
+            x.value = Math.max(raw, 0);
+          } else {
+            // Rubber-band past the end instead of a hard stop (Apple §9).
+            x.value = maxDx + rubberband(raw - maxDx, maxDx);
+          }
+          const past = x.value >= maxDx * COMPLETE_FRACTION;
+          if (past && !crossed.value) {
+            crossed.value = true;
+            runOnJS(tick)();
+          } else if (!past && crossed.value) {
+            crossed.value = false;
+          }
+        })
+        .onEnd((event) => {
+          if (confirmed.value) return;
+          const velocity = event.velocityX ?? 0;
+          // Momentum projection (Apple §6): land where the gesture is going,
+          // then commit when the projected point clears the threshold — a
+          // fling commits early, a slow drag must travel the distance.
+          const projected = x.value + project(velocity);
+          const fling = velocity > FLING_VELOCITY && x.value > maxDx * 0.3;
+          const commit =
+            x.value >= maxDx * COMPLETE_FRACTION ||
+            projected >= maxDx * COMPLETE_FRACTION ||
+            fling;
+          if (commit) {
+            // eslint-disable-next-line react-hooks/immutability
+            confirmed.value = true;
+            // eslint-disable-next-line react-hooks/immutability
+            x.value = reduced
+              ? withTiming(maxDx, { duration: pressDurationMs }, (finished) => {
+                  if (finished) runOnJS(fireConfirm)();
+                })
+              : withSpring(maxDx, { ...springFlick, velocity }, (finished) => {
+                  if (finished) runOnJS(fireConfirm)();
+                });
+          } else {
+            // Velocity handoff (Apple §5): continue at the finger's exact
+            // velocity so there is no seam between drag and spring.
+            x.value = reduced
+              ? withTiming(0, { duration: pressDurationMs })
+              : withSpring(0, { ...springDefault, velocity });
+          }
+        }),
+    [locked, maxDx, reduced, fireConfirm],
+  );
+  /* eslint-enable react-hooks/refs, react-hooks/exhaustive-deps */
 
   const thumbStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: TRACK_PADDING + x.value }],

@@ -216,3 +216,25 @@ test('orderItemsTitle summarises item snapshots', () => {
     'Nasi Ayam + 2 more',
   );
 });
+
+test('payment brands settle on exactly two rails', async () => {
+  const { PAYMENT_BRANDS, paymentBrandById } = await import('./orders.ts');
+  assert.ok(PAYMENT_BRANDS.length >= 6);
+  for (const brand of PAYMENT_BRANDS) {
+    assert.ok(brand.label.length > 0, `brand(${brand.id}) needs a label`);
+    assert.ok(brand.hint.length > 0, `brand(${brand.id}) needs a hint`);
+    assert.ok(
+      brand.method === 'online' || brand.method === 'cod',
+      `brand(${brand.id}) must settle on online or cod`,
+    );
+  }
+  const cash = PAYMENT_BRANDS.find((brand) => brand.id === 'cash');
+  assert.equal(cash?.method, 'cod');
+  for (const brand of PAYMENT_BRANDS) {
+    if (brand.id === 'cash') continue;
+    assert.equal(brand.method, 'online', `brand(${brand.id}) must settle online`);
+  }
+  assert.equal(paymentBrandById('visa')?.label, 'Visa');
+  assert.equal(paymentBrandById('nope'), null);
+  assert.equal(paymentBrandById(null), null);
+});

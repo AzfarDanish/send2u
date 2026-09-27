@@ -5,12 +5,12 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { OrderWithDetails } from '@/types/domain';
 
-// Short nouns: at 360pt each stage owns ~56pt, so every label must stay
-// well under that to keep clear gaps between neighbours.
-const STAGE_LABELS = ['Placed', 'Helper', 'Pickup', 'On the way', 'Delivered', 'Done'] as const;
+// Short nouns: at 360pt each stage owns ~68pt, so labels stay compact with
+// clear gaps between neighbours.
+const STAGE_LABELS = ['Placed', 'Helper', 'Pickup', 'On the way', 'Delivered'] as const;
 
 const DOT_SIZE = 28;
-// Every cell reserves the halo the current stage paints, so all six dot
+// Every cell reserves the halo the current stage paints, so all five dot
 // centres stay on one line and the connector never moves between states.
 const RING_SIZE = 34;
 const TRACK_TOP = RING_SIZE / 2 - 1;
@@ -45,11 +45,14 @@ export function progressPosition(order: OrderWithDetails): { reached: number; cu
       return { reached: 2, current: 3 };
     case 'delivered':
       return { reached: 3, current: 4 };
-    case 'confirmed':
     case 'awaiting_requester_payment':
-      return { reached: 4, current: 5 };
+      // Legacy holding state: the food is delivered, money is still moving.
+      return { reached: 3, current: 4 };
+    case 'confirmed':
+      // Legacy terminal-adjacent state: fulfilment fully done.
+      return { reached: 4, current: null };
     case 'completed':
-      return { reached: 5, current: null };
+      return { reached: 4, current: null };
     case 'cancelled':
     case 'disputed': {
       // Credit only what the timestamps prove happened.
@@ -67,12 +70,14 @@ export function progressPosition(order: OrderWithDetails): { reached: number; cu
 }
 
 /**
- * Horizontal 6-stage progress tracker for the real fulfilment lifecycle:
- * requested → helper accepted → collecting → on the way → delivered →
- * completed. Completed stages are solid Send2U red with a white check; the
+ * Horizontal 5-stage progress tracker for the real fulfilment lifecycle:
+ * requested → helper accepted → collecting → on the way → delivered.
+ * Delivery completes the journey: there is no Done stage because completion
+ * is a record state, not a fulfilment step. Completed stages are solid
+ * Send2U red with a white check; the
  * current stage is red as well but sits inside a soft-tint halo, which is
  * what separates "in progress" from "finished" at a glance; everything
- * ahead is light gray with muted numbering. One thin line connects all six,
+ * ahead is light gray with muted numbering. One thin line connects all five,
  * tinted red up to the last completed stage. Labels wrap to two lines so
  * narrow screens never overlap. Terminal requests highlight nothing as
  * current.
@@ -191,8 +196,8 @@ const styles = StyleSheet.create({
   dotCurrent: { backgroundColor: colors.primary },
   dotNumber: { fontWeight: '700' },
   labels: { flexDirection: 'row', marginTop: spacing.xs },
-  // 11px keeps the widest labels ("Requested", "Delivered") inside their
-  // sixth-of-row cell so neighbours never overlap on narrow screens.
+  // 11px keeps the widest labels ("Delivered", "On the way") inside their
+  // fifth-of-row cell so neighbours never overlap on narrow screens.
   label: { flex: 1, textAlign: 'center', minHeight: 30, fontSize: 11, lineHeight: 15 },
   labelReached: { fontWeight: '600' },
   labelCurrent: { fontWeight: '700' },

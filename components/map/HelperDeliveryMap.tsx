@@ -312,14 +312,18 @@ function HelperDeliveryMapImpl({ order, style }: HelperDeliveryMapProps) {
 
   return (
     <View style={[styles.container, style]}>
-      <DeliveryMap
-        points={points}
-        route={route}
-        camera={following ? 'follow' : 'none'}
-        fitToken={fitToken}
-        onEvent={handleEvent}
-        style={styles.map}
-      />
+      <View style={styles.bleed}>
+        <DeliveryMap
+          points={points}
+          route={route}
+          camera={following ? 'follow' : 'none'}
+          fitToken={fitToken}
+          onEvent={handleEvent}
+          controls
+          onRecenter={recentre}
+          style={styles.map}
+        />
+      </View>
 
       <View style={styles.status}>
         {noticeText ? (
@@ -340,12 +344,6 @@ function HelperDeliveryMapImpl({ order, style }: HelperDeliveryMapProps) {
           </View>
         ) : null}
 
-        {userExploring ? (
-          <View style={[styles.statusRow, styles.recentreRow]}>
-            <NoticeAction label="Recentre" onPress={recentre} />
-          </View>
-        ) : null}
-
         <SharingLine lastPublishedAt={lastPublishedAt} error={publishError} />
       </View>
     </View>
@@ -361,8 +359,10 @@ export const HelperDeliveryMap = memo(HelperDeliveryMapImpl);
 
 const styles = StyleSheet.create({
   container: { gap: spacing.sm },
-  // The map is the primary surface: hairline edge, no card, no shadow.
-  map: { height: MAP_HEIGHT, borderWidth: 1, borderColor: colors.divider },
+  // Full-bleed: the workspace screen's own horizontal padding is cancelled
+  // here so the live map gets the whole width; square corners, no frame.
+  bleed: { marginHorizontal: -spacing.xl },
+  map: { height: MAP_HEIGHT, borderRadius: 0 },
   status: { gap: spacing.xs },
   statusRow: {
     flexDirection: 'row',
@@ -370,7 +370,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  recentreRow: { justifyContent: 'flex-end' },
   statusText: { flex: 1 },
   action: { minHeight: 48, justifyContent: 'center', paddingHorizontal: spacing.sm },
   actionLabel: { color: colors.primary, fontWeight: '600' },

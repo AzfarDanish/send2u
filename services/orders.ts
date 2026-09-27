@@ -57,7 +57,6 @@ interface PaymentRow {
   last_error: string | null;
   submitted_at: string;
   paid_at: string | null;
-  verified_at: string | null;
 }
 
 interface SettlementRow {
@@ -73,7 +72,10 @@ interface OrderRow {
   id: string;
   requester_id: string;
   vendor_id: string;
-  delivery_location_id: string;
+  delivery_location_id: string | null;
+  saved_location_id: string | null;
+  delivery_instruction: string | null;
+  leave_at_door: boolean | null;
   status: string;
   subtotal_cents: number;
   delivery_fee_cents: number;
@@ -111,7 +113,7 @@ interface OrderRow {
   created_at: string;
   updated_at: string;
   vendor: { id: string; name: string; location_hint: string | null; pickup_lat: number | null; pickup_lng: number | null } | null;
-  delivery_location: { id: string; name: string; description: string | null; lat: number | null; lng: number | null } | null;
+  saved_location: { id: string; label: string; sub_details: string | null; location_type: string; lat: number | null; lng: number | null } | null;
   send2u_order_items: OrderItemRow[] | null;
   // To-one (UNIQUE order_id) embeds decode as a single object, not an array.
   send2u_payments: PaymentRow | PaymentRow[] | null;
@@ -129,9 +131,9 @@ function toPayment(orderId: string, row: PaymentRow): Payment {
     lastError: row.last_error,
     submittedAt: row.submitted_at,
     paidAt: row.paid_at,
-    verifiedAt: row.verified_at,
+    verifiedAt: null,
     createdAt: row.submitted_at,
-    updatedAt: row.paid_at ?? row.verified_at ?? row.submitted_at,
+    updatedAt: row.paid_at ?? row.submitted_at,
   };
 }
 
@@ -160,7 +162,28 @@ function toOrderItem(row: OrderItemRow): OrderItem {
 }
 
 function toOrderWithDetails(row: OrderRow): OrderWithDetails {
-  if (!row.vendor || !row.delivery_location) {
+  // New orders carry a saved address-book location. The shared delivery-points
+  // table that used to cover older rows is gone from the schema, so an order
+  // without a saved location has no fetchable place name: the requester's own
+  // instruction is the only surviving description of the drop-off, and the pin
+  // stays null rather than becoming a stand-in coordinate.
+  const instruction = row.delivery_instruction?.trim() || null;
+  const location = row.saved_location
+    ? {
+        id: row.saved_location.id,
+        name: row.saved_location.label,
+        description: row.saved_location.sub_details,
+        lat: row.saved_location.lat,
+        lng: row.saved_location.lng,
+      }
+    : {
+        id: row.saved_location_id ?? row.id,
+        name: instruction ?? 'Delivery point removed',
+        description: instruction ? 'Saved location removed' : null,
+        lat: null,
+        lng: null,
+      };
+  if (!row.vendor) {
     throw new Error('Order references data that is no longer visible.');
   }
   return {
@@ -168,6 +191,9 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
     requesterId: row.requester_id,
     vendorId: row.vendor_id,
     deliveryLocationId: row.delivery_location_id,
+    savedLocationId: row.saved_location_id,
+    deliveryInstruction: row.delivery_instruction,
+    leaveAtDoor: row.leave_at_door ?? false,
     status: row.status as OrderStatus,
     subtotalCents: row.subtotal_cents,
     deliveryFeeCents: row.delivery_fee_cents,
@@ -215,11 +241,11 @@ function toOrderWithDetails(row: OrderRow): OrderWithDetails {
       pickupLng: row.vendor.pickup_lng,
     },
     location: {
-      id: row.delivery_location.id,
-      name: row.delivery_location.name,
-      description: row.delivery_location.description,
-      lat: row.delivery_location.lat,
-      lng: row.delivery_location.lng,
+      id: location.id,
+      name: location.name,
+      description: location.description,
+      lat: location.lat,
+      lng: location.lng,
     },
     items: (row.send2u_order_items ?? []).map(toOrderItem),
     payment: normalizePayments(row.send2u_payments).slice(0, 1).map((p) => toPayment(row.id, p))[0] ?? null,
@@ -264,15 +290,15 @@ function toPlacedSummary(value: unknown): PlacedOrderSummary {
 }
 
 const ORDER_SELECT =
-  'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
+  'id, requester_id, vendor_id, delivery_location_id, saved_location_id, delivery_instruction, leave_at_door, status, subtotal_cents, delivery_fee_cents, pickup_code,' +
   ' payment_method, payment_status, settlement_status, paid_at, cod_expected_cents, cod_collected_cents, cod_collected_at, settled_at, refunded_at, refund_reason,' +
   ' helper_id, accepted_at, going_to_vendor_at, arrived_at, food_available_at, purchased_at, food_cost_cents, picked_up_at, out_for_delivery_at, delivered_at, confirmed_at,' +
   ' cancelled_at, cancelled_by, cancel_reason, dispute_reason, dispute_details, dispute_note, disputed_at, resolved_at, resolution,' +
   ' created_at, updated_at,' +
   ' vendor:send2u_vendors!inner(id, name, location_hint, pickup_lat, pickup_lng),' +
-  ' delivery_location:send2u_delivery_locations!inner(id, name, description, lat, lng),' +
+  ' saved_location:send2u_saved_delivery_locations!left(id, label, sub_details, location_type, lat, lng),' +
   ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at),' +
-  ' send2u_payments(order_id, amount_cents, evidence_path, status, method, provider_ref, attempt_count, last_error, submitted_at, paid_at, verified_at)';
+  ' send2u_payments(order_id, amount_cents, evidence_path, status, method, provider_ref, attempt_count, last_error, submitted_at, paid_at)';
 
 /** Current user id for owner-scoped reads. Throws when signed out. */
 async function requireUserId(): Promise<string> {
@@ -290,14 +316,34 @@ async function requireUserId(): Promise<string> {
  * carry ids and quantities only, so requester-supplied totals are never
  * trusted. Send2U records the transaction from birth (online=pending,
  * COD=unpaid); no helper financing is involved.
+ *
+ * New checkouts point at a saved address-book location; `deliveryLocationId`
+ * stays only for legacy callers (none left in the app) and old shared-point
+ * orders keep reading through the mapper fallback.
  */
-export async function placeOrders(
-  deliveryLocationId: string,
-  lines: PlaceOrderLine[],
-  paymentMethod: PaymentMethod,
-): Promise<PlacedOrderSummary[]> {
+export interface PlaceOrdersInput {
+  savedLocationId?: string | null;
+  deliveryLocationId?: string | null;
+  lines: PlaceOrderLine[];
+  paymentMethod: PaymentMethod;
+  instruction?: string | null;
+  leaveAtDoor?: boolean;
+}
+
+export async function placeOrders(input: PlaceOrdersInput): Promise<PlacedOrderSummary[]> {
+  const {
+    savedLocationId = null,
+    deliveryLocationId = null,
+    lines,
+    paymentMethod,
+    instruction = null,
+    leaveAtDoor = false,
+  } = input;
   const supabase = requireClient();
   if (lines.length === 0) throw new Error('Your cart is empty.');
+  if (!savedLocationId && !deliveryLocationId) {
+    throw new Error('Choose where to deliver.');
+  }
   if (paymentMethod !== 'online' && paymentMethod !== 'cod') {
     throw new Error('Choose how you want to pay.');
   }
@@ -305,6 +351,9 @@ export async function placeOrders(
     p_delivery_location_id: deliveryLocationId,
     p_items: lines.map((line) => ({ menu_item_id: line.menuItemId, quantity: line.quantity })),
     p_payment_method: paymentMethod,
+    p_saved_location_id: savedLocationId,
+    p_delivery_instruction: instruction,
+    p_leave_at_door: leaveAtDoor,
   });
   if (error) throw new Error(friendlyOrderError(error.message));
   if (!Array.isArray(data) || data.length === 0) {

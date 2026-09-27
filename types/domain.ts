@@ -230,7 +230,14 @@ export interface Order {
   id: string;
   requesterId: string;
   vendorId: string;
-  deliveryLocationId: string;
+  /** Legacy shared drop-off point; null for orders placed on a saved location. */
+  deliveryLocationId: string | null;
+  /** Address-book location for new orders; null for legacy shared-point orders. */
+  savedLocationId: string | null;
+  /** Per-order delivery note from checkout; null when the requester gave none. */
+  deliveryInstruction: string | null;
+  /** Leave-at-the-door choice from checkout. */
+  leaveAtDoor: boolean;
   status: OrderStatus;
   /** Food sum (unit × qty) in MYR cents. No fees or taxes. */
   subtotalCents: number;

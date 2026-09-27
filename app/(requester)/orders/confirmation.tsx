@@ -109,7 +109,7 @@ export default function OrderConfirmationScreen() {
   if (status === 'loading' || !orders) {
     return (
       <>
-        <GlassHeader title="Request Submitted" />
+        <GlassHeader title="Request Submitted" forceFallback fallbackHref="/(requester)" />
         <Screen beneathHeader>
           {status === 'loading' ? (
             <SkeletonDetail label="Confirming your request" />
@@ -146,7 +146,9 @@ export default function OrderConfirmationScreen() {
 
   return (
     <>
-      <GlassHeader title="Request Submitted" />
+      {/* Back always replaces Home: this screen is terminal for its flow,
+          so history must never lead back into payment or an emptied cart. */}
+      <GlassHeader title="Request Submitted" forceFallback fallbackHref="/(requester)" />
       <Screen beneathHeader
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />

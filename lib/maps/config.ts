@@ -41,6 +41,28 @@ export const OSM_ATTRIBUTION = '&copy; OpenStreetMap contributors, tiles &copy; 
 export const OSM_MAX_ZOOM = 19;
 
 /**
+ * MapTiler basemap style: Streets v4, rendered from MapTiler Planet with
+ * building footprints, names, and entrances baked in. `{z}/{x}/{y}` are
+ * substituted by the map library; the key is interpolated at import time
+ * from `EXPO_PUBLIC_MAPTILER_KEY`, so the map document still never remounts.
+ * Absent key means this layer is never built — OSM above is the whole map.
+ */
+export const MAPTILER_STYLE_ID = 'streets-v4';
+export const MAPTILER_TILE_URL =
+  'https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}.png?key=INSERT_KEY_AT_BUILD';
+
+/** MapTiler raster serves usefully to z20 (vector-sourced, crisper than OSM). */
+export const MAPTILER_MAX_ZOOM = 20;
+
+/**
+ * Required dual attribution, rendered inside the map by the map library
+ * whenever the MapTiler layer is the visible one. Exact vendor wording.
+ */
+export const MAPTILER_ATTRIBUTION =
+  '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> ' +
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
+
+/**
  * Applied to the map WebView as a user-agent suffix, so tile and route requests
  * are attributable to this app per the OSM tile usage policy.
  */

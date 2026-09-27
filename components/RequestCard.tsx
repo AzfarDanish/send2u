@@ -67,8 +67,6 @@ function stageTimestamps(order: OrderWithDetails, stage: number): (string | null
       return [order.pickedUpAt, order.outForDeliveryAt];
     case 4:
       return [order.deliveredAt];
-    case 5:
-      return [order.confirmedAt];
     default:
       return [];
   }

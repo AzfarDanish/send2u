@@ -227,6 +227,58 @@ export function paymentMethodLabel(method: PaymentMethod | null): string {
   }
 }
 
+/**
+ * Checkout brand: what the requester taps. Only two rails exist behind the
+ * scenes (`online` simulated in-app, `cod` cash) — brands are labels on
+ * rails, never new money paths, so adding a brand is one array entry here
+ * plus one icon in the shared brand icon map. Node-safe on purpose (plain
+ * data, no icon imports) so `npm test` covers the mapping.
+ */
+export type PaymentBrandId = 'cash' | 'visa' | 'card' | 'tng' | 'fpx' | 'duitnow';
+
+export interface PaymentBrand {
+  id: PaymentBrandId;
+  label: string;
+  /** Backend rail this brand settles on. */
+  method: PaymentMethod;
+  hint: string;
+}
+
+export const PAYMENT_BRANDS: readonly PaymentBrand[] = [
+  { id: 'cash', label: 'Cash', method: 'cod', hint: 'Pay cash to your helper on delivery.' },
+  { id: 'visa', label: 'Visa', method: 'online', hint: 'Pay by Visa card in Send2U (simulated).' },
+  {
+    id: 'card',
+    label: 'Debit or Credit Card',
+    method: 'online',
+    hint: 'Pay by debit or credit card in Send2U (simulated).',
+  },
+  {
+    id: 'tng',
+    label: "Touch 'n Go",
+    method: 'online',
+    hint: "Pay with Touch 'n Go eWallet (simulated).",
+  },
+  {
+    id: 'fpx',
+    label: 'Online Banking (FPX)',
+    method: 'online',
+    hint: 'Pay with FPX online banking (simulated).',
+  },
+  {
+    id: 'duitnow',
+    label: 'DuitNow QR',
+    method: 'online',
+    hint: 'Pay with DuitNow QR (simulated).',
+  },
+];
+
+/** Brand lookup by id; null for unknown ids so callers never render blank. */
+export function paymentBrandById(id: string | null | undefined): PaymentBrand | null {
+  if (!id) return null;
+  return PAYMENT_BRANDS.find((brand) => brand.id === id) ?? null;
+}
+
 /** Human label for the settlement state. */
 export function settlementStatusLabel(status: SettlementStatus): string {
   switch (status) {

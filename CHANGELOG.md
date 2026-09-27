@@ -10,6 +10,109 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-27 — Build: Android preview APK via EAS (`preview` profile)
+
+- Change: cloud build `04a6fd00-65db-4a60-be01-72d0d03a4331` FINISHED —
+  `send2u-preview.apk` (105 MB), `com.azfardanish.send2u` v1.0.0 (code 1).
+  No repo code changed; build only.
+- Reason: installable Android APK for on-device verification.
+- Details: `eas build -p android --profile preview --non-interactive`;
+  preview EAS env already held the Supabase URL + anon key (MapTiler key
+  absent — maps fall back to OSM raster per design); applicationId verified
+  on the artifact with `aapt2 dump badging`. Built from the dirty working
+  tree (another session's uncommitted work included — rebuild after commit
+  for a clean provenance).
+- Validation: EAS status FINISHED; artifact downloads and badges correctly.
+- Known limitation: not installed/run on the ELP_NX9 device yet.
+  Install: https://expo.dev/accounts/azfardns/projects/send2u/builds/04a6fd00-65db-4a60-be01-72d0d03a4331
+
+## 2026-09-27 — Web: vendor client created outside this repo (`send2u-web`)
+
+- Change: new standalone Next.js 16 + React 19 + TypeScript repo
+  `AzfarDanish/send2u-web` (sibling directory, Vercel target) for vendors
+  to receive orders: sign-in (vendor-role guard), prep queue with Start
+  preparing / Mark ready, order detail, stall open/close + editing, menu
+  CRUD + availability. No code in this repo changed.
+- Reason: vendors need a desktop surface; the Expo app stays the mobile
+  client on the same backend.
+- Details: same Supabase project, tables/RLS/RPCs
+  (`send2u_vendor_advance`, `send2u_update_vendor_profile`,
+  `send2u_upsert_menu_item`, `send2u_delete_menu_item`); `src/lib/vendor.ts`
+  ports `services/vendor.ts`; no new SQL, no RLS changes. Pickup-pin
+  placement stays in the mobile app.
+- Validation: `npx tsc --noEmit` clean, `npm run lint` clean,
+  `npm run build` pass, route smoke (`/login` 200, `/orders` + `/` redirect
+  to login without a session).
+- Known limitations: needs browser verification against the real project
+  with a linked vendor account; GitHub push pending (`gh` token invalid —
+  repo committed locally as `3fa4468`, push on re-auth).
+
+## 2026-09-26 — Lifecycle: auto-complete on delivery + flat detail/workspace
+
+- Change: delivery now completes the order — new migration
+  `supabase/migrations/2026-09-27_auto_complete_on_delivery.sql` (confirm
+  accepts completed as no-op via rename-and-wrap; mark_delivered
+  convergence specified with reconciliation checklist, NOT reconstructed
+  blind). Tracker drops Done for 5 stages ending at Delivered; request
+  detail converts to the RedScreen shell with flat whitespace sections;
+  helper workspace blocks flatten to match (map chrome, sliders, stages
+  untouched); confirm screen marks confirmation optional.
+- Reason: delivered work sat active waiting on review; the record screens
+  spoke bordered boxes while main screens went flat.
+- Details: money rule per approval (complete only when paid/collected;
+  unpaid parks at awaiting-payment); legacy confirmed/awaiting rows map
+  onto Delivered; shared sub-sections (payment record, ratings, timeline,
+  history detail) and confirm/pay screens keep their chrome as follow-ups.
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 13
+  errors + 1 warning all pre-existing), `npm test` 51/51, `expo export -p
+  web` pass + headless bundle check.
+- Known limitations: server Part B unapplied (delivered still waits until
+  it lands — verify per-path smoking per the file); needs on-device
+  verification.
+
+## 2026-09-26 — Slider: worklet directives were the real fix (correction)
+
+- Cause: the crash log shows `project()`/`rubberband()` — plain JS helpers
+  called synchronously inside the slider's UI worklets — throwing
+  "tried to synchronously call a Remote Function", which kills the gesture.
+  `project()` runs on every release, so no drag could ever commit; that, not
+  gesture identity, is the won't-complete. Correction to the previous entry:
+  memoization stands (mid-drag cancellation was real), but it was not the
+  committer.
+- Change: `constants/motion.ts` marks both helpers `'worklet'` with
+  do-not-remove docs; no call sites changed.
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 13
+  errors + 1 warning all pre-existing), `npm test` 51/51, `expo export -p
+  web` pass (proves the Reanimated plugin accepts the directives).
+- Known limitations: the crash reproduces only on a real drag — on-device
+  confirmation that slides now complete is still required.
+
+## 2026-09-26 — Routing: submitted→Home, workspace backs→Jobs, slide-cancel, slider fix
+
+- Change: Request Submitted back now always replaces Home (both branches);
+  pay-online success offers Continue into Request Submitted with pay-online
+  scrubbed from history. All helper workspace backs replace the Jobs list:
+  new floating backs on go/collect/deliver/confirm (these stages had none),
+  done header forced to Jobs, closed button plain-replaced; new `replace`
+  prop on `FloatingBackButton`. Requester cancel is a filled Slide-to-cancel
+  (fixed 'Cancelled by requester' reason, no typing). Decision map bleeds
+  to the top edge. Slider root-caused and fixed: the gesture rebuilt every
+  render, so any mid-drag re-render cancelled it before `onEnd` — now
+  memoized on true inputs with the callback ref-routed.
+- Reason: terminal screens must not lead back into payment/history; cancel
+  needed no interrogation; the slider silently swallowed completions.
+- Details: done knowingly against the newer tree state — the drafted
+  `2026-09-26_checkout_fields.sql` was discarded (a real six-arg
+  `place_orders` + saved-location columns are applied; the draft would have
+  destroyed them), and the mapper work converged on the other session's
+  saved-only embeds already in the tree. Stale `services/locations.ts`
+  doc reference corrected.
+- Validation: `tsc` clean, `eslint` clean on touched files (repo-wide 13
+  errors + 1 warning all pre-existing), `npm test` 51/51, `expo export -p
+  web` pass + headless bundle check.
+- Known limitations: needs on-device verification (slider completion under
+  realtime load, back chains, cancel display wording).
+
 ## 2026-09-26 — Helper job: headerless full-bleed map + in-map controls
 
 - Change: helper job decision/workspace stages go headerless with the map

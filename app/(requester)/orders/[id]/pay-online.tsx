@@ -1,11 +1,12 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOr } from '@/lib/navigation';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { GlassHeader } from '@/components/GlassHeader';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { Button } from '@/components/ui/Button';
+import { DockedActionBar } from '@/components/ui/DockedActionBar';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -57,11 +58,24 @@ export default function PayOnlineScreen() {
   const paid = context?.paymentStatus === 'paid';
   const failed = payPhase === 'failed' || context?.paymentStatus === 'failed';
   const processing = payPhase === 'starting' || payPhase === 'processing' || payBusy;
+  // The one state with a docked action: a payable online order that has not
+  // finished. Every other branch keeps its inline buttons.
+  const payable =
+    !!context &&
+    context.paymentMethod !== 'cod' &&
+    context.orderStatus !== 'cancelled' &&
+    context.orderStatus !== 'disputed' &&
+    !paid &&
+    payPhase !== 'success';
 
   return (
     <>
       <GlassHeader title="Online Payment" />
-      <Screen beneathHeader>
+      <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}>
         {status === 'loading' ? (
           <Card>
             <SkeletonBlock lines={2} label="Loading payment" />
@@ -121,10 +135,18 @@ export default function PayOnlineScreen() {
               />
             </Card>
             <Button
-              title="Track Request"
-              onPress={() =>
-                router.push({ pathname: '/(requester)/orders/[id]', params: { id: orderId } })
-              }
+              title="Continue"
+              accessibilityLabel="Continue to your submitted request"
+              onPress={() => {
+                // Terminal transition like View Request below: step back to
+                // the origin first so pay-online leaves history — Back from
+                // Request Submitted returns Home, never to Payment successful.
+                if (router.canGoBack()) router.back();
+                router.push({
+                  pathname: '/(requester)/orders/confirmation',
+                  params: { orderIds: orderId },
+                });
+              }}
             />
           </>
         ) : (
@@ -169,15 +191,6 @@ export default function PayOnlineScreen() {
               />
             ) : null}
 
-            {!processing ? (
-              <Button
-                title={failed ? 'Retry Payment' : `Pay ${formatMYR(context.totalCents)}`}
-                onPress={() => void pay(false)}
-                disabled={payBusy}
-                loading={payBusy}
-              />
-            ) : null}
-
             <Text variant="caption" color="muted" style={styles.centered}>
               Simulated payment for this demo — no real money moves and no bank app is needed.
             </Text>
@@ -190,12 +203,36 @@ export default function PayOnlineScreen() {
             ) : null}
           </>
         )}
+        </ScrollView>
+        {/* Fixed bottom sheet: Pay stays docked while the breakdown scrolls.
+            The button stays mounted through processing (disabled + loading)
+            instead of hiding, so the action context never jumps. */}
+        {payable && context ? (
+          <DockedActionBar>
+            <Button
+              title={failed ? 'Retry Payment' : `Pay ${formatMYR(context.totalCents)}`}
+              onPress={() => void pay(false)}
+              disabled={processing}
+              loading={processing}
+            />
+          </DockedActionBar>
+        ) : null}
       </Screen>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  // Shell drops the scroll container's own padding: the inner scroll view
+  // owns horizontal rhythm and the docked bar owns the bottom edge.
+  shell: { flex: 1, paddingHorizontal: 0, paddingBottom: 0, gap: 0 },
+  scroll: { flex: 1 },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: spacing.lg,
+  },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   amountText: { flex: 1, gap: spacing.xs },
   processingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

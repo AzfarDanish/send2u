@@ -35,18 +35,28 @@ export const fadeDurationMs = 200 as const;
  * sample code): exponential decay, NOT the physics-textbook v²/(2·decel).
  * Returns extra pixels the gesture would travel before stopping.
  *
+ * Runs on the UI thread inside gesture worklets (the slider's release
+ * handler calls it synchronously), so the 'worklet' directive below is
+ * load-bearing: without it the UI runtime throws "tried to synchronously
+ * call a Remote Function" and the gesture dies. Do not remove it.
+ *
  * @param initialVelocity px/s at release
  * @param decelerationRate 0.998 = normal scroll feel, 0.99 = snappier
  */
 export function project(initialVelocity: number, decelerationRate = 0.998): number {
+  'worklet';
   return ((initialVelocity / 1000) * decelerationRate) / (1 - decelerationRate);
 }
 
 /**
  * Progressive boundary resistance (Apple §9: rubber-band, don't hard-stop).
  * The further past the bound, the less the element follows.
+ *
+ * Same UI-thread requirement as `project` above: called synchronously from
+ * the slider's update handler, so the directive stays.
  */
 export function rubberband(overshoot: number, dimension: number, constant = 0.55): number {
+  'worklet';
   if (overshoot === 0) return 0;
   return ((overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot)));
 }

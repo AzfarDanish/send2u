@@ -4,8 +4,8 @@ import type { SavedDeliveryLocation, SavedLocationType } from '@/types/domain';
 /**
  * Saved-location service layer (the requester's personal address book).
  *
- * The shared campus points in `services/locations.ts` stay curated read-only
- * data. Everything here is per-user: rows are owned by their creator, reads
+ * This is the only delivery-location store: the legacy shared campus table
+ * is gone, so every read here is per-user. Rows are owned by their creator, reads
  * go through the owner SELECT policy, and every write goes through a
  * `send2u_*` SECURITY DEFINER function — matching every other write in this
  * project. The single-select rule lives in the database (partial unique index

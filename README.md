@@ -163,6 +163,7 @@ cp .env.example .env
 | `EXPO_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase publishable/anon key |
 | `EXPO_PUBLIC_SEND2U_DEV_AUTH` | Dev only | `1` enables credential-free dev entry (anonymous session + role picker). Never enable in production builds |
+| `EXPO_PUBLIC_MAPTILER_KEY` | No — OSM fallback | MapTiler API key for the Streets basemap (building detail). URL-restrict it in the MapTiler dashboard; push to EAS env for builds |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side only | Bypasses RLS. **Never** prefix with `EXPO_PUBLIC_`, never reference from app code, never commit |
 
 `.env` is gitignored — paste real keys only from the Supabase Dashboard.

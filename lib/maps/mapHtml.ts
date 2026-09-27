@@ -3,6 +3,9 @@ import {
   FOLLOW_ZOOM,
   LEAFLET_CSS_URL,
   LEAFLET_JS_URL,
+  MAPTILER_ATTRIBUTION,
+  MAPTILER_MAX_ZOOM,
+  MAPTILER_TILE_URL,
   MARKER_DROPOFF_COLOR,
   MARKER_HELPER_COLOR,
   MARKER_LOCATE_COLOR,
@@ -15,6 +18,7 @@ import {
   ROUTE_COLOR,
   ROUTE_WIDTH,
 } from '@/lib/maps/config';
+import { env } from '@/config/env';
 
 /**
  * The map document, built once and handed to the WebView as a static string.
@@ -34,9 +38,24 @@ import {
  * Pick mode is the one thing that makes a tap an answer instead of camera
  * interaction: the host turns it on for the length of a pin-placement task and
  * the page reports the tapped coordinate back as `map-tap`.
+ *
+ * Base layers: MapTiler Streets (building detail) is primary whenever a key
+ * was baked in at import; OSM raster is always built as the silent standby.
+ * Three failed tiles in a row on the primary falls back to OSM inside this
+ * document — the host only ever hears `tiles-failed` when the standby fails
+ * too. Attribution follows the visible layer automatically, because each
+ * layer carries its own attribution string.
  */
 
-export function buildMapHtml(): string {
+export function buildMapHtml(maptilerKey: string): string {
+  const hasMapTiler = maptilerKey.length > 0;
+  const maptilerDecl = hasMapTiler
+    ? `L.tileLayer('${MAPTILER_TILE_URL.replace('INSERT_KEY_AT_BUILD', maptilerKey)}', {
+    maxZoom: ${MAPTILER_MAX_ZOOM},
+    attribution: '${MAPTILER_ATTRIBUTION}',
+    detectRetina: false,
+  })`
+    : 'null';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -45,6 +64,12 @@ export function buildMapHtml(): string {
 <link rel="stylesheet" href="${LEAFLET_CSS_URL}" />
 <style>
   html, body, #map { height: 100%; margin: 0; padding: 0; background: #FFFFFF; }
+  /* The map document must never scroll or bounce: pan/zoom are Leaflet's own,
+     and the host screen scrolls nothing while the map is the surface.
+     touch-action is scoped to the map container (Leaflet manages gestures
+     there); pinning the document stops the WebView's own bounce scroll. */
+  html, body { overflow: hidden; position: fixed; inset: 0; width: 100%; }
+  #map { touch-action: none; }
   /* Restrained marker vocabulary: circles only, no artwork, no emoji. */
   .s2u-marker {
     width: 18px; height: 18px; border-radius: 50%;
@@ -110,29 +135,54 @@ export function buildMapHtml(): string {
     attributionControl: true,
     // Nothing decorative: the base map is the only background.
     zoomSnap: 0.5,
-    maxZoom: ${OSM_MAX_ZOOM},
+    maxZoom: ${hasMapTiler ? MAPTILER_MAX_ZOOM : OSM_MAX_ZOOM},
   });
   map.setView([0, 0], 2);
 
-  var tiles = L.tileLayer('${OSM_TILE_URL}', {
+  var osmLayer = L.tileLayer('${OSM_TILE_URL}', {
     maxZoom: ${OSM_MAX_ZOOM},
     attribution: '${OSM_ATTRIBUTION}',
     detectRetina: false,
   });
+  var maptilerLayer = ${maptilerDecl};
+  // The OSM standby is always built but only added on fallback, so a missing
+  // key costs nothing and a failing primary costs one layer swap, never a
+  // blank map. Each layer's own attribution string keeps the credit honest.
+  var activeBase = maptilerLayer ? 'maptiler' : 'osm';
+  var osmAdded = false;
+  if (maptilerLayer) {
+    maptilerLayer.addTo(map);
+  } else {
+    osmLayer.addTo(map);
+    osmAdded = true;
+  }
 
   // Three failed tiles in a row means the tile server is unreachable, not that
-  // one tile is missing. That is a real error state for the UI, not a blank map.
+  // one tile is missing. On the primary that falls back to the standby; only
+  // the standby failing is a real error state for the UI.
   var tileErrors = 0;
   var tilesReported = false;
-  tiles.on('tileerror', function () {
-    tileErrors += 1;
-    if (tileErrors >= 3 && !tilesReported) {
-      tilesReported = true;
-      send({ type: 'tiles-failed' });
-    }
-  });
-  tiles.on('tileload', function () { tileErrors = 0; });
-  tiles.addTo(map);
+  function watchLayer(layer) {
+    layer.on('tileerror', function () {
+      tileErrors += 1;
+      if (tileErrors >= 3 && !tilesReported) {
+        if (activeBase === 'maptiler') {
+          map.removeLayer(maptilerLayer);
+          osmLayer.addTo(map);
+          osmAdded = true;
+          activeBase = 'osm';
+          tileErrors = 0;
+          send({ type: 'base-fallback', from: 'maptiler', to: 'osm' });
+          return;
+        }
+        tilesReported = true;
+        send({ type: 'tiles-failed' });
+      }
+    });
+    layer.on('tileload', function () { tileErrors = 0; });
+  }
+  watchLayer(osmLayer);
+  if (maptilerLayer) watchLayer(maptilerLayer);
 
   var markers = {};
   // One style per logical point, from the provider config: the live helper is
@@ -375,6 +425,15 @@ export function buildMapHtml(): string {
           // Asking to follow is also a reset of manual exploration.
           if (followEnabled) userControlsCamera = false;
           return;
+        case 'zoomIn':
+        case 'zoomOut': {
+          // Button-driven, so it must not read as a manual pan the way a
+          // pinch does: flag it the way programmatic jumps already are.
+          map._s2uZoomProgrammatic = true;
+          if (command.type === 'zoomIn') map.zoomIn();
+          else map.zoomOut();
+          return;
+        }
         case 'pickMode':
           setPickMode(command.enabled);
           return;
@@ -392,4 +451,4 @@ export function buildMapHtml(): string {
 }
 
 /** Built once at import: the WebView source must never change identity. */
-export const MAP_HTML = buildMapHtml();
+export const MAP_HTML = buildMapHtml(env.maptilerKey);

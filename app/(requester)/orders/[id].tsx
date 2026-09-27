@@ -13,14 +13,15 @@ import { RequesterTrackingMap } from '@/components/map/RequesterTrackingMap';
 import type { StatusCardTone } from '@/components/RequestStatusCard';
 import { RequesterPaymentCard } from '@/components/RequesterPaymentCard';
 import { TransactionRecord } from '@/components/TransactionRecord';
-import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBack } from '@/components/HeaderBack';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { ListRow } from '@/components/ui/ListRow';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { Screen } from '@/components/ui/Screen';
+import { RedScreen } from '@/components/RedScreen';
+import { SlideToConfirm } from '@/components/ui/SlideToConfirm';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
@@ -33,8 +34,6 @@ import {
   requesterStatusMessage,
 } from '@/lib/orders';
 import { cancelOrder, getOrderDetail, openDispute, withdrawDispute } from '@/services/orders';
-import { helperLabel } from '@/services/helperIdentity';
-import { useHelperIdentity } from '@/hooks/useHelperIdentity';
 import type { OrderWithDetails } from '@/types/domain';
 import type { RequesterDisputeReason } from '@/services/orders';
 
@@ -257,8 +256,6 @@ export default function OrderDetailScreen() {
   const [retryToken, setRetryToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [reason, setReason] = useState('');
-  const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
@@ -313,8 +310,6 @@ export default function OrderDetailScreen() {
     setOrder(null);
     setCancelError(null);
     setCancelled(false);
-    setReason('');
-    setCancelOpen(false);
     setPaymentTick(0);
     setReportOpen(false);
     setReportCategory(null);
@@ -373,7 +368,9 @@ export default function OrderDetailScreen() {
     setCancelling(true);
     setCancelError(null);
     try {
-      const result = await cancelOrder(order.id, reason);
+      // No typed reason: the slide is the confirmation, and the server gets
+      // a fixed account of who cancelled.
+      const result = await cancelOrder(order.id, 'Cancelled by requester');
       const patched = {
         ...previous,
         status: result.status,
@@ -388,16 +385,11 @@ export default function OrderDetailScreen() {
     } finally {
       setCancelling(false);
     }
-  }, [order, cancelling, reason]);
+  }, [order, cancelling]);
 
   // Delivery confirmation lives on the dedicated confirm screen (checklist
   // + attestation); the detail screen routes there instead of confirming
   // inline. Report/withdraw stay inline — they belong to this record view.
-  const { identity: helperIdentity } = useHelperIdentity(
-    typeof id === 'string' ? id : '',
-    order?.helperId ?? null,
-  );
-
   const handleReport = useCallback(async () => {
     if (!order || reporting || !reportCategory) return;
     const previous = order;
@@ -441,35 +433,35 @@ export default function OrderDetailScreen() {
 
   if (status === 'loading' || !order) {
     return (
-      <>
-        <GlassHeader title="Request Detail" />
-        <Screen beneathHeader>
-          {status === 'loading' ? (
-            <SkeletonDetail label="Loading request" />
-          ) : loadFailed ? (
-            <ErrorState
-              title="Couldn't load the request"
-              message="Check your connection and try again."
-              retryTitle="Try again"
-              onRetry={() => {
-                setLoadFailed(false);
-                setStatus('loading');
-                setRetryToken((t) => t + 1);
-              }}
-            />
-          ) : (
-            <ErrorState
-              title="Request not found"
-              message="This request isn't available to you. It may belong to another requester."
-              retryTitle="Back to requests"
-              onRetry={() => {
-                if (router.canGoBack()) router.back();
-                else router.replace('/(requester)/orders');
-              }}
-            />
-          )}
-        </Screen>
-      </>
+      <RedScreen
+        title="Request"
+        titleSize="title"
+        leading={<HeaderBack fallbackHref="/(requester)" color={colors.onPrimary} />}>
+        {status === 'loading' ? (
+          <SkeletonDetail label="Loading request" />
+        ) : loadFailed ? (
+          <ErrorState
+            title="Couldn't load the request"
+            message="Check your connection and try again."
+            retryTitle="Try again"
+            onRetry={() => {
+              setLoadFailed(false);
+              setStatus('loading');
+              setRetryToken((t) => t + 1);
+            }}
+          />
+        ) : (
+          <ErrorState
+            title="Request not found"
+            message="This request isn't available to you. It may belong to another requester."
+            retryTitle="Back to requests"
+            onRetry={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace('/(requester)/orders');
+            }}
+          />
+        )}
+      </RedScreen>
     );
   }
 
@@ -553,22 +545,11 @@ export default function OrderDetailScreen() {
 
   return (
     <>
-      <GlassHeader title="Request Detail" />
-      <Screen
-        beneathHeader
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
-        }>
-        <View style={styles.headerRow}>
-          <View style={styles.headerText}>
-            <Text variant="title" numberOfLines={2}>
-              Request from {order.vendor.name}
-            </Text>
-            <Text variant="caption" color="secondary">
-              #{order.id.slice(0, 8)} · Placed {formatOrderDate(order.createdAt)}
-              {order.helperId ? ` · ${helperLabel(helperIdentity, order.helperId)}` : ''}
-            </Text>
-          </View>
+      <RedScreen
+        title="Request"
+        titleSize="title"
+        leading={<HeaderBack fallbackHref="/(requester)" color={colors.onPrimary} />}
+        right={
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel="More actions"
@@ -583,10 +564,13 @@ export default function OrderDetailScreen() {
             haptic={null}
             style={styles.menuButton}
             hitSlop={8}>
-            <MaterialIcons name="more-vert" size={22} color={colors.text} />
+            <MaterialIcons name="more-vert" size={22} color={colors.onPrimary} />
           </PressableScale>
-        </View>
-
+        }
+        subtitle={`From ${order.vendor.name} · #${order.id.slice(0, 8)}`}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
+        }>
         <RequestProgress order={order} />
 
         <View style={styles.statusBlock}>
@@ -597,8 +581,13 @@ export default function OrderDetailScreen() {
         </View>
 
         {/* The map sits with the status it explains, ahead of the order's
-            static detail: what is happening, then where it is happening. */}
-        {tracking ? <RequesterTrackingMap order={order} /> : null}
+            static detail: what is happening, then where it is happening.
+            Full-bleed inside the sheet so tracking gets the whole width. */}
+        {tracking ? (
+          <View style={styles.mapBleed}>
+            <RequesterTrackingMap order={order} />
+          </View>
+        ) : null}
 
         <Card style={styles.card}>
           <Text variant="subtitle">Order Summary</Text>
@@ -711,46 +700,27 @@ export default function OrderDetailScreen() {
 
         {showCancel ? (
           <Card style={styles.card}>
-            <Button
-              title={cancelOpen ? 'Hide cancellation' : 'Cancel this request'}
-              variant="tertiary"
-              onPress={() => setCancelOpen((open) => !open)}
-            />
-            {cancelOpen ? (
-              <>
-                {lateCancellable ? (
-                  <Text color="secondary">
-                    The kitchen may already be working on your food. Cancelling now sends
-                    the order for review — you carry no food-cost debt.
-                  </Text>
-                ) : (
-                  <Text color="secondary">
-                    Free cancellation while the kitchen has not committed. A completed
-                    online payment is recorded as refunded (simulated).
-                  </Text>
-                )}
-                {cancelError ? (
-                  <ErrorState title="Could not cancel" message={cancelError} retryTitle="Dismiss" onRetry={() => setCancelError(null)} />
-                ) : null}
-                <TextInput
-                  value={reason}
-                  onChangeText={setReason}
-                  placeholder="Reason for cancelling"
-                  placeholderTextColor={colors.muted}
-                  maxLength={500}
-                  editable={!cancelling}
-                  style={styles.reasonInput}
-                  accessibilityLabel="Cancellation reason"
-                />
-                <Button
-                  title={cancelling ? 'Cancelling…' : 'Cancel request'}
-                  variant="danger"
-                  onPress={() => void handleCancel()}
-                  disabled={cancelling || reason.trim().length === 0}
-                  loading={cancelling}
-                />
-              </>
+            {lateCancellable ? (
+              <Text color="secondary">
+                The kitchen may already be working on your food. Cancelling now sends
+                the order for review — you carry no food-cost debt.
+              </Text>
+            ) : (
+              <Text color="secondary">
+                Free cancellation while the kitchen has not committed. A completed
+                online payment is recorded as refunded (simulated).
+              </Text>
+            )}
+            {cancelError ? (
+              <ErrorState title="Could not cancel" message={cancelError} retryTitle="Dismiss" onRetry={() => setCancelError(null)} />
             ) : null}
+            <SlideToConfirm
+              tone="filled"
+              label="Slide to cancel"
+              busyLabel="Cancelling…"
+              busy={cancelling}
+              onConfirm={() => void handleCancel()}
+            />
           </Card>
         ) : null}
 
@@ -801,7 +771,7 @@ export default function OrderDetailScreen() {
             </View>
           </>
         ) : null}
-      </Screen>
+      </RedScreen>
 
       <Modal visible={menuOpen} transparent animationType="none" onRequestClose={() => setMenuOpen(false)}>
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.menuBackdropWrap}>
@@ -835,17 +805,13 @@ export default function OrderDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  headerText: { flex: 1, gap: spacing.xs },
   statusBlock: { gap: spacing.xs },
-  // Bordered, explicitly shadow-free card surface for detail sections.
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    borderRadius: radii.md,
-    padding: spacing.lg,
-  },
+  // Tracking gets the sheet's whole width, like the helper maps.
+  mapBleed: { marginHorizontal: -spacing.xl },
+  // Flat sections, main-screen language: whitespace and typography separate
+  // content, never bordered boxes. Shared sub-sections (payment, rating)
+  // own their own chrome.
+  card: { gap: spacing.md },
   menuButton: {
     width: 44,
     height: 44,
@@ -877,6 +843,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
+  reportForm: { gap: spacing.md },
   reasonInput: {
     borderWidth: 1.5,
     borderColor: colors.primary,
@@ -887,7 +854,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.surface,
   },
-  reportForm: { gap: spacing.md },
   actionRow: { flexDirection: 'row', gap: spacing.sm },
   actionFill: { flex: 1 },
 });

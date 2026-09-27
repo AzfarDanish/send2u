@@ -434,10 +434,13 @@ money detail only inside the transaction record. Job rows stay lean
 (vendor, items summary, location, date, fee); full order information
 belongs on Job Detail. **Acceptance happens on the Job Detail page**
 via the §11 confirmation interaction, so the queue row itself is never
-the claim control. The decision view follows hero (vendor mark, name,
-context) → "Pick up from" → "Deliver to" (each a Maps-opening row with
-a plain arrow affordance) → "Order (N items)" full item lines →
-factual "Delivery fee" row → filled "Slide to accept".
+the claim control. The decision view follows full-width two-point overview
+map (pickup + drop-off pins with the driving leg, in-app — never an external
+Maps jump) → hero (vendor mark, name, context) → "Pick up from" →
+"Deliver to" (plain info blocks, not links) → "Order (N items)" full item
+lines → factual "Delivery fee" row → filled "Slide to accept". Workspace
+stages keep the same full-width live map on top; their "Navigate" chips are
+gone with the handoff.
 
 **Current deltas (resolved 2026-09-16 except where noted).** Portal
 bottom nav (Jobs/Deliveries/Profile, no portal sign-out) is implemented;

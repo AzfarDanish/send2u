@@ -10,7 +10,8 @@
  * - `osrm`     — route lookup (geometry, distance, duration)
  * - `mapHtml`  — the in-app map document (Leaflet over OSM raster tiles)
  * - `external` — the pre-existing "open this label in the phone's maps app"
- *                handoff, kept because helpers still use it for turn-by-turn
+ *                handoff, kept for the history detail (the one screen that
+ *                still jumps out); the job screen shows both points in-app.
  *
  * The in-app map and the external handoff were never meant to be two systems:
  * `external.ts` used to sit at `lib/maps.ts`, which cannot coexist with this
@@ -24,7 +25,10 @@ export {
   FOLLOW_PADDING_PX,
   FOLLOW_ZOOM,
   MAP_USER_AGENT,
-  MARKER_DROPOFF_COLOR,
+  MAPTILER_ATTRIBUTION,
+  MAPTILER_MAX_ZOOM,
+  MAPTILER_STYLE_ID,
+  MAPTILER_TILE_URL,
   MARKER_HELPER_COLOR,
   MARKER_VENDOR_COLOR,
   OSM_ATTRIBUTION,

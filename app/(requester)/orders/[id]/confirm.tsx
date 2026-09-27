@@ -2,9 +2,10 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { goBackOr } from '@/lib/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
+import { DockedActionBar } from '@/components/ui/DockedActionBar';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -159,7 +160,11 @@ export default function OrderConfirmScreen() {
   return (
     <>
       <GlassHeader title="Confirm Delivery" />
-      <Screen beneathHeader>
+      <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}>
         {status === 'loading' || !order ? (
           status === 'loading' ? (
             <SkeletonDetail label="Loading request" />
@@ -258,6 +263,9 @@ export default function OrderConfirmScreen() {
               <Text color="secondary" style={styles.centered}>
                 Please confirm only when you have received your food in good condition.
               </Text>
+              <Text variant="caption" color="muted" style={styles.centered}>
+                Confirming is optional and never blocks your order.
+              </Text>
             </View>
 
             <Text variant="subtitle">Order Summary</Text>
@@ -320,12 +328,6 @@ export default function OrderConfirmScreen() {
               />
             ) : null}
             <Button
-              title={confirming ? 'Confirming…' : 'Confirm Delivery'}
-              onPress={() => void handleConfirm()}
-              disabled={confirming || refreshing}
-              loading={confirming}
-            />
-            <Button
               title="Not Yet, Still Waiting"
               variant="secondary"
               disabled={confirming}
@@ -339,12 +341,36 @@ export default function OrderConfirmScreen() {
             />
           </>
         )}
+        </ScrollView>
+        {/* Fixed bottom sheet: Confirm stays docked while the checklist
+            scrolls. "Not yet" stays inline — it is the escape hatch, not
+            the action. */}
+        {order && !confirmed && !pastDelivery && order.status === 'delivered' ? (
+          <DockedActionBar>
+            <Button
+              title={confirming ? 'Confirming…' : 'Confirm Delivery'}
+              onPress={() => void handleConfirm()}
+              disabled={confirming || refreshing}
+              loading={confirming}
+            />
+          </DockedActionBar>
+        ) : null}
       </Screen>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  // Shell drops the scroll container's own padding: the inner scroll view
+  // owns horizontal rhythm and the docked bar owns the bottom edge.
+  shell: { flex: 1, paddingHorizontal: 0, paddingBottom: 0, gap: 0 },
+  scroll: { flex: 1 },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: spacing.lg,
+  },
   hero: { alignItems: 'center', gap: spacing.sm, paddingTop: spacing.md },
   heroCircle: {
     width: 96,

@@ -280,7 +280,10 @@ interface VendorOrderRow {
   id: string;
   requester_id: string;
   vendor_id: string;
-  delivery_location_id: string;
+  delivery_location_id: string | null;
+  saved_location_id: string | null;
+  delivery_instruction: string | null;
+  leave_at_door: boolean | null;
   status: string;
   subtotal_cents: number;
   delivery_fee_cents: number;
@@ -291,23 +294,44 @@ interface VendorOrderRow {
   accepted_at: string | null;
   created_at: string;
   updated_at: string;
-  delivery_location: { id: string; name: string; description: string | null; lat: number | null; lng: number | null } | null;
+  saved_location: { id: string; label: string; sub_details: string | null; location_type: string; lat: number | null; lng: number | null } | null;
   send2u_order_items: VendorOrderItemRow[] | null;
 }
 
 const VENDOR_ORDER_SELECT =
-  'id, requester_id, vendor_id, delivery_location_id, status, subtotal_cents, delivery_fee_cents,' +
+  'id, requester_id, vendor_id, delivery_location_id, saved_location_id, delivery_instruction, leave_at_door, status, subtotal_cents, delivery_fee_cents,' +
   ' payment_method, payment_status, settlement_status, helper_id, accepted_at, created_at, updated_at,' +
-  ' delivery_location:send2u_delivery_locations!inner(id, name, description, lat, lng),' +
+  ' saved_location:send2u_saved_delivery_locations!left(id, label, sub_details, lat, lng),' +
   ' send2u_order_items(id, order_id, menu_item_id, item_name, unit_price_cents, quantity, line_total_cents, created_at)';
 
 function toVendorOrderWithDetails(row: VendorOrderRow): OrderWithDetails {
-  if (!row.delivery_location) throw new Error('Order references data that is no longer visible.');
+  // Same synthesis as the requester mapper: the saved row is the only source.
+  // The shared delivery-points table is gone, so a missing saved row falls back
+  // to the order's own instruction rather than failing the whole list.
+  const instruction = row.delivery_instruction?.trim() || null;
+  const location = row.saved_location
+    ? {
+        id: row.saved_location.id,
+        name: row.saved_location.label,
+        description: row.saved_location.sub_details,
+        lat: row.saved_location.lat,
+        lng: row.saved_location.lng,
+      }
+    : {
+        id: row.saved_location_id ?? row.id,
+        name: instruction ?? 'Delivery point removed',
+        description: instruction ? 'Saved location removed' : null,
+        lat: null,
+        lng: null,
+      };
   return {
     id: row.id,
     requesterId: row.requester_id,
     vendorId: row.vendor_id,
     deliveryLocationId: row.delivery_location_id,
+    savedLocationId: row.saved_location_id,
+    deliveryInstruction: row.delivery_instruction,
+    leaveAtDoor: row.leave_at_door ?? false,
     status: row.status as OrderWithDetails['status'],
     subtotalCents: row.subtotal_cents,
     deliveryFeeCents: row.delivery_fee_cents,
@@ -349,11 +373,11 @@ function toVendorOrderWithDetails(row: VendorOrderRow): OrderWithDetails {
     // make every order disappear if the stall were ever hidden from requesters.
     vendor: { id: row.vendor_id, name: '', locationHint: null, pickupLat: null, pickupLng: null },
     location: {
-      id: row.delivery_location.id,
-      name: row.delivery_location.name,
-      description: row.delivery_location.description,
-      lat: row.delivery_location.lat,
-      lng: row.delivery_location.lng,
+      id: location.id,
+      name: location.name,
+      description: location.description,
+      lat: location.lat,
+      lng: location.lng,
     },
     items: (row.send2u_order_items ?? []).map((item) => ({
       id: item.id,

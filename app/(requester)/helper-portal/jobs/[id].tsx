@@ -2,16 +2,19 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassHeader } from '@/components/GlassHeader';
+import { FloatingBackButton } from '@/components/FloatingBackButton';
+import { HeaderBack } from '@/components/HeaderBack';
 import { HeaderBell } from '@/components/HeaderBell';
 import { HelperHistoryDetail } from '@/components/HelperHistoryDetail';
 import { HelperPortalGuard } from '@/components/HelperPortalGuard';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
 import { VendorMark } from '@/components/VendorMark';
 import { HelperDeliveryMap } from '@/components/map/HelperDeliveryMap';
+import { JobOverviewMap } from '@/components/map/JobOverviewMap';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { Screen } from '@/components/ui/Screen';
@@ -20,7 +23,6 @@ import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useMyDeliveries } from '@/hooks/useMyDeliveries';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
-import { openMapsLocation } from '@/lib/maps';
 import { formatMYR } from '@/lib/money';
 import { emitOrderChanged } from '@/lib/orderEvents';
 import { isTerminalOrderStatus, MAX_ACTIVE_JOBS_PER_HELPER, orderTotalCents } from '@/lib/orders';
@@ -93,26 +95,20 @@ function StageProgress({ step }: { step: number }) {
   );
 }
 
-/** Location block with a compact external-Maps chip (whole chip opens Maps). */
+/** Location block: the in-app map above shows where; this names the place. */
 function StageWayBlock({
   icon,
   heading,
   title,
   detail,
-  mapsLabel,
-  onOpen,
-  mapsDisabled,
 }: {
   icon: 'storefront' | 'place';
   heading: string;
   title: string;
   detail?: string | null;
-  mapsLabel: string;
-  onOpen: (label: string) => void;
-  mapsDisabled: boolean;
 }) {
   return (
-    <Card style={styles.card}>
+    <View style={styles.section}>
       <View style={styles.sectionHead}>
         <MaterialIcons name={icon} size={20} color={colors.primary} />
         <Text variant="subtitle">{heading}</Text>
@@ -128,26 +124,15 @@ function StageWayBlock({
             </Text>
           ) : null}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Open in Maps: ${mapsLabel}`}
-          onPress={() => onOpen(mapsLabel)}
-          disabled={mapsDisabled}
-          style={({ pressed }) => [styles.navChip, pressed && styles.pressed]}>
-          <MaterialIcons name="navigation" size={20} color={colors.primary} />
-          <Text variant="caption" style={styles.navLabel}>
-            Navigate
-          </Text>
-        </Pressable>
       </View>
-    </Card>
+    </View>
   );
 }
 
 /** Compact order preview: small visuals, item lines, optional fee line. */
 function StageOrderPreview({ job, showFee }: { job: OrderWithDetails; showFee?: boolean }) {
   return (
-    <Card style={styles.card}>
+    <View style={styles.section}>
       <View style={styles.sectionHead}>
         <MaterialIcons name="receipt-long" size={20} color={colors.primary} />
         <Text variant="subtitle">Order items</Text>
@@ -176,7 +161,7 @@ function StageOrderPreview({ job, showFee }: { job: OrderWithDetails; showFee?: 
           </Text>
         </View>
       ) : null}
-    </Card>
+    </View>
   );
 }
 
@@ -198,20 +183,10 @@ function StageDots({ step, label }: { step: number; label: string }) {
   );
 }
 
-/** Shared drop-off block for the deliver/confirm stages: name, description, Maps chip. */
-function WorkspaceDeliverTo({
-  job,
-  mapsLabel,
-  onOpen,
-  mapsDisabled,
-}: {
-  job: OrderWithDetails;
-  mapsLabel: string;
-  onOpen: (label: string) => void;
-  mapsDisabled: boolean;
-}) {
+/** Shared drop-off block for the deliver/confirm stages: name, description. */
+function WorkspaceDeliverTo({ job }: { job: OrderWithDetails }) {
   return (
-    <Card style={styles.card}>
+    <View style={styles.section}>
       <Text variant="subtitle">Deliver to</Text>
       <View style={styles.feeRow}>
         <View style={styles.itemText}>
@@ -224,26 +199,15 @@ function WorkspaceDeliverTo({
             </Text>
           ) : null}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Open in Maps: ${mapsLabel}`}
-          onPress={() => onOpen(mapsLabel)}
-          disabled={mapsDisabled}
-          style={({ pressed }) => [styles.navChip, pressed && styles.pressed]}>
-          <MaterialIcons name="navigation" size={20} color={colors.primary} />
-          <Text variant="caption" style={styles.navLabel}>
-            Navigate
-          </Text>
-        </Pressable>
       </View>
-    </Card>
+    </View>
   );
 }
 
 /** Shared order-items block for the collect/deliver stages: 44pt thumbs, no heroes, no icons. */
 function WorkspaceOrderItems({ job }: { job: OrderWithDetails }) {
   return (
-    <Card style={styles.card}>
+    <View style={styles.section}>
       <Text variant="subtitle">Order items</Text>
       {job.items.map((item) => (
         <View key={item.id} style={styles.itemRow}>
@@ -261,7 +225,7 @@ function WorkspaceOrderItems({ job }: { job: OrderWithDetails }) {
           </Text>
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 
@@ -300,8 +264,7 @@ function ExceptionConfirm({
 function CompletionResult({ job, staysForCash }: { job: OrderWithDetails; staysForCash?: boolean }) {
   const itemCount = job.items.reduce((sum, item) => sum + item.quantity, 0);
   return (
-    <Card style={[styles.card, styles.doneCard]}>
-      <View accessibilityRole="image" accessibilityLabel="Delivery completed" style={styles.doneEmblem}>
+    <View style={styles.doneSection}>      <View accessibilityRole="image" accessibilityLabel="Delivery completed" style={styles.doneEmblem}>
         <MaterialIcons name="check" size={36} color={colors.success} />
       </View>
       <Text variant="title" style={styles.doneCenter}>
@@ -316,7 +279,7 @@ function CompletionResult({ job, staysForCash }: { job: OrderWithDetails; staysF
       <Text variant="caption" color="muted" style={styles.doneCenter}>
         {staysForCash ? 'Confirm the cash collection below.' : 'Returning to your deliveries…'}
       </Text>
-    </Card>
+    </View>
   );
 }
 
@@ -340,10 +303,13 @@ export default function PortalJobDetailScreen() {
   const [paymentTick, setPaymentTick] = useState(0);
   const [acting, setActing] = useState<FulfilmentAction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [mapsBusy, setMapsBusy] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [cashingOut, setCashingOut] = useState(false);
   const [confirmKind, setConfirmKind] = useState<null | 'unavailable' | 'abandon'>(null);
+  // Outer scroll freezes while a finger is on the decision map: map touches
+  // pan the map, and scrolling only ever starts outside it.
+  const [mapTouching, setMapTouching] = useState(false);
+  const insets = useSafeAreaInsets();
   const mountedRef = useRef(true);
   // Active-delivery count gates acceptance at the 3-job capacity (the
   // server enforces the same cap race-safely; this only shapes the UI).
@@ -538,16 +504,6 @@ export default function PortalJobDetailScreen() {
     }
   }, [job, collecting, reload]);
 
-  const openMaps = useCallback(async (label: string) => {
-    if (mapsBusy) return;
-    setMapsBusy(true);
-    try {
-      await openMapsLocation(label);
-    } finally {
-      setMapsBusy(false);
-    }
-  }, [mapsBusy]);
-
   /**
    * COD cash collection: records the customer handover as a platform
    * transaction event. Amount comes from the database — the helper only
@@ -617,8 +573,6 @@ export default function PortalJobDetailScreen() {
   }
 
   const busy = acting !== null;
-  const pickupLabel = job.vendor.locationHint ?? job.vendor.name;
-  const dropoffLabel = job.location.name;
 
   // Decision mode: an open job under review (pending, or already prepared
   // by the cafeteria awaiting a collector). Visual → route → order →
@@ -627,28 +581,27 @@ export default function PortalJobDetailScreen() {
   if (!accepted && !job.helperId &&
     (job.status === 'pending' || job.status === 'preparing' || job.status === 'ready_for_pickup')) {
     return (
-      <HelperPortalGuard title="Job Details">
-        <GlassHeader title="Job Details" fallbackHref="/(requester)" />
-        <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollBody}
-            showsVerticalScrollIndicator={false}>
-            <View>
-              <Text variant="title" numberOfLines={2}>
-                {job.vendor.name}
-              </Text>
-            </View>
+    <HelperPortalGuard title="Job Details">
+      <Screen beneathHeader scrollable={false} contentStyle={[styles.shell, styles.edgeTop]}>
+        <View style={[styles.backFloat, { top: insets.top + spacing.sm }]}>
+          <HeaderBack fallbackHref="/(requester)" accessibilityLabel="Back to jobs" />
+        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollBody}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!mapTouching}>
+          <View
+            onTouchStart={() => setMapTouching(true)}
+            onTouchEnd={() => setMapTouching(false)}
+            onTouchCancel={() => setMapTouching(false)}>
+            <JobOverviewMap order={job} />
+          </View>
 
-            <WorkspaceOrderItems job={job} />
+          <WorkspaceOrderItems job={job} />
 
-            <Card style={styles.card}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open pickup location in Maps: ${pickupLabel}`}
-                onPress={() => void openMaps(pickupLabel)}
-                disabled={mapsBusy}
-                style={({ pressed }) => [styles.locBlock, pressed && styles.pressed]}>
+            <View style={styles.section}>
+              <View style={styles.locBlock} accessibilityRole="summary">
                 <View style={styles.locText}>
                   <Text variant="caption" color="secondary">
                     Pick up from
@@ -662,16 +615,11 @@ export default function PortalJobDetailScreen() {
                     </Text>
                   ) : null}
                 </View>
-              </Pressable>
-            </Card>
+              </View>
+            </View>
 
-            <Card style={styles.card}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open delivery location in Maps: ${dropoffLabel}`}
-                onPress={() => void openMaps(dropoffLabel)}
-                disabled={mapsBusy}
-                style={({ pressed }) => [styles.locBlock, pressed && styles.pressed]}>
+            <View style={styles.section}>
+              <View style={styles.locBlock} accessibilityRole="summary">
                 <View style={styles.locText}>
                   <Text variant="caption" color="secondary">
                     Deliver to
@@ -685,10 +633,10 @@ export default function PortalJobDetailScreen() {
                     </Text>
                   ) : null}
                 </View>
-              </Pressable>
-            </Card>
+              </View>
+            </View>
 
-            <Card style={styles.card}>
+            <View style={styles.section}>
               <View style={styles.moneyRow}>
                 <Text color="secondary">Your delivery fee</Text>
                 <Text variant="price" style={styles.feeEarn}>
@@ -704,7 +652,7 @@ export default function PortalJobDetailScreen() {
                   ? `Cash on delivery — collect ${formatMYR(orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} from the customer.`
                   : 'Online payment — the food is covered by Send2U. Just collect and deliver.'}
               </Text>
-            </Card>
+            </View>
           </ScrollView>
           <View style={styles.footer}>
             {acceptError ? (
@@ -808,9 +756,6 @@ export default function PortalJobDetailScreen() {
           heading="Pick up from"
           title={job.vendor.name}
           detail={job.vendor.locationHint}
-          mapsLabel={pickupLabel}
-          onOpen={(label) => void openMaps(label)}
-          mapsDisabled={mapsBusy}
         />
         <StageOrderPreview job={job} showFee />
       </>
@@ -846,7 +791,7 @@ export default function PortalJobDetailScreen() {
           </Text>
         </View>
         <WorkspaceOrderItems job={job} />
-        <Card style={styles.card}>
+        <View style={styles.section}>
           <View style={styles.moneyRow}>
             <Text color="secondary">Food total (covered by Send2U)</Text>
             <Text variant="price">{formatMYR(foodCents)}</Text>
@@ -868,7 +813,7 @@ export default function PortalJobDetailScreen() {
               collect and deliver — your earning is the delivery fee above.
             </Text>
           )}
-        </Card>
+        </View>
       </>
     );
     foot = confirmKind ? (
@@ -901,14 +846,9 @@ export default function PortalJobDetailScreen() {
           <Text variant="title">Deliver to requester</Text>
           <Text color="secondary">Head to the drop-off location.</Text>
         </View>
-        <WorkspaceDeliverTo
-          job={job}
-          mapsLabel={dropoffLabel}
-          onOpen={(label) => void openMaps(label)}
-          mapsDisabled={mapsBusy}
-        />
+        <WorkspaceDeliverTo job={job} />
         <WorkspaceOrderItems job={job} />
-        <Card style={styles.card}>
+        <View style={styles.section}>
           <View style={styles.moneyRow}>
             <Text color="secondary">Your delivery fee</Text>
             <Text variant="price" style={styles.feeEarn}>
@@ -921,7 +861,7 @@ export default function PortalJobDetailScreen() {
               cash from the customer on handover.
             </Text>
           ) : null}
-        </Card>
+        </View>
       </>
     );
     foot = (
@@ -944,14 +884,9 @@ export default function PortalJobDetailScreen() {
           <Text variant="title">Confirm delivery</Text>
           <Text color="secondary">Hand the food to the requester.</Text>
         </View>
-        <WorkspaceDeliverTo
-          job={job}
-          mapsLabel={dropoffLabel}
-          onOpen={(label) => void openMaps(label)}
-          mapsDisabled={mapsBusy}
-        />
+        <WorkspaceDeliverTo job={job} />
         <WorkspaceOrderItems job={job} />
-        <Card style={styles.card}>
+        <View style={styles.section}>
           <View style={styles.moneyRow}>
             <Text color="secondary">Your delivery fee</Text>
             <Text variant="price" style={styles.feeEarn}>
@@ -964,7 +899,7 @@ export default function PortalJobDetailScreen() {
               cash from the customer, then confirm the collection.
             </Text>
           ) : null}
-        </Card>
+        </View>
       </>
     );
     foot = (
@@ -989,7 +924,7 @@ export default function PortalJobDetailScreen() {
       <>
         <CompletionResult job={job} staysForCash={codDue} />
         {codDue ? (
-          <Card style={styles.card}>
+          <View style={styles.section}>
             <Text variant="subtitle">
               Cash due: {formatMYR(job.codExpectedCents ?? orderTotalCents(job.subtotalCents, job.deliveryFeeCents))}
             </Text>
@@ -1011,14 +946,14 @@ export default function PortalJobDetailScreen() {
               disabled={cashingOut}
               loading={cashingOut}
             />
-          </Card>
+          </View>
         ) : codDone ? (
-          <Card style={styles.card}>
+          <View style={styles.section}>
             <Text color="secondary">
               Cash of {formatMYR(job.codCollectedCents ?? orderTotalCents(job.subtotalCents, job.deliveryFeeCents))} collected
               and recorded.
             </Text>
-          </Card>
+          </View>
         ) : null}
       </>
     );
@@ -1029,31 +964,42 @@ export default function PortalJobDetailScreen() {
         This job is no longer open.
       </Text>
     );
-    foot = (
-      <Button
-        title="Back to portal"
-        variant="secondary"
-        onPress={() => {
-          if (router.canGoBack()) router.back();
-          else router.replace('/(requester)/helper-portal');
-        }}
-      />
-    );
+      foot = (
+        <Button
+          title="Back to portal"
+          variant="secondary"
+          onPress={() => router.replace('/(requester)/helper-portal')}
+        />
+      );
   }
 
   return (
     <HelperPortalGuard title="Delivery">
-      <GlassHeader
-        title="Delivery"
-        fallbackHref="/(requester)"
-        hideBack={stage === 'go' || stage === 'collect' || stage === 'deliver' || stage === 'confirm'}
-        right={
-          stage === 'go' || stage === 'collect' || stage === 'deliver' || stage === 'confirm' ? undefined : (
-            <HeaderBell />
-          )
-        }
-      />
-      <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
+      {/* Map-led stages go fully headerless (no back affordance there today,
+          so none appears); done/closed keep the chrome they already had. */}
+      {showMap ? null : (
+        <GlassHeader
+          title="Delivery"
+          fallbackHref="/(requester)/helper-portal"
+          forceFallback
+          right={<HeaderBell />}
+        />
+      )}
+      <Screen
+        beneathHeader
+        scrollable={false}
+        contentStyle={showMap ? [styles.shell, styles.edgeTop] : styles.shell}>
+        {/* Every map-led stage owns its back button: always a replace to
+            the Jobs list, never a walk back through the stage history. */}
+        {showMap ? (
+          <View style={[styles.backFloat, { top: insets.top + spacing.sm }]}>
+            <FloatingBackButton
+              fallbackHref="/(requester)/helper-portal"
+              replace
+              accessibilityLabel="Back to jobs"
+            />
+          </View>
+        ) : null}
         {showMap ? <HelperDeliveryMap order={job} /> : null}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
           {body}
@@ -1066,15 +1012,29 @@ export default function PortalJobDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Bordered, explicitly shadow-free card surface for detail/workspace blocks.
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    borderRadius: radii.md,
-    padding: spacing.lg,
-  },
+  // Flat sections, main-screen language: whitespace and typography separate
+  // content, never bordered boxes.
+  section: { gap: spacing.md },
   shell: { paddingBottom: spacing.md },
+  // Headerless map stages: content starts at the window top so the map
+  // bleeds edge to edge, width and top.
+  edgeTop: { paddingTop: 0 },
+  // Floating back: a 44pt disc over the map's top-left corner, clear of the
+  // status bar via the top offset at the call site.
+  backFloat: {
+    position: 'absolute',
+    left: spacing.md,
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 4,
+  },
   scroll: { flex: 1 },
   scrollBody: { gap: spacing.lg, paddingBottom: spacing.md },
   footer: {
@@ -1087,17 +1047,6 @@ const styles = StyleSheet.create({
   progressSeg: { flex: 1, height: 4, borderRadius: 999 },
   progressSegFilled: { backgroundColor: colors.primary },
   progressSegEmpty: { backgroundColor: colors.border },
-  navChip: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    minWidth: 64,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  navLabel: { color: colors.primary },
   feeEarn: { fontWeight: '700', color: colors.success },
   dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 999 },
@@ -1114,7 +1063,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   confirmPanel: { gap: spacing.sm },
-  doneCard: { alignItems: 'center' },
+  doneSection: { alignItems: 'center', gap: spacing.sm },
   doneEmblem: {
     width: 76,
     height: 76,

@@ -1,13 +1,12 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonBlock, SkeletonKeyValueRows } from '@/components/ui/LoadingBlocks';
 import { Text } from '@/components/ui/Text';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useTransaction } from '@/hooks/useTransaction';
 import { formatMYR } from '@/lib/money';
 import { paymentMethodLabel, paymentStatusLabel } from '@/lib/orders';
@@ -29,13 +28,14 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
   const { context, status, error, reloading, retry } = useTransaction(orderId, refreshToken);
 
   if (status === 'loading') {
-    // Same bordered card as the loaded state (method, status, breakdown rows),
-    // so the payment section never collapses to a spinner and re-expands.
+    // Same flat section as the loaded state (method, status, breakdown
+    // rows), so the payment section never collapses to a spinner and
+    // re-expands.
     return (
-      <Card style={styles.card}>
+      <View style={styles.section}>
         <SkeletonBlock lines={2} label="Loading payment" />
         <SkeletonKeyValueRows rows={3} />
-      </Card>
+      </View>
     );
   }
   if (status === 'error' || !context) {
@@ -60,7 +60,7 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
       context.paymentStatus === 'unpaid');
 
   return (
-    <Card style={styles.card}>
+    <View style={styles.section}>
       <Text variant="subtitle">{paymentMethodLabel(context.paymentMethod)}</Text>
       {reloading ? (
         <ActivityIndicator
@@ -114,17 +114,11 @@ export function RequesterPaymentCard({ orderId, refreshToken = 0 }: RequesterPay
           helper when your food arrives. Nothing is due now.
         </Text>
       )}
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Bordered, explicitly shadow-free card surface.
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    borderRadius: radii.md,
-    padding: spacing.lg,
-  },
+  // Flat section, main-screen language: whitespace separates content.
+  section: { gap: spacing.sm },
 });

@@ -53,10 +53,26 @@ export interface DeliveryMapProps {
    * to 0, which leaves every existing screen exactly where it is.
    */
   locateBottomInset?: number;
+  /**
+   * In-map control stack (zoom in, zoom out, recenter): round buttons
+   * floating inside the map's own bottom-right corner, so map functions
+   * live where the map is instead of in rows beneath it. Off by default;
+   * helper maps opt in. The recenter button appears only with `onRecenter`.
+   */
+  controls?: boolean;
+  /** Screen-specific recenter (refit, relocate): what the recenter button runs. */
+  onRecenter?: () => void;
   onEvent?: (event: MapEvent) => void;
   style?: StyleProp<ViewStyle>;
   /** Hide the built-in state overlay when the screen renders its own. */
   hideInternalState?: boolean;
+  /**
+   * Full-bleed map surface: square corners (no internal border radius) so the
+   * map runs edge to edge and is clipped by its screen, not by its own frame.
+   * Screens that let the map own the whole viewport (the pin-placement screens)
+   * set this; inline tracking blocks keep the default rounded frame.
+   */
+  edgeToEdge?: boolean;
 }
 
 /**
@@ -83,9 +99,12 @@ function DeliveryMapImpl({
   pickMode = false,
   locateControl = false,
   locateBottomInset = 0,
+  controls = false,
+  onRecenter,
   onEvent,
   style,
   hideInternalState = false,
+  edgeToEdge = false,
 }: DeliveryMapProps) {
   const webRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
@@ -286,7 +305,7 @@ function DeliveryMapImpl({
   const unavailable = failed !== null;
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, edgeToEdge && styles.edgeToEdge, style]}>
       <WebView
         ref={webRef}
         source={source}
@@ -344,6 +363,34 @@ function DeliveryMapImpl({
         </View>
       ) : null}
 
+      {controls ? (
+        <View style={styles.controls} pointerEvents="box-none">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Zoom in"
+            onPress={() => send({ type: 'zoomIn' })}
+            style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}>
+            <MaterialIcons name="add" size={22} color={colors.text} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Zoom out"
+            onPress={() => send({ type: 'zoomOut' })}
+            style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}>
+            <MaterialIcons name="remove" size={22} color={colors.text} />
+          </Pressable>
+          {onRecenter ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Recentre on the delivery locations"
+              onPress={onRecenter}
+              style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}>
+              <MaterialIcons name="center-focus-strong" size={22} color={colors.text} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       {!ready && !unavailable && !hideInternalState ? (
         <View style={styles.overlay} pointerEvents="none">
           <ActivityIndicator color={colors.primary} />
@@ -361,7 +408,7 @@ function DeliveryMapImpl({
           <Text variant="caption" color="muted" style={styles.stateText}>
             {failed === 'library'
               ? 'The map library did not load. Check the connection and try again.'
-              : 'OpenStreetMap tiles did not load. Check the connection and try again.'}
+              : 'The map layers did not load. Check the connection and try again.'}
           </Text>
         </View>
       ) : null}
@@ -381,6 +428,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.surfaceSecondary,
     borderRadius: radii.lg,
+  },
+  edgeToEdge: {
+    // Full-bleed: the map owns the whole viewport and its screen does the
+    // clipping, so the frame itself contributes no radius.
+    borderRadius: 0,
   },
   web: { flex: 1, backgroundColor: colors.surfaceSecondary },
   // The locate control sits bottom-left, away from the map's own attribution in
@@ -410,6 +462,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   locatePressed: { opacity: 0.7 },
+  // In-map control stack: bottom-right, above the attribution, clear of the
+  // bottom-left locate control. Round white buttons, one per map function.
+  controls: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.xxxl,
+    gap: spacing.sm,
+  },
+  controlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlPressed: { opacity: 0.7 },
   overlay: {
     position: 'absolute',
     top: 0,

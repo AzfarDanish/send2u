@@ -64,6 +64,9 @@ export type MapCommand =
   | { type: 'follow'; enabled: boolean }
   /** Jump straight to one point at a given zoom, with no animation. */
   | { type: 'centerOn'; coordinate: LatLng; zoom: number }
+  /** Step the zoom one level in or out (in-map zoom buttons). */
+  | { type: 'zoomIn' }
+  | { type: 'zoomOut' }
   /** Pin placement mode: a map tap reports the tapped coordinate. */
   | { type: 'pickMode'; enabled: boolean };
 
@@ -84,7 +87,13 @@ export type MapEvent =
    */
   | { type: 'center-changed'; coordinate: LatLng }
   /** The user dragged or pinched: the camera must stop being driven for them. */
-  | { type: 'manual-pan' };
+  | { type: 'manual-pan' }
+  /**
+   * The map document swapped its own base layer (MapTiler primary failed and
+   * the OSM standby took over). Informational: attribution already follows
+   * the visible layer, and `tiles-failed` still means nothing is drawable.
+   */
+  | { type: 'base-fallback'; from: string; to: string };
 
 /**
  * Helper GPS permission surface. `services-off` and `unavailable` are separate

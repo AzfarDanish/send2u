@@ -1,16 +1,16 @@
 import { goBackOr } from '@/lib/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GlassHeader } from '@/components/GlassHeader';
+import { FloatingBackButton } from '@/components/FloatingBackButton';
 import { DeliveryMap } from '@/components/map/DeliveryMap';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
-import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { useMyVendor } from '@/hooks/useMyVendor';
 import type { LatLng, MapEvent, MapPoint } from '@/lib/maps/types';
 import { setMyPickupPin } from '@/services/vendor';
@@ -115,21 +115,31 @@ export default function PickupPinScreen() {
   }, [draft, saving]);
 
   const noStall = error?.includes('No stall is linked') ?? false;
+  const insets = useSafeAreaInsets();
 
   return (
-    <>
-      <GlassHeader title="Pickup pin" fallbackHref="/(vendor)" />
-      <Screen beneathHeader scrollable={false} contentStyle={styles.content}>
-        <DeliveryMap
-          points={points}
-          route={null}
-          fitToken={fitToken}
-          pickMode={picking}
-          locateControl
-          onEvent={handleMapEvent}
-          style={styles.map}
-        />
+    <View style={styles.root}>
+      {/* Full-bleed map: the map owns the whole viewport, edge to edge behind
+          the status bar, with the back control and the status/actions layered
+          on top of it. */}
+      <DeliveryMap
+        points={points}
+        route={null}
+        fitToken={fitToken}
+        pickMode={picking}
+        locateControl
+        onEvent={handleMapEvent}
+        edgeToEdge
+        style={StyleSheet.absoluteFill}
+      />
 
+      {/* Floating back chevron, over the map, clear of the status bar. */}
+      <View style={[styles.backLayer, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
+        <FloatingBackButton fallbackHref="/(vendor)" accessibilityLabel="Back to the map" />
+      </View>
+
+      {/* States and guidance sit in a bottom panel so the map stays the surface. */}
+      <View style={[styles.statusPanel, { paddingBottom: Math.max(insets.bottom, 8) }]}>
         <View style={styles.footer}>
           {status === 'loading' ? (
             <SkeletonList rows={1} lines={2} thumb={0} label="Loading your stall" />
@@ -203,15 +213,30 @@ export default function PickupPinScreen() {
             </>
           ) : null}
         </View>
-      </Screen>
-    </>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // The map is the screen: it runs edge to edge, with only the action row
-  // inset, so nothing competes with the pin being placed.
-  content: { paddingHorizontal: 0, paddingBottom: spacing.lg, gap: spacing.md },
-  map: { flex: 1, borderRadius: 0 },
-  footer: { paddingHorizontal: spacing.xl, gap: spacing.sm },
+  root: { flex: 1, backgroundColor: colors.surfaceSecondary },
+  backLayer: {
+    position: 'absolute',
+    left: spacing.md,
+  },
+  // The status/action area floats over the map's bottom edge in a translucent
+  // panel, so the map stays the surface and the guidance stays readable.
+  statusPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+  },
+  footer: { gap: spacing.sm },
 });

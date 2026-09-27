@@ -15,7 +15,8 @@ import { Platform } from 'react-native';
 
 export type PushRegistration =
   | { status: 'registered'; token: string }
-  | { status: 'unsupported' | 'denied' | 'error' };
+  | { status: 'denied'; canAskAgain: boolean }
+  | { status: 'unsupported' | 'error' };
 
 let foregroundPolicySet = false;
 
@@ -44,17 +45,22 @@ async function ensureAndroidChannel(): Promise<void> {
 /**
  * Requests permission (when needed) and returns an Expo push token, or a
  * non-registered status explaining why there is none. Never throws.
+ * `denied` carries `canAskAgain` so callers can offer a re-ask or fall
+ * back to the OS Settings deep link (a second OS prompt after a deny is
+ * a no-op on iOS).
  */
 export async function registerForPushToken(): Promise<PushRegistration> {
   if (Platform.OS === 'web') return { status: 'unsupported' };
   try {
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    let granted = existing;
-    if (existing !== 'granted') {
-      const { status: asked } = await Notifications.requestPermissionsAsync();
-      granted = asked;
+    const existing = await Notifications.getPermissionsAsync();
+    let status = existing.status;
+    let canAskAgain = existing.canAskAgain ?? false;
+    if (existing.status !== 'granted') {
+      const asked = await Notifications.requestPermissionsAsync();
+      status = asked.status;
+      canAskAgain = asked.canAskAgain ?? false;
     }
-    if (granted !== 'granted') return { status: 'denied' };
+    if (status !== 'granted') return { status: 'denied', canAskAgain };
     await ensureAndroidChannel();
     const projectId = Constants?.expoConfig?.extra?.eas?.projectId;
     const response = projectId

@@ -10,6 +10,56 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-27 — Redesign: purchase path on the RedScreen shell + flat sections
+
+- Change: carts, checkout, set-location, order confirmation, pay-online,
+  confirm-delivery, and past orders converted from GlassHeader + Screen +
+  bordered Cards to the RedScreen shell (red header, white rounded sheet)
+  with flat whitespace/hairline sections. No copy, routing, validation, or
+  RPC logic changed.
+- Reason: the new Home/vendor/detail screens dropped into old chrome
+  mid-flow; the purchase path now reads as one app.
+- Details: RedScreen `titleSize="title"` + white HeaderBack on pushed
+  screens (confirmation keeps force-replace-Home); checkout/pay-online/
+  confirm keep their ScrollView + DockedActionBar inside
+  `scrollable={false}` so docked actions never move; set-location keeps
+  its map box and both snap geometries exactly — only the floating glass
+  header became a FloatingBackButton disc and the suggestion/summary Cards
+  became flat hairline sections; past orders was a shell swap (rows were
+  already flat). Tinted bands (confirmation id/status, pay result emblem)
+  stay — they are surfaces, not bordered boxes.
+- Validation: `tsc` clean, `eslint` clean on touched files, `npm test`
+  51/51, `expo export -p web` pass + headless DOM check on
+  carts/checkout/set-location/confirmation (no error output).
+- Known limitation: needs on-device verification (sheet/dock interplay on
+  small screens, keyboard on set-location/checkout inputs, hero legibility);
+  rate/settings/edit-profile/help/payment-method/report, helper remainder,
+  and vendor group still on old chrome (out of scope).
+
+## 2026-09-27 — Onboarding: post-signup notification + location screens
+
+- Change: fresh requester signups now tap through two permission screens
+  (notifications, then foreground location) before entering the app. New
+  `components/auth/OnboardingPermissions.tsx` in the auth shell with 1-of-2
+  progress; `lib/onboardingPermissions.ts` holds a device-local per-account
+  flag (`pending` recorded at signup, `done` on completion, absent means
+  done so existing accounts and provisioned vendors never see it);
+  `app/index.tsx` renders the flow in place (never pushed — Back can't
+  return to the prompts) for `requester`/`helper` roles only.
+- Reason: both permissions are required product-wise, but the OS can deny
+  without re-prompting — so the gate is tap-through with grant encouraged,
+  never a dead end.
+- Details: grant auto-advances; deny offers re-ask or Open Settings plus an
+  always-available Continue; web skips push as unsupported; location stays
+  foreground/WhenInUse only (no config change). `lib/push.ts` `denied` now
+  carries `canAskAgain` (existing root-hook consumer unaffected — it only
+  narrows on `registered`). No schema, RLS, or route-group changes.
+- Validation: `tsc` clean, `eslint` clean on touched files, `npm test`
+  51/51, `expo export -p web` pass.
+- Known limitation: needs on-device verification (fresh signup path,
+  grant/deny/Settings paths, iOS Allow-Once re-check, confirmation-required
+  signups skip the flow since no session exists yet).
+
 ## 2026-09-27 — Docs: README rewritten for the 2026-09-25–27 architecture
 
 - Change: `README.md` rewritten against the last 3 days of changelog

@@ -4,14 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { CopyButton } from '@/components/CopyButton';
+import { HeaderBack } from '@/components/HeaderBack';
+import { RedScreen } from '@/components/RedScreen';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
 import { ListRow } from '@/components/ui/ListRow';
-import { GlassHeader } from '@/components/GlassHeader';
-import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useRealtimeReload } from '@/hooks/useRealtimeReload';
@@ -108,32 +107,34 @@ export default function OrderConfirmationScreen() {
 
   if (status === 'loading' || !orders) {
     return (
-      <>
-        <GlassHeader title="Request Submitted" forceFallback fallbackHref="/(requester)" />
-        <Screen beneathHeader>
-          {status === 'loading' ? (
-            <SkeletonDetail label="Confirming your request" />
-          ) : loadFailed ? (
-            <ErrorState
-              title="Couldn't load the confirmation"
-              message="Check your connection and try again."
-              retryTitle="Try again"
-              onRetry={() => {
-                setLoadFailed(false);
-                setStatus('loading');
-                setRetryToken((t) => t + 1);
-              }}
-            />
-          ) : (
-            <ErrorState
-              title="Nothing to confirm"
-              message="These requests aren't available to you. Check Requests for your orders."
-              retryTitle="View Requests"
-              onRetry={() => router.push('/(requester)/orders')}
-            />
-          )}
-        </Screen>
-      </>
+      <RedScreen
+        title="Request Submitted"
+        titleSize="title"
+        leading={
+          <HeaderBack fallbackHref="/(requester)" forceFallback color={colors.onPrimary} />
+        }>
+        {status === 'loading' ? (
+          <SkeletonDetail label="Confirming your request" />
+        ) : loadFailed ? (
+          <ErrorState
+            title="Couldn't load the confirmation"
+            message="Check your connection and try again."
+            retryTitle="Try again"
+            onRetry={() => {
+              setLoadFailed(false);
+              setStatus('loading');
+              setRetryToken((t) => t + 1);
+            }}
+          />
+        ) : (
+          <ErrorState
+            title="Nothing to confirm"
+            message="These requests aren't available to you. Check Requests for your orders."
+            retryTitle="View Requests"
+            onRetry={() => router.push('/(requester)/orders')}
+          />
+        )}
+      </RedScreen>
     );
   }
 
@@ -145,14 +146,17 @@ export default function OrderConfirmationScreen() {
   );
 
   return (
-    <>
+    <RedScreen
+      title="Request Submitted"
+      titleSize="title"
+      leading={
+        <HeaderBack fallbackHref="/(requester)" forceFallback color={colors.onPrimary} />
+      }
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
+      }>
       {/* Back always replaces Home: this screen is terminal for its flow,
           so history must never lead back into payment or an emptied cart. */}
-      <GlassHeader title="Request Submitted" forceFallback fallbackHref="/(requester)" />
-      <Screen beneathHeader
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor={colors.primary} />
-        }>
         <View style={styles.hero}>
           <View style={styles.heroCircle}>
             <MaterialIcons name="send" size={44} color={colors.primary} accessibilityLabel="Request sent" />
@@ -226,7 +230,7 @@ export default function OrderConfirmationScreen() {
 
         <Text variant="subtitle">Order Summary</Text>
         {single ? (
-          <Card>
+          <View style={styles.summaryBlock}>
             <View style={styles.row}>
               <MaterialIcons name="storefront" size={20} color={colors.primary} />
               <View style={styles.rowText}>
@@ -249,37 +253,38 @@ export default function OrderConfirmationScreen() {
                 {formatMYR(orderTotalCents(single.subtotalCents, single.deliveryFeeCents))}
               </Text>
             </View>
-          </Card>
+          </View>
         ) : (
-          <Card style={styles.listCard}>
-            {orders.map((order) => (
-              <ListRow
+          <View>
+            {orders.map((order, index) => (
+              <View
                 key={order.id}
-                icon="receipt-long"
-                title={order.vendor.name}
-                subtitle={`#${order.id.slice(0, 8)} · ${orderItemsTitle(order.items)}`}
-                onPress={() =>
-                  router.push({ pathname: '/(requester)/orders/[id]', params: { id: order.id } })
-                }
-                right={
-                  <Text variant="secondary" style={styles.rowTotal}>
-                    {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
-                  </Text>
-                }
-              />
+                style={index < orders.length - 1 ? styles.divider : undefined}>
+                <ListRow
+                  icon="receipt-long"
+                  title={order.vendor.name}
+                  subtitle={`#${order.id.slice(0, 8)} · ${orderItemsTitle(order.items)}`}
+                  onPress={() =>
+                    router.push({ pathname: '/(requester)/orders/[id]', params: { id: order.id } })
+                  }
+                  right={
+                    <Text variant="secondary" style={styles.rowTotal}>
+                      {formatMYR(orderTotalCents(order.subtotalCents, order.deliveryFeeCents))}
+                    </Text>
+                  }
+                />
+              </View>
             ))}
-          </Card>
+          </View>
         )}
 
         <Text variant="subtitle">Drop-off Location</Text>
-        <Card>
-          <View style={styles.row}>
-            <MaterialIcons name="place" size={20} color={colors.error} />
-            <Text variant="secondary" style={styles.rowText} numberOfLines={2}>
-              {locationName ?? 'Drop-off location not set'}
-            </Text>
-          </View>
-        </Card>
+        <View style={styles.row}>
+          <MaterialIcons name="place" size={20} color={colors.error} />
+          <Text variant="secondary" style={styles.rowText} numberOfLines={2}>
+            {locationName ?? 'Drop-off location not set'}
+          </Text>
+        </View>
 
         {single ? (
           <Button
@@ -325,8 +330,7 @@ export default function OrderConfirmationScreen() {
             }}
           />
         ) : null}
-      </Screen>
-    </>
+      </RedScreen>
   );
 }
 
@@ -361,11 +365,12 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   statusText: { flex: 1, gap: spacing.xs },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+  summaryBlock: { gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { flex: 1, fontWeight: '600', color: colors.text },
   vendorName: { fontWeight: '600', color: colors.text },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   summaryTotal: { fontVariant: ['tabular-nums'] as const },
   rowTotal: { fontWeight: '700', color: colors.primary },
-  listCard: { gap: 0 },
 });

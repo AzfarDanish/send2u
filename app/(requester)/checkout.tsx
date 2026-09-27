@@ -3,19 +3,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 
-import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBack } from '@/components/HeaderBack';
 import { DeliverToSheet, locationTypeIcon } from '@/components/location/DeliverToSheet';
 import { paymentBrandIcon } from '@/components/payment/brandIcons';
 import { PlaceholderImage } from '@/components/PlaceholderImage';
+import { RedScreen } from '@/components/RedScreen';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { DockedActionBar } from '@/components/ui/DockedActionBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Input } from '@/components/ui/Input';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
@@ -131,34 +130,40 @@ export default function CheckoutScreen() {
 
   if (!cart) {
     return (
-      <>
-        <GlassHeader title="Checkout" fallbackHref="/(requester)" />
-        <Screen beneathHeader>
-          <EmptyState
-            icon="shopping-cart"
-            title="Nothing to check out"
-            message="This vendor's cart is empty."
-            actionTitle="Back to carts"
-            onAction={() => goBackOr('/(requester)/carts')}
-          />
-        </Screen>
-      </>
+      <RedScreen
+        title="Checkout"
+        titleSize="title"
+        leading={<HeaderBack fallbackHref="/(requester)" color={colors.onPrimary} />}>
+        <EmptyState
+          icon="shopping-cart"
+          title="Nothing to check out"
+          message="This vendor's cart is empty."
+          actionTitle="Back to carts"
+          onAction={() => goBackOr('/(requester)/carts')}
+        />
+      </RedScreen>
     );
   }
 
   return (
-    <>
-      <GlassHeader title={`${cart.vendorName} · Checkout`} fallbackHref="/(requester)/carts" />
-      <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
-          <Text variant="subtitle">Items ({cart.lines.reduce((s, l) => s + l.quantity, 0)})</Text>
-          <Card style={styles.itemsCard}>
-            {cart.lines.map((line) => (
-              <View key={line.item.id} style={styles.itemRow}>
+    <RedScreen
+      title={`${cart.vendorName} · Checkout`}
+      titleSize="title"
+      leading={<HeaderBack fallbackHref="/(requester)/carts" color={colors.onPrimary} />}
+      scrollable={false}
+      contentStyle={styles.shell}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+        <Text variant="subtitle">Items ({cart.lines.reduce((s, l) => s + l.quantity, 0)})</Text>
+        <View>
+          {cart.lines.map((line, index) => (
+            <View
+              key={line.item.id}
+              style={index < cart.lines.length - 1 ? styles.divider : undefined}>
+              <View style={styles.itemRow}>
                 <View style={styles.thumb}>
                   <PlaceholderImage style={styles.thumbImage} />
                 </View>
@@ -196,133 +201,126 @@ export default function CheckoutScreen() {
                   <MaterialIcons name="close" size={20} color={colors.muted} />
                 </PressableScale>
               </View>
-            ))}
-          </Card>
+            </View>
+          ))}
+        </View>
 
-          <Text variant="subtitle" style={styles.sectionLabel}>
-            Delivery Location
-          </Text>
-          {saved.status === 'loading' ? (
-            <Card>
-              <SkeletonList rows={1} lines={2} thumb={44} label="Loading saved locations" />
-            </Card>
-          ) : null}
-          {saved.status === 'error' ? (
-            <Card style={styles.stateCard}>
-              <ErrorState
-                title="Couldn't load locations"
-                message={saved.error ?? 'Check your connection and try again.'}
-                retryTitle="Try again"
-                onRetry={saved.retry}
-              />
-            </Card>
-          ) : null}
-          {saved.status === 'empty' ? (
-            <Card style={styles.stateCard}>
-              <EmptyState
-                icon="place"
-                title="No saved locations"
-                message="Save your first delivery spot to check out."
-                actionTitle="Set a location"
-                onAction={() => router.push('/(requester)/set-location')}
-              />
-            </Card>
-          ) : null}
-          {saved.status === 'ready' ? (
-            <Card style={styles.locationCard}>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel={
-                  activeSaved
-                    ? `Deliver to ${activeSaved.label}. Change saved location.`
-                    : 'Choose a saved location'
-                }
-                onPress={() => setSheetOpen(true)}
-                haptic="selection"
-                style={styles.savedRow}>
-                <View style={styles.iconChip}>
-                  <MaterialIcons
-                    name={activeSaved ? locationTypeIcon(activeSaved.locationType) : 'place'}
-                    size={22}
-                    color={colors.primary}
-                  />
-                </View>
-                <View style={styles.itemText}>
-                  <Text variant="secondary" style={styles.itemName} numberOfLines={1}>
-                    {activeSaved ? activeSaved.label : 'Choose a saved location'}
-                  </Text>
-                  {activeSaved?.subDetails ? (
-                    <Text variant="caption" color="secondary" numberOfLines={2}>
-                      {activeSaved.subDetails}
-                    </Text>
-                  ) : null}
-                </View>
-                <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
-              </PressableScale>
-              <Input
-                label="Delivery instruction (optional)"
-                placeholder="How does the helper recognise the spot?"
-                value={instruction}
-                onChangeText={setInstruction}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                maxLength={500}
-              />
-              <View style={styles.leaveRow}>
-                <View style={styles.itemText}>
-                  <Text variant="secondary" style={styles.itemName}>
-                    Leave at the door
-                  </Text>
-                  <Text variant="caption" color="secondary">
-                    The helper drops off without a handover.
-                  </Text>
-                </View>
-                <Switch
-                  accessibilityRole="switch"
-                  accessibilityLabel="Leave at the door"
-                  accessibilityState={{ checked: leaveAtDoor }}
-                  value={leaveAtDoor}
-                  onValueChange={setLeaveAtDoor}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={colors.surface}
-                />
-              </View>
-            </Card>
-          ) : null}
-
-          <Text variant="subtitle" style={styles.sectionLabel}>
-            Payment Method
-          </Text>
-          <Card>
+        <Text variant="subtitle" style={styles.sectionLabel}>
+          Delivery Location
+        </Text>
+        {saved.status === 'loading' ? (
+          <SkeletonList rows={1} lines={2} thumb={44} label="Loading saved locations" />
+        ) : null}
+        {saved.status === 'error' ? (
+          <ErrorState
+            title="Couldn't load locations"
+            message={saved.error ?? 'Check your connection and try again.'}
+            retryTitle="Try again"
+            onRetry={saved.retry}
+          />
+        ) : null}
+        {saved.status === 'empty' ? (
+          <EmptyState
+            icon="place"
+            title="No saved locations"
+            message="Save your first delivery spot to check out."
+            actionTitle="Set a location"
+            onAction={() => router.push('/(requester)/set-location')}
+          />
+        ) : null}
+        {saved.status === 'ready' ? (
+          <View style={styles.locationBlock}>
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel={
-                brand ? `Pay with ${brand.label}. Change payment method.` : 'Choose a payment method'
+                activeSaved
+                  ? `Deliver to ${activeSaved.label}. Change saved location.`
+                  : 'Choose a saved location'
               }
-              onPress={() => router.push('/(requester)/payment-method')}
+              onPress={() => setSheetOpen(true)}
               haptic="selection"
               style={styles.savedRow}>
               <View style={styles.iconChip}>
                 <MaterialIcons
-                  name={brand ? paymentBrandIcon(brand.id) : 'payment'}
+                  name={activeSaved ? locationTypeIcon(activeSaved.locationType) : 'place'}
                   size={22}
                   color={colors.primary}
                 />
               </View>
               <View style={styles.itemText}>
                 <Text variant="secondary" style={styles.itemName} numberOfLines={1}>
-                  {brand ? brand.label : 'Choose a payment method'}
+                  {activeSaved ? activeSaved.label : 'Choose a saved location'}
                 </Text>
-                {brand ? (
-                  <Text variant="caption" color="secondary" numberOfLines={1}>
-                    {brand.hint}
+                {activeSaved?.subDetails ? (
+                  <Text variant="caption" color="secondary" numberOfLines={2}>
+                    {activeSaved.subDetails}
                   </Text>
                 ) : null}
               </View>
               <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
             </PressableScale>
-          </Card>
+            <Input
+              label="Delivery instruction (optional)"
+              placeholder="How does the helper recognise the spot?"
+              value={instruction}
+              onChangeText={setInstruction}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              maxLength={500}
+            />
+            <View style={styles.leaveRow}>
+              <View style={styles.itemText}>
+                <Text variant="secondary" style={styles.itemName}>
+                  Leave at the door
+                </Text>
+                <Text variant="caption" color="secondary">
+                  The helper drops off without a handover.
+                </Text>
+              </View>
+              <Switch
+                accessibilityRole="switch"
+                accessibilityLabel="Leave at the door"
+                accessibilityState={{ checked: leaveAtDoor }}
+                value={leaveAtDoor}
+                onValueChange={setLeaveAtDoor}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.surface}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        <Text variant="subtitle" style={styles.sectionLabel}>
+          Payment Method
+        </Text>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={
+            brand ? `Pay with ${brand.label}. Change payment method.` : 'Choose a payment method'
+          }
+          onPress={() => router.push('/(requester)/payment-method')}
+          haptic="selection"
+          style={styles.savedRow}>
+          <View style={styles.iconChip}>
+            <MaterialIcons
+              name={brand ? paymentBrandIcon(brand.id) : 'payment'}
+              size={22}
+              color={colors.primary}
+            />
+          </View>
+          <View style={styles.itemText}>
+            <Text variant="secondary" style={styles.itemName} numberOfLines={1}>
+              {brand ? brand.label : 'Choose a payment method'}
+            </Text>
+            {brand ? (
+              <Text variant="caption" color="secondary" numberOfLines={1}>
+                {brand.hint}
+              </Text>
+            ) : null}
+          </View>
+          <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
+        </PressableScale>
 
           <Text variant="subtitle" style={styles.sectionLabel}>
             Order Summary
@@ -398,8 +396,7 @@ export default function CheckoutScreen() {
           onRetry={saved.retry}
           onOpenRefresh={saved.refresh}
         />
-      </Screen>
-    </>
+    </RedScreen>
   );
 }
 
@@ -413,7 +410,8 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   sectionLabel: { marginTop: spacing.sm },
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   thumb: {
     width: 64,
     height: 64,
@@ -424,7 +422,6 @@ const styles = StyleSheet.create({
   thumbImage: { borderRadius: radii.md },
   itemText: { flex: 1, gap: spacing.xs },
   itemName: { fontWeight: '600', color: colors.text },
-  itemsCard: { gap: spacing.md },
   stepperWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   qty: { minWidth: 28, textAlign: 'center' },
   removeButton: {
@@ -434,7 +431,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  locationCard: { gap: spacing.md },
+  locationBlock: { gap: spacing.md },
   savedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   iconChip: {
     width: 44,
@@ -449,5 +446,4 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   summaryItem: { flex: 1 },
   numeric: { fontVariant: ['tabular-nums'] as const },
-  stateCard: { minHeight: 160, justifyContent: 'center' },
 });

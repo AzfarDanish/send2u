@@ -6,12 +6,11 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { DockedActionBar } from '@/components/ui/DockedActionBar';
-import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonDetail } from '@/components/ui/LoadingBlocks';
-import { GlassHeader } from '@/components/GlassHeader';
-import { Screen } from '@/components/ui/Screen';
+import { HeaderBack } from '@/components/HeaderBack';
+import { RedScreen } from '@/components/RedScreen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { emitOrderChanged } from '@/lib/orderEvents';
@@ -137,17 +136,17 @@ export default function OrderConfirmScreen() {
 
   if (!orderId) {
     return (
-      <>
-        <GlassHeader title="Confirm Delivery" />
-        <Screen beneathHeader>
-          <ErrorState
-            title="Request not found"
-            message="This request isn't available to you."
-            retryTitle="Back to requests"
-            onRetry={() => router.push('/(requester)/orders')}
-          />
-        </Screen>
-      </>
+      <RedScreen
+        title="Confirm Delivery"
+        titleSize="title"
+        leading={<HeaderBack fallbackHref="/(requester)/orders" color={colors.onPrimary} />}>
+        <ErrorState
+          title="Request not found"
+          message="This request isn't available to you."
+          retryTitle="Back to requests"
+          onRetry={() => router.push('/(requester)/orders')}
+        />
+      </RedScreen>
     );
   }
 
@@ -158,13 +157,21 @@ export default function OrderConfirmScreen() {
       order.status === 'completed');
 
   return (
-    <>
-      <GlassHeader title="Confirm Delivery" />
-      <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}>
+    <RedScreen
+      title="Confirm Delivery"
+      titleSize="title"
+      leading={
+        <HeaderBack
+          fallbackHref={orderId ? `/(requester)/orders/${orderId}` : '/(requester)/orders'}
+          color={colors.onPrimary}
+        />
+      }
+      scrollable={false}
+      contentStyle={styles.shell}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}>
         {status === 'loading' || !order ? (
           status === 'loading' ? (
             <SkeletonDetail label="Loading request" />
@@ -269,7 +276,7 @@ export default function OrderConfirmScreen() {
             </View>
 
             <Text variant="subtitle">Order Summary</Text>
-            <Card>
+            <View>
               <View style={styles.row}>
                 <MaterialIcons name="storefront" size={20} color={colors.primary} />
                 <Text variant="secondary" style={styles.rowText} numberOfLines={2}>
@@ -288,9 +295,9 @@ export default function OrderConfirmScreen() {
                   {order.location.name}
                 </Text>
               </View>
-            </Card>
+            </View>
 
-            <Card>
+            <View>
               <View style={styles.checkTitle}>
                 <MaterialIcons name="error" size={22} color={colors.error} />
                 <Text variant="secondary" style={styles.checkHeading}>
@@ -305,7 +312,7 @@ export default function OrderConfirmScreen() {
                   </Text>
                 </View>
               ))}
-            </Card>
+            </View>
 
             {refreshing ? (
               <View style={styles.refreshRow}>
@@ -355,8 +362,7 @@ export default function OrderConfirmScreen() {
             />
           </DockedActionBar>
         ) : null}
-      </Screen>
-    </>
+    </RedScreen>
   );
 }
 

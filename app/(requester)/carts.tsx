@@ -1,15 +1,14 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBack } from '@/components/HeaderBack';
 import { VendorMark } from '@/components/VendorMark';
+import { RedScreen } from '@/components/RedScreen';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
@@ -60,108 +59,113 @@ export default function CartsScreen() {
   }, [lines]);
 
   return (
-    <>
-      <GlassHeader title="Your Carts" fallbackHref="/(requester)" />
-      <Screen beneathHeader>
-        {lines.length === 0 ? (
-          <EmptyState
-            icon="shopping-cart"
-            title="No carts yet"
-            message="Items you add land here, grouped by vendor, until you check out."
-            actionTitle="Browse menu"
-            onAction={() => router.replace('/(requester)')}
-          />
-        ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.content}>
-            {carts.map((cart) => (
-              <View key={cart.vendorId} style={styles.cartBlock}>
-                {/* Vendor header row */}
-                <View style={styles.vendorRow}>
-                  <VendorMark name={cart.vendorName} size={44} />
-                  <View style={styles.vendorText}>
-                    <Text variant="subtitle" numberOfLines={1}>
-                      {cart.vendorName}
-                    </Text>
-                    <Text variant="caption" color="secondary">
-                      {cart.lines.reduce((sum, line) => sum + line.quantity, 0)} item
-                      {cart.lines.reduce((sum, line) => sum + line.quantity, 0) === 1 ? '' : 's'}
+    <RedScreen
+      title="Your Carts"
+      titleSize="title"
+      leading={<HeaderBack fallbackHref="/(requester)" color={colors.onPrimary} />}>
+      {lines.length === 0 ? (
+        <EmptyState
+          icon="shopping-cart"
+          title="No carts yet"
+          message="Items you add land here, grouped by vendor, until you check out."
+          actionTitle="Browse menu"
+          onAction={() => router.replace('/(requester)')}
+        />
+      ) : (
+        carts.map((cart) => (
+          <View key={cart.vendorId} style={styles.cartBlock}>
+            {/* Vendor header row */}
+            <View style={styles.vendorRow}>
+              <VendorMark name={cart.vendorName} size={44} />
+              <View style={styles.vendorText}>
+                <Text variant="subtitle" numberOfLines={1}>
+                  {cart.vendorName}
+                </Text>
+                <Text variant="caption" color="secondary">
+                  {cart.lines.reduce((sum, line) => sum + line.quantity, 0)} item
+                  {cart.lines.reduce((sum, line) => sum + line.quantity, 0) === 1 ? '' : 's'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Items belonging only to this vendor */}
+            <View>
+              {cart.lines.map((line, index) => (
+                <View
+                  key={line.item.id}
+                  style={index < cart.lines.length - 1 ? styles.divider : undefined}>
+                  <View style={styles.itemRow}>
+                    <View style={styles.itemText}>
+                      <Text variant="secondary" style={styles.itemName} numberOfLines={2}>
+                        {line.item.name}
+                      </Text>
+                      <Text variant="caption" color="secondary" style={styles.numeric}>
+                        {line.quantity} × {formatMYR(line.item.priceCents)}
+                      </Text>
+                    </View>
+                    <Text variant="secondary" style={styles.numeric}>
+                      {formatMYR(line.item.priceCents * line.quantity)}
                     </Text>
                   </View>
                 </View>
+              ))}
+            </View>
 
-                {/* Items belonging only to this vendor */}
-                <Card style={styles.itemsCard}>
-                  {cart.lines.map((line) => (
-                    <View key={line.item.id} style={styles.itemRow}>
-                      <View style={styles.itemText}>
-                        <Text variant="secondary" style={styles.itemName} numberOfLines={2}>
-                          {line.item.name}
-                        </Text>
-                        <Text variant="caption" color="secondary" style={styles.numeric}>
-                          {line.quantity} × {formatMYR(line.item.priceCents)}
-                        </Text>
-                      </View>
-                      <Text variant="secondary" style={styles.numeric}>
-                        {formatMYR(line.item.priceCents * line.quantity)}
-                      </Text>
-                    </View>
-                  ))}
-                </Card>
+            {/* Subtotals and actions, one cart per vendor */}
+            <View style={styles.subtotalRow}>
+              <Text color="secondary">Subtotal</Text>
+              <Text variant="subtitle" style={styles.numeric}>
+                {formatMYR(cart.subtotalCents)}
+              </Text>
+            </View>
 
-                {/* Subtotals and actions, one cart per vendor */}
-                <View style={styles.subtotalRow}>
-                  <Text color="secondary">Subtotal</Text>
-                  <Text variant="subtitle" style={styles.numeric}>
-                    {formatMYR(cart.subtotalCents)}
-                  </Text>
-                </View>
-
-                <View style={styles.actionsRow}>
-                  <Button
-                    title="Add more"
-                    variant="secondary"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(requester)/vendors/[id]',
-                        params: { id: cart.vendorId },
-                      })
-                    }
-                  />
-                  <PressableScale
-                    accessibilityRole="button"
-                    accessibilityLabel={`Continue to checkout for ${cart.vendorName}`}
-                    haptic="selection"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(requester)/checkout',
-                        params: { vendorId: cart.vendorId },
-                      })
-                    }
-                    style={styles.continueButton}>
-                    <Text variant="button" color="onPrimary">
-                      Continue
-                    </Text>
-                    <MaterialIcons name="chevron-right" size={20} color={colors.onPrimary} />
-                  </PressableScale>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-      </Screen>
-    </>
+            <View style={styles.actionsRow}>
+              <Button
+                title="Add more"
+                variant="secondary"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(requester)/vendors/[id]',
+                    params: { id: cart.vendorId },
+                  })
+                }
+              />
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={`Continue to checkout for ${cart.vendorName}`}
+                haptic="selection"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(requester)/checkout',
+                    params: { vendorId: cart.vendorId },
+                  })
+                }
+                style={styles.continueButton}>
+                <Text variant="button" color="onPrimary">
+                  Continue
+                </Text>
+                <MaterialIcons name="chevron-right" size={20} color={colors.onPrimary} />
+              </PressableScale>
+            </View>
+          </View>
+        ))
+      )}
+    </RedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.xl, paddingBottom: spacing.xxxl },
   cartBlock: { gap: spacing.md },
   vendorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   vendorText: { flex: 1, gap: spacing.xs },
-  itemsCard: { gap: spacing.md },
-  itemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
   itemText: { flex: 1, gap: spacing.xs },
   itemName: { fontWeight: '600', color: colors.text },
   numeric: { fontVariant: ['tabular-nums'] as const },

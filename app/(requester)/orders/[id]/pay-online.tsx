@@ -3,15 +3,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOr } from '@/lib/navigation';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
-import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBack } from '@/components/HeaderBack';
+import { RedScreen } from '@/components/RedScreen';
 import { OrderBreakdown } from '@/components/OrderBreakdown';
 import { Button } from '@/components/ui/Button';
 import { DockedActionBar } from '@/components/ui/DockedActionBar';
-import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonBlock, SkeletonKeyValueRows } from '@/components/ui/LoadingBlocks';
-import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, spacing } from '@/constants/theme';
 import { useTransaction } from '@/hooks/useTransaction';
@@ -41,17 +40,17 @@ export default function PayOnlineScreen() {
 
   if (!orderId) {
     return (
-      <>
-        <GlassHeader title="Online Payment" />
-        <Screen beneathHeader>
-          <ErrorState
-            title="Request not found"
-            message="This request isn't available to you."
-            retryTitle="Back to requests"
-            onRetry={() => router.push('/(requester)/orders')}
-          />
-        </Screen>
-      </>
+      <RedScreen
+        title="Online Payment"
+        titleSize="title"
+        leading={<HeaderBack fallbackHref="/(requester)/orders" color={colors.onPrimary} />}>
+        <ErrorState
+          title="Request not found"
+          message="This request isn't available to you."
+          retryTitle="Back to requests"
+          onRetry={() => router.push('/(requester)/orders')}
+        />
+      </RedScreen>
     );
   }
 
@@ -69,18 +68,30 @@ export default function PayOnlineScreen() {
     payPhase !== 'success';
 
   return (
-    <>
-      <GlassHeader title="Online Payment" />
-      <Screen beneathHeader scrollable={false} contentStyle={styles.shell}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}>
+    <RedScreen
+      title="Online Payment"
+      titleSize="title"
+      leading={
+        <HeaderBack
+          fallbackHref={
+            orderId
+              ? `/(requester)/orders/${orderId}`
+              : '/(requester)/orders'
+          }
+          color={colors.onPrimary}
+        />
+      }
+      scrollable={false}
+      contentStyle={styles.shell}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}>
         {status === 'loading' ? (
-          <Card>
+          <View>
             <SkeletonBlock lines={2} label="Loading payment" />
             <SkeletonKeyValueRows rows={4} />
-          </Card>
+          </View>
         ) : status === 'error' || !context ? (
           <ErrorState
             title="Couldn't load payment"
@@ -90,13 +101,13 @@ export default function PayOnlineScreen() {
           />
         ) : context.paymentMethod === 'cod' ? (
           <>
-            <Card>
+            <View>
               <Text variant="subtitle">Cash on Delivery</Text>
               <Text color="secondary">
                 Pay {formatMYR(context.totalCents)} in cash to your helper when your food
                 arrives. Nothing is due now.
               </Text>
-            </Card>
+            </View>
             <Button
               title="Back to Request"
               onPress={() =>
@@ -128,12 +139,10 @@ export default function PayOnlineScreen() {
                 preparing your food.
               </Text>
             </View>
-            <Card>
-              <OrderBreakdown
-                subtotalCents={context.subtotalCents}
-                deliveryFeeCents={context.deliveryFeeCents}
-              />
-            </Card>
+            <OrderBreakdown
+              subtotalCents={context.subtotalCents}
+              deliveryFeeCents={context.deliveryFeeCents}
+            />
             <Button
               title="Continue"
               accessibilityLabel="Continue to your submitted request"
@@ -151,7 +160,7 @@ export default function PayOnlineScreen() {
           </>
         ) : (
           <>
-            <Card>
+            <View>
               <View style={styles.amountRow}>
                 <View style={styles.amountText}>
                   <Text color="secondary">Amount Due</Text>
@@ -162,10 +171,10 @@ export default function PayOnlineScreen() {
                 subtotalCents={context.subtotalCents}
                 deliveryFeeCents={context.deliveryFeeCents}
               />
-            </Card>
+            </View>
 
             {processing ? (
-              <Card>
+              <View>
                 <View style={styles.processingRow}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text color="secondary">
@@ -175,7 +184,7 @@ export default function PayOnlineScreen() {
                 <Text variant="caption" color="muted">
                   Do not close this screen. Your payment is being recorded.
                 </Text>
-              </Card>
+              </View>
             ) : null}
 
             {failed && !processing ? (
@@ -203,22 +212,21 @@ export default function PayOnlineScreen() {
             ) : null}
           </>
         )}
-        </ScrollView>
-        {/* Fixed bottom sheet: Pay stays docked while the breakdown scrolls.
-            The button stays mounted through processing (disabled + loading)
-            instead of hiding, so the action context never jumps. */}
-        {payable && context ? (
-          <DockedActionBar>
-            <Button
-              title={failed ? 'Retry Payment' : `Pay ${formatMYR(context.totalCents)}`}
-              onPress={() => void pay(false)}
-              disabled={processing}
-              loading={processing}
-            />
-          </DockedActionBar>
-        ) : null}
-      </Screen>
-    </>
+      </ScrollView>
+      {/* Fixed bottom sheet: Pay stays docked while the breakdown scrolls.
+          The button stays mounted through processing (disabled + loading)
+          instead of hiding, so the action context never jumps. */}
+      {payable && context ? (
+        <DockedActionBar>
+          <Button
+            title={failed ? 'Retry Payment' : `Pay ${formatMYR(context.totalCents)}`}
+            onPress={() => void pay(false)}
+            disabled={processing}
+            loading={processing}
+          />
+        </DockedActionBar>
+      ) : null}
+    </RedScreen>
   );
 }
 

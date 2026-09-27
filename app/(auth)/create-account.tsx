@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import { spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import { markPermissionsOnboardingPending } from '@/lib/onboardingPermissions';
 import { updateMyProfile } from '@/services/auth';
 
 interface CreateAccountErrors {
@@ -87,6 +88,10 @@ export default function CreateAccountScreen() {
             : 'Your account was created, but your name could not be saved yet.',
         );
       }
+      // Fresh requester accounts owe the permissions walkthrough. The root
+      // gate picks this up on the auth-state redirect; best-effort so a
+      // flag write can never fail signup.
+      await markPermissionsOnboardingPending(result.user.id);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Authentication failed.');
     } finally {

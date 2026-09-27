@@ -20,12 +20,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GlassHeader, GLASS_HEADER_ROW } from '@/components/GlassHeader';
+import { GLASS_HEADER_ROW } from '@/components/GlassHeader';
+import { FloatingBackButton } from '@/components/FloatingBackButton';
 import { locationTypeIcon } from '@/components/location/DeliverToSheet';
 import { DeliveryMap } from '@/components/map/DeliveryMap';
 import { matchesSearch } from '@/components/SearchBar';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { DockedActionBar } from '@/components/ui/DockedActionBar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -673,8 +673,8 @@ export default function SetLocationScreen() {
                   returnKeyType="next"
                 />
                 {buildingFocused && suggestions.length > 0 ? (
-                  <Card style={styles.suggestionCard}>
-                    {suggestions.map((suggestion) => (
+                  <View style={styles.suggestionList}>
+                    {suggestions.map((suggestion, index) => (
                       <PressableScale
                         key={suggestion.title}
                         accessibilityRole="button"
@@ -685,7 +685,10 @@ export default function SetLocationScreen() {
                           markTouched('building');
                         }}
                         haptic="selection"
-                        style={styles.suggestionRow}>
+                        style={[
+                          styles.suggestionRow,
+                          index < suggestions.length - 1 ? styles.divider : undefined,
+                        ]}>
                         <MaterialIcons name="place" size={20} color={colors.primary} />
                         <View style={styles.suggestionText}>
                           <Text variant="secondary" style={styles.suggestionTitle} numberOfLines={1}>
@@ -699,7 +702,7 @@ export default function SetLocationScreen() {
                         </View>
                       </PressableScale>
                     ))}
-                  </Card>
+                  </View>
                 ) : null}
                 {geoSuggestion && !buildingFocused ? (
                   <PressableScale
@@ -812,7 +815,7 @@ export default function SetLocationScreen() {
               ) : null}
 
               {resolvedText !== '' || pin !== null ? (
-                <Card style={styles.summaryCard}>
+                <View style={styles.summaryBlock}>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryIcon}>
                       <MaterialIcons
@@ -844,7 +847,7 @@ export default function SetLocationScreen() {
                       Edit fields
                     </Text>
                   </PressableScale>
-                </Card>
+                </View>
               ) : null}
 
               <View style={styles.noteRow}>
@@ -879,13 +882,18 @@ export default function SetLocationScreen() {
         </KeyboardAvoidingView>
       </Animated.View>
 
-      <GlassHeader title={editingId ? 'Edit Location' : 'Set Location'} />
+      {/* Floating back disc in the header band, helper-map language: the map
+          box and every snap are untouched, so only the chrome changes. */}
+      <View style={[styles.backDisc, { top: insets.top + (GLASS_HEADER_ROW - 44) / 2 }]}>
+        <FloatingBackButton fallbackHref="/(requester)" accessibilityLabel="Back" />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  backDisc: { position: 'absolute', left: spacing.md, zIndex: 50 },
   mapArea: { position: 'absolute', left: 0, right: 0 },
   map: { flex: 1, borderRadius: 0 },
   // The sheet is exactly as tall as the expanded visible area, translated
@@ -994,7 +1002,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  suggestionCard: { marginTop: spacing.sm, gap: 0, paddingVertical: spacing.xs },
+  suggestionList: {
+    marginTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.divider,
+  },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   geoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1020,7 +1034,12 @@ const styles = StyleSheet.create({
   categorySelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   categoryLabel: { color: colors.secondary, textAlign: 'center' },
   categoryLabelSelected: { color: colors.primary, fontWeight: '600', textAlign: 'center' },
-  summaryCard: { gap: spacing.sm },
+  summaryBlock: {
+    gap: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.divider,
+    paddingTop: spacing.md,
+  },
   summaryRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   summaryIcon: {
     width: 44,

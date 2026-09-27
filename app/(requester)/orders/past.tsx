@@ -2,12 +2,12 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router } from 'expo-router';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
-import { GlassHeader } from '@/components/GlassHeader';
+import { HeaderBack } from '@/components/HeaderBack';
+import { RedScreen } from '@/components/RedScreen';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonList } from '@/components/ui/LoadingBlocks';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { colors, radii, spacing, touchTargets } from '@/constants/theme';
 import { useMyOrderHistory } from '@/hooks/useMyOrderHistory';
@@ -31,46 +31,45 @@ export default function PastOrdersScreen() {
   const { orders, status, error, refreshing, retry, refresh } = useMyOrderHistory();
 
   return (
-    <>
-      <GlassHeader title="Past orders" fallbackHref="/(requester)/profile" />
-      <Screen
-        beneathHeader
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void refresh()}
-            tintColor={colors.primary}
-          />
-        }>
-        {status === 'loading' ? (
-          <SkeletonList rows={4} lines={2} thumb={44} label="Loading past orders" />
-        ) : null}
-        {status === 'error' ? (
-          <ErrorState
-            title="Couldn't load past orders"
-            message={error ?? 'Check your connection and try again.'}
-            retryTitle="Try again"
-            onRetry={retry}
-          />
-        ) : null}
-        {status === 'empty' ? (
-          <EmptyState
-            icon="history"
-            title="No past orders yet"
-            message="Delivered, cancelled, and disputed requests are kept here."
-            actionTitle="Browse the menu"
-            onAction={() => router.push('/(requester)')}
-          />
-        ) : null}
-        {status === 'ready'
-          ? orders.map((order, index) => (
-              <View key={order.id} style={index < orders.length - 1 ? styles.divider : undefined}>
-                <PastOrderRow order={order} />
-              </View>
-            ))
-          : null}
-      </Screen>
-    </>
+    <RedScreen
+      title="Past orders"
+      titleSize="title"
+      leading={<HeaderBack fallbackHref="/(requester)/profile" color={colors.onPrimary} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
+          tintColor={colors.primary}
+        />
+      }>
+      {status === 'loading' ? (
+        <SkeletonList rows={4} lines={2} thumb={44} label="Loading past orders" />
+      ) : null}
+      {status === 'error' ? (
+        <ErrorState
+          title="Couldn't load past orders"
+          message={error ?? 'Check your connection and try again.'}
+          retryTitle="Try again"
+          onRetry={retry}
+        />
+      ) : null}
+      {status === 'empty' ? (
+        <EmptyState
+          icon="history"
+          title="No past orders yet"
+          message="Delivered, cancelled, and disputed requests are kept here."
+          actionTitle="Browse the menu"
+          onAction={() => router.push('/(requester)')}
+        />
+      ) : null}
+      {status === 'ready'
+        ? orders.map((order, index) => (
+            <View key={order.id} style={index < orders.length - 1 ? styles.divider : undefined}>
+              <PastOrderRow order={order} />
+            </View>
+          ))
+        : null}
+    </RedScreen>
   );
 }
 

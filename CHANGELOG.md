@@ -10,6 +10,19 @@ Standing notes (not repeated per entry): on-device verification is pending
 unless an entry says otherwise; web screenshots are layout-representative
 only. No secrets are ever recorded here.
 
+## 2026-09-27 — Build: Android preview APK from clean tree (redesign + onboarding)
+
+- Change: cloud build `f7b55a2f-51bc-423f-87f9-c8ac2643f03e` FINISHED —
+  `com.azfardanish.send2u` v1.0.0 (code 1). Built from committed
+  `0eec7b7e`, so this APK carries the purchase-path RedScreen redesign and
+  the post-signup permissions onboarding. No code changed for the build.
+- Reason: installable APK with clean provenance for on-device verification.
+- Details: `eas build -p android --profile preview --non-interactive`;
+  applicationId verified on the artifact with `aapt2 dump badging`.
+- Validation: EAS status FINISHED; artifact downloads and badges correctly.
+- Known limitation: not installed/run on the ELP_NX9 device yet.
+  Install: https://expo.dev/accounts/azfardns/projects/send2u/builds/f7b55a2f-51bc-423f-87f9-c8ac2643f03e
+
 ## 2026-09-27 — Redesign: purchase path on the RedScreen shell + flat sections
 
 - Change: carts, checkout, set-location, order confirmation, pay-online,
